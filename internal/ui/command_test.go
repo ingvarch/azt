@@ -26,9 +26,9 @@ func TestParseCommand(t *testing.T) {
 		{in: "acr", kind: cmdView, title: "containerregistry/registries"},
 		{in: "nsg", kind: cmdView, title: "network/networksecuritygroups"},
 		{in: "NSG", kind: cmdView, title: "network/networksecuritygroups"},
-		{in: "dns", kind: cmdView, title: "network/dnszones"},
-		{in: "pdns", kind: cmdView, title: "network/privatednszones"},
-		{in: "PDNS", kind: cmdView, title: "network/privatednszones"},
+		{in: "dns", kind: cmdView, title: "network/dnszones, network/privatednszones"},
+		{in: "pdns", err: "unknown command: pdns"},
+		{in: "PDNS", err: "unknown command: PDNS"},
 		{in: "type microsoft.cache/redis", kind: cmdView, title: "cache/redis"},
 		{in: "  type   microsoft.cache/redis  ", kind: cmdView, title: "cache/redis"},
 		{in: "VM", kind: cmdView, title: "compute/virtualmachines"},
@@ -66,6 +66,23 @@ func TestParseCommand(t *testing.T) {
 	}
 }
 
+func TestParseCommandTypes(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"dns", "microsoft.network/dnszones,microsoft.network/privatednszones"},
+		{"app", "microsoft.web/sites"},
+		{"type microsoft.web/sites", "microsoft.web/sites"},
+	}
+	for _, tt := range tests {
+		c, err := parseCommand(tt.in)
+		if err != nil {
+			t.Fatalf("parseCommand(%q) error = %v", tt.in, err)
+		}
+		if got := c.view.Spec().Type; got != tt.want {
+			t.Errorf("parseCommand(%q) types = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
 func TestCommandTable(t *testing.T) {
 	want := []commandInfo{
 		{"subs", "subscriptions"},
@@ -80,8 +97,7 @@ func TestCommandTable(t *testing.T) {
 		{"mi", "managed identities in every subscription"},
 		{"acr", "container registries in every subscription"},
 		{"nsg", "network security groups in every subscription"},
-		{"dns", "DNS zones in every subscription"},
-		{"pdns", "private DNS zones in every subscription"},
+		{"dns", "public and private DNS zones in every subscription"},
 		{"type", "resources of any type: type <resource type>"},
 		{"help", "keys and commands"},
 		{"q", "quit"},
@@ -106,8 +122,8 @@ func TestMatchingCommands(t *testing.T) {
 		{"ac", []string{"acr"}},
 		{"ns", []string{"nsg"}},
 		{"d", []string{"dns"}},
-		{"p", []string{"pdns"}},
-		{"pd", []string{"pdns"}},
+		{"p", nil},
+		{"pd", nil},
 		{"zzz", nil},
 	}
 	for _, tt := range tests {

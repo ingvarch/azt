@@ -196,6 +196,23 @@ func TestAllResourceGroups(t *testing.T) {
 	}
 }
 
+func TestResourcesOfTypeTakesSeveralTypes(t *testing.T) {
+	graph := &fakeGraph{pages: []armresourcegraph.ClientResourcesResponse{page(nil)}}
+
+	if _, err := ResourcesOfType(context.Background(), graph, []string{"Microsoft.A/x", "microsoft.b/y'z"}); err != nil {
+		t.Fatal(err)
+	}
+
+	wantQuery := `resources
+| where type in~ ('Microsoft.A/x', 'microsoft.b/y\'z')
+` + wantJoin + `
+| project id, name, type, location, resourceGroup, subscriptionId, subscription
+| order by name asc`
+	if got := *graph.requests[0].Query; got != wantQuery {
+		t.Errorf("query = %q, want %q", got, wantQuery)
+	}
+}
+
 func TestResourcesOfType(t *testing.T) {
 	graph := &fakeGraph{pages: []armresourcegraph.ClientResourcesResponse{
 		page(nil, map[string]any{
@@ -204,7 +221,7 @@ func TestResourcesOfType(t *testing.T) {
 		}),
 	}}
 
-	got, err := ResourcesOfType(context.Background(), graph, "microsoft.x/it's")
+	got, err := ResourcesOfType(context.Background(), graph, []string{"microsoft.x/it's"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +238,7 @@ func TestResourcesOfType(t *testing.T) {
 		t.Errorf("scope = %v, want empty", got)
 	}
 	wantQuery := `resources
-| where type =~ 'microsoft.x/it\'s'
+| where type in~ ('microsoft.x/it\'s')
 ` + wantJoin + `
 | project id, name, type, location, resourceGroup, subscriptionId, subscription
 | order by name asc`

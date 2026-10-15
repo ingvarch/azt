@@ -74,18 +74,17 @@ func TestKindsListEachTypeOnce(t *testing.T) {
 
 func TestTypeCommands(t *testing.T) {
 	want := []TypeCommand{
-		{"vm", "virtual machines in every subscription", "microsoft.compute/virtualmachines"},
-		{"aks", "AKS clusters in every subscription", "microsoft.containerservice/managedclusters"},
-		{"kv", "key vaults in every subscription", "microsoft.keyvault/vaults"},
-		{"sql", "SQL servers in every subscription", "microsoft.sql/servers"},
-		{"storage", "storage accounts in every subscription", "microsoft.storage/storageaccounts"},
-		{"app", "web apps in every subscription", "microsoft.web/sites"},
-		{"vnet", "virtual networks in every subscription", "microsoft.network/virtualnetworks"},
-		{"mi", "managed identities in every subscription", "microsoft.managedidentity/userassignedidentities"},
-		{"acr", "container registries in every subscription", "microsoft.containerregistry/registries"},
-		{"nsg", "network security groups in every subscription", "microsoft.network/networksecuritygroups"},
-		{"dns", "DNS zones in every subscription", "microsoft.network/dnszones"},
-		{"pdns", "private DNS zones in every subscription", "microsoft.network/privatednszones"},
+		{"vm", "virtual machines in every subscription", []string{"microsoft.compute/virtualmachines"}},
+		{"aks", "AKS clusters in every subscription", []string{"microsoft.containerservice/managedclusters"}},
+		{"kv", "key vaults in every subscription", []string{"microsoft.keyvault/vaults"}},
+		{"sql", "SQL servers in every subscription", []string{"microsoft.sql/servers"}},
+		{"storage", "storage accounts in every subscription", []string{"microsoft.storage/storageaccounts"}},
+		{"app", "web apps in every subscription", []string{"microsoft.web/sites"}},
+		{"vnet", "virtual networks in every subscription", []string{"microsoft.network/virtualnetworks"}},
+		{"mi", "managed identities in every subscription", []string{"microsoft.managedidentity/userassignedidentities"}},
+		{"acr", "container registries in every subscription", []string{"microsoft.containerregistry/registries"}},
+		{"nsg", "network security groups in every subscription", []string{"microsoft.network/networksecuritygroups"}},
+		{"dns", "public and private DNS zones in every subscription", []string{"microsoft.network/dnszones", "microsoft.network/privatednszones"}},
 	}
 	if got := TypeCommands(); !reflect.DeepEqual(got, want) {
 		t.Errorf("TypeCommands() = %v, want %v", got, want)
@@ -94,7 +93,24 @@ func TestTypeCommands(t *testing.T) {
 
 func TestTypeCommandsSkipKindsWithoutCommand(t *testing.T) {
 	list := []resourceKind{{types: []string{"a/x"}}, {types: []string{"a/y"}, command: "y", desc: "d"}}
-	want := []TypeCommand{{"y", "d", "a/y"}}
+	want := []TypeCommand{{"y", "d", []string{"a/y"}}}
+	if got := typeCommands(list); !reflect.DeepEqual(got, want) {
+		t.Errorf("typeCommands = %v, want %v", got, want)
+	}
+}
+
+func TestTypeCommandsMergeKindsSharingACommand(t *testing.T) {
+	list := []resourceKind{
+		{types: []string{"a/x"}, command: "one", desc: "first"},
+		{types: []string{"b/y"}, command: "two", desc: "second"},
+		{types: []string{"a/z"}, command: "one", desc: "other"},
+		{types: []string{"c/p", "c/q"}, command: "three", desc: "third"},
+	}
+	want := []TypeCommand{
+		{"one", "first", []string{"a/x", "a/z"}},
+		{"two", "second", []string{"b/y"}},
+		{"three", "third", []string{"c/p", "c/q"}},
+	}
 	if got := typeCommands(list); !reflect.DeepEqual(got, want) {
 		t.Errorf("typeCommands = %v, want %v", got, want)
 	}

@@ -44,14 +44,14 @@ func buildCommandTable() []commandInfo {
 	)
 }
 
-// typeCommand returns the resource type the command called name lists.
-func typeCommand(name string) (string, bool) {
+// typeCommand returns the resource types the command called name lists.
+func typeCommand(name string) ([]string, bool) {
 	for _, c := range views.TypeCommands() {
 		if c.Name == name {
-			return c.Type, true
+			return c.Types, true
 		}
 	}
-	return "", false
+	return nil, false
 }
 
 // parseCommand turns palette input into a command; the first word names it.
@@ -61,8 +61,8 @@ func parseCommand(input string) (command, error) {
 		return command{}, nil
 	}
 	name := strings.ToLower(words[0])
-	if t, ok := typeCommand(name); ok {
-		return command{cmdView, views.NewResourcesByType(t)}, nil
+	if types, ok := typeCommand(name); ok {
+		return command{cmdView, views.NewResourcesByType(types...)}, nil
 	}
 	switch name {
 	case "subs":
