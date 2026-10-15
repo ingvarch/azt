@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // ErrNotFound is returned when a resource does not exist.
@@ -62,10 +63,14 @@ func Resources(ctx context.Context, graph ResourceGraph, subscriptionID, resourc
 	return query[Resource](ctx, graph, kql, subscriptionID)
 }
 
-// ResourcesOfType returns the resources of one type in every subscription.
-func ResourcesOfType(ctx context.Context, graph ResourceGraph, resourceType string) ([]Resource, error) {
+// ResourcesOfType returns the resources of the given types in every subscription.
+func ResourcesOfType(ctx context.Context, graph ResourceGraph, resourceTypes []string) ([]Resource, error) {
+	quoted := make([]string, len(resourceTypes))
+	for i, t := range resourceTypes {
+		quoted[i] = kqlString(t)
+	}
 	kql := `resources
-| where type =~ ` + kqlString(resourceType) + `
+| where type in~ (` + strings.Join(quoted, ", ") + `)
 ` + withSubscriptionName + `
 | project id, name, type, location, resourceGroup, subscriptionId, subscription
 | order by name asc`

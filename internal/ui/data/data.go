@@ -4,6 +4,7 @@ package data
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -28,7 +29,8 @@ type Key struct {
 	Kind         Kind
 	Subscription string
 	Group, ID    string
-	Type         string
+	// Type is one resource type or several joined by ","; a type never holds a comma.
+	Type string
 }
 
 // FetchMsg is sent by a view that needs data.
@@ -109,7 +111,7 @@ func NewFetcher(ctx context.Context, graph azure.ResourceGraph) Fetcher {
 		case AllResourceGroups:
 			return azure.AllResourceGroups(ctx, graph)
 		case ResourcesOfType:
-			return azure.ResourcesOfType(ctx, graph, k.Type)
+			return azure.ResourcesOfType(ctx, graph, strings.Split(k.Type, ","))
 		case Details:
 			return azure.ResourceDetails(ctx, graph, k.Subscription, k.ID)
 		}

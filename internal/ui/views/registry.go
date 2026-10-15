@@ -8,7 +8,8 @@ import (
 type resourceKind struct {
 	// types are the resource types the kind covers, in lower case.
 	types []string
-	// command is the palette command that lists the kind; desc is its description.
+	// command is the palette command that lists the kind; kinds that share a
+	// command merge, and the first one's desc describes it.
 	command, desc string
 	// tabs are the tabs of the details; nil means the generic tabs.
 	tabs []tabDef
@@ -30,8 +31,8 @@ var kinds = []resourceKind{
 	{types: []string{"microsoft.managedidentity/userassignedidentities"}, command: "mi", desc: "managed identities in every subscription", tabs: miTabs},
 	{types: []string{"microsoft.containerregistry/registries"}, command: "acr", desc: "container registries in every subscription", tabs: acrTabs, attention: acrAttention},
 	{types: []string{"microsoft.network/networksecuritygroups"}, command: "nsg", desc: "network security groups in every subscription", tabs: nsgTabs, attention: nsgAttention},
-	{types: []string{"microsoft.network/dnszones"}, command: "dns", desc: "DNS zones in every subscription", tabs: dnsTabs, attention: dnsAttention},
-	{types: []string{"microsoft.network/privatednszones"}, command: "pdns", desc: "private DNS zones in every subscription", tabs: pdnsTabs, attention: pdnsAttention},
+	{types: []string{"microsoft.network/dnszones"}, command: "dns", desc: "public and private DNS zones in every subscription", tabs: dnsTabs, attention: dnsAttention},
+	{types: []string{"microsoft.network/privatednszones"}, command: "dns", tabs: pdnsTabs, attention: pdnsAttention},
 }
 
 // kindOf is the kind of a resource type; the zero kind for a type no kind lists.
@@ -63,18 +64,28 @@ func tabDefs(resourceType string) []tabDef {
 	return defs
 }
 
-// TypeCommand is a palette command that lists the resources of one type.
-type TypeCommand struct{ Name, Desc, Type string }
+// TypeCommand is a palette command that lists the resources of one or more types.
+type TypeCommand struct {
+	Name, Desc string
+	Types      []string
+}
 
 // TypeCommands lists the type commands in the order of the palette.
 func TypeCommands() []TypeCommand { return typeCommands(kinds) }
 
+// typeCommands merges kinds that share a command into the place of the first.
 func typeCommands(list []resourceKind) []TypeCommand {
 	var out []TypeCommand
 	for _, k := range list {
-		if k.command != "" {
-			out = append(out, TypeCommand{k.command, k.desc, k.types[0]})
+		if k.command == "" {
+			continue
 		}
+		i := slices.IndexFunc(out, func(c TypeCommand) bool { return c.Name == k.command })
+		if i < 0 {
+			out = append(out, TypeCommand{k.command, k.desc, slices.Clone(k.types)})
+			continue
+		}
+		out[i].Types = append(out[i].Types, k.types...)
 	}
 	return out
 }

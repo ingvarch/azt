@@ -266,22 +266,39 @@ func NewAllResourceGroups() View {
 	})
 }
 
-// NewResourcesByType lists the resources of one type in every subscription.
-func NewResourcesByType(resourceType string) View {
+// NewResourcesByType lists the resources of the given types in every subscription.
+// With several types the list adds a Type column.
+func NewResourcesByType(resourceTypes ...string) View {
+	joined := strings.Join(resourceTypes, ",")
+	short := make([]string, len(resourceTypes))
+	for i, t := range resourceTypes {
+		short[i] = ShortType(t)
+	}
+	several := len(resourceTypes) > 1
+	empty := "No resources of this type."
+	columns := []column{
+		{title: "Name", width: 32},
+		{title: "Resource group", width: 28},
+		{title: "Subscription", width: 24},
+		{title: "Location", width: 16},
+	}
+	if several {
+		empty = "No resources of these types."
+		columns = slices.Insert(columns, 1, column{title: "Type", width: 24})
+	}
 	return newList(listConfig[azure.Resource]{
-		key:   data.Key{Kind: data.ResourcesOfType, Type: resourceType},
-		spec:  Spec{Kind: "resourcesByType", Type: resourceType},
-		title: ShortType(resourceType),
-		noun:  "resources",
-		empty: "No resources of this type.",
-		columns: []column{
-			{title: "Name", width: 32},
-			{title: "Resource group", width: 28},
-			{title: "Subscription", width: 24},
-			{title: "Location", width: 16},
-		},
+		key:     data.Key{Kind: data.ResourcesOfType, Type: joined},
+		spec:    Spec{Kind: "resourcesByType", Type: joined},
+		title:   strings.Join(short, ", "),
+		noun:    "resources",
+		empty:   empty,
+		columns: columns,
 		row: func(r azure.Resource) []string {
-			return []string{r.Name, r.ResourceGroup, r.Subscription, r.Location}
+			cells := []string{r.Name, r.ResourceGroup, r.Subscription, r.Location}
+			if several {
+				cells = slices.Insert(cells, 1, ShortType(r.Type))
+			}
+			return cells
 		},
 		open: func(r azure.Resource) View { return NewDetails(r.SubscriptionID, r) },
 	})

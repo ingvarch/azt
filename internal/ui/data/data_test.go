@@ -224,7 +224,14 @@ var fetcherCases = []fetcherCase{
 		key:       Key{Kind: ResourcesOfType, Type: "microsoft.web/sites"},
 		row:       map[string]any{"id": "/a", "name": "a", "resourceGroup": "rg", "subscription": "Dev"},
 		want:      []azure.Resource{{ID: "/a", Name: "a", ResourceGroup: "rg", Subscription: "Dev"}},
-		wantQuery: "type =~ 'microsoft.web/sites'",
+		wantQuery: "type in~ ('microsoft.web/sites')",
+	},
+	{
+		name:      "resources of two types",
+		key:       Key{Kind: ResourcesOfType, Type: "microsoft.network/dnszones,microsoft.network/privatednszones"},
+		row:       map[string]any{"id": "/z", "name": "z"},
+		want:      []azure.Resource{{ID: "/z", Name: "z"}},
+		wantQuery: "type in~ ('microsoft.network/dnszones', 'microsoft.network/privatednszones')",
 	},
 	{
 		name:      "details",
@@ -266,5 +273,13 @@ func TestNewFetcherRoutesKinds(t *testing.T) {
 func TestNewFetcherRejectsUnknownKind(t *testing.T) {
 	if _, err := NewFetcher(context.Background(), &fakeGraph{})(Key{Kind: Kind(99)}); err == nil {
 		t.Error("err = nil, want unknown kind error")
+	}
+}
+
+func TestKeysOverDifferentTypeListsDiffer(t *testing.T) {
+	one := Key{Kind: ResourcesOfType, Type: "microsoft.network/dnszones"}
+	two := Key{Kind: ResourcesOfType, Type: "microsoft.network/dnszones,microsoft.network/privatednszones"}
+	if one == two {
+		t.Error("keys over different type lists are equal")
 	}
 }

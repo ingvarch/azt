@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ingvarch/azt/internal/azure"
 )
@@ -61,7 +62,7 @@ func build(s Spec) (View, error) {
 		if err := require(s, "type", s.Type); err != nil {
 			return nil, err
 		}
-		return NewResourcesByType(s.Type), nil
+		return NewResourcesByType(strings.Split(s.Type, ",")...), nil
 	}
 	return nil, fmt.Errorf("unknown view kind %q", s.Kind)
 }
