@@ -203,8 +203,8 @@ func TestRefreshingShowsUntilResult(t *testing.T) {
 			t.Errorf("%s: refreshing before r", name)
 		}
 		v, _ = press(v, keyR)
-		// The details view keeps its tab bar on the first line.
-		line := map[string]int{"list": 0, "details": 1}[name]
+		// The details view shows it under the tab bar and its rule.
+		line := map[string]int{"list": 0, "details": 2}[name]
 		if got := strings.Split(v.Render(), "\n")[line]; !strings.Contains(got, "refreshing…") {
 			t.Errorf("%s: line %d after r = %q, want refreshing…", name, line, got)
 		}

@@ -15,7 +15,7 @@ var sgrSeq = regexp.MustCompile("\x1b\\[[0-9;:]*m")
 func plain(s string) string { return sgrSeq.ReplaceAllString(s, "") }
 
 func testTable(width, height int, rows ...[]string) table {
-	t := newTable([]column{{"Name", 6}, {"ID", 4}})
+	t := newTable([]column{{title: "Name", width: 6}, {title: "ID", width: 4}})
 	t.resize(width, height)
 	t.setRows(rows)
 	return t
@@ -87,7 +87,7 @@ func TestTableStyles(t *testing.T) {
 }
 
 func TestTableWideAndEmptyCells(t *testing.T) {
-	tb := newTable([]column{{"A", 4}, {"B", 1}, {"C", 0}})
+	tb := newTable([]column{{title: "A", width: 4}, {title: "B", width: 1}, {title: "C"}})
 	tb.resize(20, 4)
 	tb.setRows([][]string{{"日本語", "xy", "z"}, {"", "", ""}})
 	got := strings.Split(plain(tb.view()), "\n")
@@ -277,5 +277,100 @@ func TestTableCellWithNewlineStaysOnOneLine(t *testing.T) {
 	tb := testTable(40, 5, []string{"a\nb", "1"}, []string{"c", "2"})
 	if got := strings.Count(tb.view(), "\n"); got != 3 {
 		t.Errorf("view has %d line breaks, want 3:\n%s", got, tb.view())
+	}
+}
+
+func stateTable(width, height int) table {
+	t := newTable([]column{{title: "Name", width: 6}, {title: "State", width: 12, state: true}})
+	t.resize(width, height)
+	t.setRows([][]string{{"a", "Running"}, {"b", "Failed"}, {"c", "Updating"}})
+	return t
+}
+
+func TestTableColorsTheStateColumn(t *testing.T) {
+	lines := strings.Split(stateTable(40, 5).view(), "\n")
+	if got, want := plain(lines[3]), "b      ● Failed    "; got != want {
+		t.Errorf("line 3 = %q, want %q", got, want)
+	}
+	wantFg(t, lines[3], "Failed", fgBad)
+	wantFg(t, lines[4], "Updating", fgWarn)
+	wantFg(t, lines[3], "b", "")
+	if attrsOf(t, lines[0], "State").fg != "" {
+		t.Error("the header is colored")
+	}
+}
+
+func TestTableSelectedRowStaysReversedWithColoredState(t *testing.T) {
+	lines := strings.Split(stateTable(40, 5).view(), "\n")
+	for _, sub := range []string{"a", "Running", "●", "   "} {
+		if !attrsOf(t, lines[2], sub).reverse {
+			t.Errorf("%q is not reversed in %q", sub, lines[2])
+		}
+	}
+	wantFg(t, lines[2], "Running", fgGood)
+	if attrsOf(t, lines[3], "Failed").reverse {
+		t.Error("an unselected row is reversed")
+	}
+}
+
+func TestTableCutsAColoredStateCell(t *testing.T) {
+	tb := newTable([]column{{title: "State", width: 6, state: true}})
+	tb.resize(20, 3)
+	tb.setRows([][]string{{"Updating"}})
+	if got := plain(strings.Split(tb.view(), "\n")[2]); got != "● Upd…" {
+		t.Errorf("cell = %q", got)
+	}
+}
+
+func TestSummaryTable(t *testing.T) {
+	cols := []column{{title: "Name"}, {title: "State", state: true}}
+	lines := summaryTable(cols, [][]string{{"a", "Running"}, {"bb", "Stopped · Updating"}})
+	want := []string{
+		"Name  State",
+		"a     ● Running",
+		"bb    ● Stopped · Updating",
+	}
+	got := make([]string, len(lines))
+	for i, l := range lines {
+		got[i] = plain(l)
+	}
+	wantLines(t, got, want)
+	if a := attrsOf(t, lines[0], "Name"); !a.bold || a.fg != fgMuted {
+		t.Errorf("header = %+v, want bold muted", a)
+	}
+	wantFg(t, lines[1], "a", "")
+	wantFg(t, lines[1], "Running", fgGood)
+	wantFg(t, lines[2], "Stopped", fgBad)
+	wantFg(t, lines[2], "Updating", fgWarn)
+	for i, l := range lines {
+		if strings.Contains(l, "\x1b[7m") {
+			t.Errorf("line %d is highlighted", i)
+		}
+	}
+}
+
+func TestSummaryTableWithoutRows(t *testing.T) {
+	lines := summaryTable([]column{{title: "Name"}}, nil)
+	if len(lines) != 1 || strings.TrimRight(plain(lines[0]), " ") != "Name" {
+		t.Errorf("lines = %q", lines)
+	}
+}
+
+func TestTableSelectedRowIsReversedAfterAState(t *testing.T) {
+	tb := newTable([]column{{title: "State", width: 12, state: true}, {title: "Name", width: 4}})
+	tb.resize(40, 3)
+	tb.setRows([][]string{{"Running", "a"}})
+	line := strings.Split(tb.view(), "\n")[2]
+	for _, sub := range []string{"  ", " a"} {
+		if !attrsOf(t, line, sub).reverse {
+			t.Errorf("%q after the state is not reversed in %q", sub, line)
+		}
+	}
+}
+
+func TestSummaryTableShortRow(t *testing.T) {
+	lines := summaryTable([]column{{title: "A"}, {title: "B"}}, [][]string{{"x"}})
+	if got := plain(lines[1]); got != "x" {
+		t.Errorf("row = %q", got)
 	}
 }
