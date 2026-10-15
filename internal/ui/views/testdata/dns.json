@@ -1,0 +1,22 @@
+{
+  "id": "/subscriptions/s9/resourceGroups/rg-dns/providers/Microsoft.Network/dnszones/contoso.example",
+  "name": "contoso.example",
+  "type": "microsoft.network/dnszones",
+  "location": "global",
+  "resourceGroup": "rg-dns",
+  "subscriptionId": "s9",
+  "subscription": "Prod",
+  "tags": {"env": "prod"},
+  "properties": {
+    "maxNumberOfRecordSets": 5000,
+    "maxNumberOfRecordsPerRecordSet": null,
+    "nameServers": [
+      "ns1-01.azure-dns.com.",
+      "ns2-01.azure-dns.net.",
+      "ns3-01.azure-dns.org.",
+      "ns4-01.azure-dns.info."
+    ],
+    "numberOfRecordSets": 37,
+    "zoneType": "Public"
+  }
+}

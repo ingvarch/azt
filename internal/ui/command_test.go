@@ -26,6 +26,9 @@ func TestParseCommand(t *testing.T) {
 		{in: "acr", kind: cmdView, title: "containerregistry/registries"},
 		{in: "nsg", kind: cmdView, title: "network/networksecuritygroups"},
 		{in: "NSG", kind: cmdView, title: "network/networksecuritygroups"},
+		{in: "dns", kind: cmdView, title: "network/dnszones"},
+		{in: "pdns", kind: cmdView, title: "network/privatednszones"},
+		{in: "PDNS", kind: cmdView, title: "network/privatednszones"},
 		{in: "type microsoft.cache/redis", kind: cmdView, title: "cache/redis"},
 		{in: "  type   microsoft.cache/redis  ", kind: cmdView, title: "cache/redis"},
 		{in: "VM", kind: cmdView, title: "compute/virtualmachines"},
@@ -77,6 +80,8 @@ func TestCommandTable(t *testing.T) {
 		{"mi", "managed identities in every subscription"},
 		{"acr", "container registries in every subscription"},
 		{"nsg", "network security groups in every subscription"},
+		{"dns", "DNS zones in every subscription"},
+		{"pdns", "private DNS zones in every subscription"},
 		{"type", "resources of any type: type <resource type>"},
 		{"help", "keys and commands"},
 		{"q", "quit"},
@@ -100,6 +105,9 @@ func TestMatchingCommands(t *testing.T) {
 		{"m", []string{"mi"}},
 		{"ac", []string{"acr"}},
 		{"ns", []string{"nsg"}},
+		{"d", []string{"dns"}},
+		{"p", []string{"pdns"}},
+		{"pd", []string{"pdns"}},
 		{"zzz", nil},
 	}
 	for _, tt := range tests {

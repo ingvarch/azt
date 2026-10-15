@@ -84,6 +84,8 @@ func TestTypeCommands(t *testing.T) {
 		{"mi", "managed identities in every subscription", "microsoft.managedidentity/userassignedidentities"},
 		{"acr", "container registries in every subscription", "microsoft.containerregistry/registries"},
 		{"nsg", "network security groups in every subscription", "microsoft.network/networksecuritygroups"},
+		{"dns", "DNS zones in every subscription", "microsoft.network/dnszones"},
+		{"pdns", "private DNS zones in every subscription", "microsoft.network/privatednszones"},
 	}
 	if got := TypeCommands(); !reflect.DeepEqual(got, want) {
 		t.Errorf("TypeCommands() = %v, want %v", got, want)

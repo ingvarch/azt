@@ -108,7 +108,7 @@ func nsgDirection(direction string) func(rule any) bool {
 }
 
 func nsgPriority(rule any) float64 {
-	p, _ := dig(rule, "properties", "priority").(float64)
+	p, _ := number(rule, "properties", "priority")
 	return p
 }
 
