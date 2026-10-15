@@ -9,6 +9,41 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
+func TestDateTimeAndUnitFormats(t *testing.T) {
+	tests := []struct {
+		name   string
+		format format
+		in     any
+		want   string
+	}{
+		{"time", fmtDateTime, "2024-03-05T10:20:30Z", "2024-03-05 10:20 UTC"},
+		{"time in UTC", fmtDateTime, "2024-03-05T23:30:00-02:00", "2024-03-06 01:30 UTC"},
+		{"time with fraction", fmtDateTime, "2024-03-05T10:20:59.5Z", "2024-03-05 10:20 UTC"},
+		{"time of other text", fmtDateTime, "last week", "last week"},
+		{"time missing", fmtDateTime, nil, dash},
+		{"unit of a number", fmtUnit("days"), 14.0, "14 days"},
+		{"unit of a fraction", fmtUnit("days"), 0.5, "0.5 days"},
+		{"unit of a string", fmtUnit("days"), "7", "7 days"},
+		{"unit missing", fmtUnit("days"), nil, dash},
+		{"unit empty", fmtUnit("days"), "", dash},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.format(tt.in); got != tt.want {
+				t.Errorf("format(%v) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGB(t *testing.T) {
+	for in, want := range map[string]string{"": "", "32": "32 GB", "0.5": "0.5 GB"} {
+		if got := gb(in); got != want {
+			t.Errorf("gb(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestFormats(t *testing.T) {
 	list := []any{"a", "b"}
 	tests := []struct {

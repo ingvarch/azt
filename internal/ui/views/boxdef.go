@@ -32,13 +32,30 @@ func fmtOnOffOr(def bool) format {
 // fmtEnabled draws the strings "enabled" and "disabled" and a bool like fmtOnOff; other text stays.
 func fmtEnabled(v any) string { return switchText(enabledState(v)) }
 
-// fmtDate is the UTC date of an RFC 3339 time; text that is no time stays.
-func fmtDate(v any) string {
-	s := text(v)
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t.UTC().Format(time.DateOnly)
+// fmtTime is the UTC time of an RFC 3339 time in layout; text that is no time stays.
+func fmtTime(layout string) format {
+	return func(v any) string {
+		s := text(v)
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			return t.UTC().Format(layout)
+		}
+		return orDash(s)
 	}
-	return orDash(s)
+}
+
+var (
+	fmtDate     = fmtTime(time.DateOnly)
+	fmtDateTime = fmtTime("2006-01-02 15:04 UTC")
+)
+
+// fmtUnit puts unit after a value; a missing value stays a dash.
+func fmtUnit(unit string) format {
+	return func(v any) string {
+		if s := text(v); s != "" {
+			return s + " " + unit
+		}
+		return dash
+	}
 }
 
 // fmtCount is the number of elements of a list or keys of a map, "0" when missing.
