@@ -703,14 +703,12 @@ func (m Model) inputLine(prompt string) string {
 }
 
 // modeBar is the status bar outside the input modes: badge, path or notice, hints.
+// modeBar is the badge, a notice when there is one, and the hints; the pane
+// border already shows the path.
 func (m Model) modeBar() string {
 	badge, hints := " NORMAL ", normalHints
-	path := strings.Join(titles(m.stacks[m.tabs[m.active].focus]), pathSep)
 	if m.sidebarFocused {
-		hints, path = sidebarHints, m.sidebar.Title()
-	}
-	if m.notice != "" {
-		path = errorStyle.Render(m.notice)
+		hints = sidebarHints
 	}
 	switch {
 	case m.mode == modePrefix && m.sidebarFocused:
@@ -718,7 +716,11 @@ func (m Model) modeBar() string {
 	case m.mode == modePrefix:
 		badge, hints = " CTRL-W ", prefixHints
 	}
-	return reverseStyle.Render(badge) + " " + path + "  " + hintStyle.Render(hints)
+	bar := reverseStyle.Render(badge)
+	if m.notice != "" {
+		bar += " " + errorStyle.Render(m.notice)
+	}
+	return bar + "  " + hintStyle.Render(hints)
 }
 
 func titles(stack []views.View) []string {

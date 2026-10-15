@@ -307,7 +307,7 @@ func TestPaletteErrorShowsUntilNextKey(t *testing.T) {
 			t.Errorf("%s: notice is not red: %q", in, lines[len(lines)-1])
 		}
 		h.send(key("x"))
-		if strings.Contains(h.status(), msg) || !strings.Contains(h.status(), "Fake1") {
+		if strings.Contains(h.status(), msg) || !strings.Contains(h.status(), "NORMAL") {
 			t.Errorf("%s: notice stayed after a key: %q", in, h.status())
 		}
 	}
@@ -667,5 +667,17 @@ func TestCtrlVDoesNotReadClipboard(t *testing.T) {
 		if got := h.m.input.Value(); got != "ab" {
 			t.Errorf("%s: input = %q, want ab", md.name, got)
 		}
+	}
+}
+
+func TestStatusBarShowsNoPath(t *testing.T) {
+	h := newSidebarHarness(140, 30)
+	h.loadSubs()
+	if got := h.status(); strings.Contains(got, "Fake1") || !strings.Contains(got, "NORMAL") {
+		t.Errorf("pane focus: status = %q, want the badge and no path", got)
+	}
+	h.prefix("h")
+	if got := h.status(); strings.Contains(got, "Explorer") || !strings.Contains(got, sidebarHints) {
+		t.Errorf("explorer focus: status = %q, want the explorer hints and no title", got)
 	}
 }
