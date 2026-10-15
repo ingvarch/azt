@@ -10,8 +10,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
 
-	"github.com/ingvarch/azt/internal/azure"
 	"github.com/ingvarch/azt/internal/ui"
+	"github.com/ingvarch/azt/internal/ui/data"
 	"github.com/ingvarch/azt/internal/ui/views"
 )
 
@@ -37,7 +37,7 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	load := func() ([]azure.Subscription, error) { return azure.Subscriptions(ctx, graph) }
-	_, err = tea.NewProgram(ui.New(func() views.View { return views.NewSubscriptions(load) })).Run()
+	fetch := data.NewFetcher(ctx, graph)
+	_, err = tea.NewProgram(ui.New(views.NewSubscriptions, fetch)).Run()
 	return err
 }

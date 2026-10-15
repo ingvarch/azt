@@ -1,0 +1,465 @@
+package views
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/ingvarch/azt/internal/azure"
+	"github.com/ingvarch/azt/internal/ui/data"
+)
+
+// collect runs cmd, unwrapping batches, and returns the messages it produces.
+func collect(cmd tea.Cmd) []tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		return []tea.Msg{msg}
+	}
+	var msgs []tea.Msg
+	for _, c := range batch {
+		msgs = append(msgs, collect(c)...)
+	}
+	return msgs
+}
+
+// fetchKey returns the key v asks for in Init.
+func fetchKey(t *testing.T, v View) data.Key {
+	t.Helper()
+	for _, msg := range collect(v.Init()) {
+		if f, ok := msg.(data.FetchMsg); ok {
+			return f.Key
+		}
+	}
+	t.Fatalf("%s: Init returned no FetchMsg", v.Title())
+	return data.Key{}
+}
+
+// deliver sends v the result for its own key.
+func deliver(t *testing.T, v View, d any, err error) View {
+	t.Helper()
+	v, _ = v.Update(data.ResultMsg{Key: fetchKey(t, v), Data: d, Err: err})
+	return v
+}
+
+func press(v View, k tea.KeyPressMsg) (View, tea.Cmd) { return v.Update(k) }
+
+var (
+	keyDown = tea.KeyPressMsg{Code: tea.KeyDown}
+	keyR    = tea.KeyPressMsg{Code: 'r', Text: "r"}
+)
+
+var (
+	subs = []azure.Subscription{
+		{ID: "id-1", Name: "Dev", State: "Enabled"},
+		{ID: "id-2", Name: "Prod", State: "Disabled"},
+	}
+	groups = []azure.ResourceGroup{
+		{Name: "rg-a", Location: "westeurope", State: "Succeeded"},
+		{Name: "rg-b", Location: "northeurope", State: "Deleting"},
+	}
+	resources = []azure.Resource{
+		{ID: "/r/web", Name: "web-app", Type: "microsoft.web/sites", Location: "westeurope"},
+		{ID: "/r/kv", Name: "kv-prod", Type: "microsoft.keyvault/vaults", Location: "northeurope"},
+	}
+	detail = map[string]any{
+		"id": "/r/web", "name": "web-app", "tags": map[string]any{"env": "prod"},
+		"url": "https://x/?a=1&b=<2>",
+	}
+)
+
+// lists are the three table views with the data that fills them.
+var lists = []struct {
+	name  string
+	new   func() View
+	key   data.Key
+	title string
+	noun  string
+	empty string
+	data  any
+	cells []string
+}{
+	{
+		"subscriptions", NewSubscriptions,
+		data.Key{Kind: data.Subscriptions}, "Subscriptions", "subscriptions",
+		"No subscriptions found. Check the account you signed in with az login.",
+		subs, []string{"Subscription ID", "Dev", "id-1", "Prod", "id-2", "Disabled"},
+	},
+	{
+		"resource groups", func() View { return NewResourceGroups(subs[0]) },
+		data.Key{Kind: data.ResourceGroups, Subscription: "id-1"}, "Dev", "resource groups",
+		"No resource groups in this subscription.",
+		groups, []string{"Location", "rg-a", "westeurope", "rg-b", "Deleting"},
+	},
+	{
+		"resources", func() View { return NewResources("id-1", groups[1]) },
+		data.Key{Kind: data.Resources, Subscription: "id-1", Group: "rg-b"}, "rg-b", "resources",
+		"No resources in this resource group.",
+		resources, []string{"Type", "web-app", "microsoft.web/sites", "kv-prod", "northeurope"},
+	},
+}
+
+func TestListKeyAndTitle(t *testing.T) {
+	for _, l := range lists {
+		v := l.new()
+		if got := v.Title(); got != l.title {
+			t.Errorf("%s: Title() = %q, want %q", l.name, got, l.title)
+		}
+		if got := fetchKey(t, v); got != l.key {
+			t.Errorf("%s: key = %+v, want %+v", l.name, got, l.key)
+		}
+	}
+}
+
+func TestListStates(t *testing.T) {
+	for _, l := range lists {
+		loading := l.new().Resize(120, 20).Render()
+		if want := "Loading " + l.noun; !strings.Contains(loading, want) {
+			t.Errorf("%s: loading render lacks %q:\n%s", l.name, want, loading)
+		}
+
+		failed := deliver(t, l.new().Resize(120, 20), nil, errors.New("boom")).Render()
+		if want := "Failed to load " + l.noun + ": boom"; !strings.Contains(failed, want) {
+			t.Errorf("%s: error render lacks %q:\n%s", l.name, want, failed)
+		}
+
+		empty := deliver(t, l.new().Resize(120, 20), nil, nil).Render()
+		if !strings.Contains(empty, l.empty) {
+			t.Errorf("%s: empty render lacks %q:\n%s", l.name, l.empty, empty)
+		}
+
+		got := deliver(t, l.new().Resize(120, 20), l.data, nil).Render()
+		for _, want := range l.cells {
+			if !strings.Contains(got, want) {
+				t.Errorf("%s: render lacks %q:\n%s", l.name, want, got)
+			}
+		}
+		if strings.Contains(got, "Loading") {
+			t.Errorf("%s: render still shows loading:\n%s", l.name, got)
+		}
+	}
+}
+
+// sendForeign sends v a result and an error for a key that is not its own.
+func sendForeign(v View, d any) View {
+	other := data.Key{Kind: data.Details, ID: "other"}
+	v, _ = v.Update(data.ResultMsg{Key: other, Data: d})
+	v, _ = v.Update(data.ResultMsg{Key: other, Err: errors.New("boom")})
+	return v
+}
+
+func TestIgnoresResultsOfOtherKeys(t *testing.T) {
+	for _, l := range lists {
+		if got := sendForeign(l.new().Resize(120, 20), l.data).Render(); !strings.Contains(got, "Loading") {
+			t.Errorf("%s: result of another key changed the loading view:\n%s", l.name, got)
+		}
+		loaded := deliver(t, l.new().Resize(120, 20), l.data, nil)
+		if got := sendForeign(loaded, nil).Render(); !strings.Contains(got, l.cells[1]) || strings.Contains(got, "Failed") {
+			t.Errorf("%s: result of another key changed the loaded view:\n%s", l.name, got)
+		}
+	}
+}
+
+func TestErrorReplacesRowsAndNextResultRecovers(t *testing.T) {
+	for _, l := range lists {
+		v := deliver(t, l.new().Resize(120, 20), l.data, nil)
+		v = deliver(t, v, nil, errors.New("boom"))
+		got := v.Render()
+		if !strings.Contains(got, "Failed to load") || strings.Contains(got, l.cells[1]) {
+			t.Errorf("%s: error did not replace the rows:\n%s", l.name, got)
+		}
+		if _, ok := v.Open(); ok {
+			t.Errorf("%s: Open is true after an error", l.name)
+		}
+		v = deliver(t, v, l.data, nil)
+		if got := v.Render(); !strings.Contains(got, l.cells[1]) || strings.Contains(got, "Failed") {
+			t.Errorf("%s: view did not recover:\n%s", l.name, got)
+		}
+	}
+}
+
+func TestOpenWorksAfterErrorOrEmptyResult(t *testing.T) {
+	for _, l := range lists {
+		for name, first := range map[string]struct {
+			d   any
+			err error
+		}{"error": {nil, errors.New("boom")}, "empty": {nil, nil}} {
+			v := deliver(t, l.new().Resize(120, 20), first.d, first.err)
+			v = deliver(t, v, l.data, nil)
+			next, ok := v.Open()
+			if !ok {
+				t.Errorf("%s after %s: Open is false with rows", l.name, name)
+				continue
+			}
+			if want := fetchKey(t, next); want == l.key {
+				t.Errorf("%s after %s: Open returned the same view", l.name, name)
+			}
+		}
+	}
+}
+
+func TestRefresh(t *testing.T) {
+	for _, l := range lists {
+		v := deliver(t, l.new().Resize(120, 20), l.data, nil)
+		v, cmd := press(v, keyR)
+		msgs := collect(cmd)
+		if len(msgs) != 1 || msgs[0] != (data.FetchMsg{Key: l.key, Force: true}) {
+			t.Errorf("%s: r returned %v, want a forced FetchMsg", l.name, msgs)
+		}
+		if got := v.Render(); !strings.Contains(got, l.cells[1]) {
+			t.Errorf("%s: rows vanished while refreshing:\n%s", l.name, got)
+		}
+	}
+}
+
+func TestOpenIsFalseWithoutRows(t *testing.T) {
+	for _, l := range lists {
+		views := map[string]View{
+			"loading":         l.new(),
+			"error":           deliver(t, l.new(), nil, errors.New("boom")),
+			"error with data": deliver(t, l.new(), l.data, errors.New("boom")),
+			"empty":           deliver(t, l.new(), nil, nil),
+		}
+		for state, v := range views {
+			if next, ok := v.Open(); ok || next != nil {
+				t.Errorf("%s %s: Open = %v, %v; want nil, false", l.name, state, next, ok)
+			}
+		}
+	}
+}
+
+func TestDrillDown(t *testing.T) {
+	// Each step selects the second row and opens it.
+	v := deliver(t, NewSubscriptions().Resize(120, 20), subs, nil)
+	v, _ = press(v, keyDown)
+	groupsView, ok := v.Open()
+	if !ok {
+		t.Fatal("subscriptions: Open is false")
+	}
+	if got := groupsView.Title(); got != "Prod" {
+		t.Errorf("groups title = %q, want Prod", got)
+	}
+	if got, want := fetchKey(t, groupsView), (data.Key{Kind: data.ResourceGroups, Subscription: "id-2"}); got != want {
+		t.Errorf("groups key = %+v, want %+v", got, want)
+	}
+
+	v = deliver(t, groupsView.Resize(120, 20), groups, nil)
+	v, _ = press(v, keyDown)
+	resView, ok := v.Open()
+	if !ok {
+		t.Fatal("resource groups: Open is false")
+	}
+	if got := resView.Title(); got != "rg-b" {
+		t.Errorf("resources title = %q, want rg-b", got)
+	}
+	if got, want := fetchKey(t, resView), (data.Key{Kind: data.Resources, Subscription: "id-2", Group: "rg-b"}); got != want {
+		t.Errorf("resources key = %+v, want %+v", got, want)
+	}
+
+	v = deliver(t, resView.Resize(120, 20), resources, nil)
+	v, _ = press(v, keyDown)
+	detView, ok := v.Open()
+	if !ok {
+		t.Fatal("resources: Open is false")
+	}
+	if got := detView.Title(); got != "kv-prod" {
+		t.Errorf("details title = %q, want kv-prod", got)
+	}
+	if got, want := fetchKey(t, detView), (data.Key{Kind: data.Details, Subscription: "id-2", ID: "/r/kv"}); got != want {
+		t.Errorf("details key = %+v, want %+v", got, want)
+	}
+}
+
+func newDetails() View {
+	return NewDetails("id-1", azure.Resource{ID: "/r/web", Name: "web-app"})
+}
+
+func TestDetailsKeyAndTitle(t *testing.T) {
+	v := newDetails()
+	if got := v.Title(); got != "web-app" {
+		t.Errorf("Title() = %q, want web-app", got)
+	}
+	if got, want := fetchKey(t, v), (data.Key{Kind: data.Details, Subscription: "id-1", ID: "/r/web"}); got != want {
+		t.Errorf("key = %+v, want %+v", got, want)
+	}
+}
+
+func TestDetailsStates(t *testing.T) {
+	if got := newDetails().Resize(80, 10).Render(); !strings.Contains(got, "Loading details") {
+		t.Errorf("loading render:\n%s", got)
+	}
+	failed := deliver(t, newDetails().Resize(80, 10), nil, errors.New("boom")).Render()
+	if !strings.Contains(failed, "Failed to load details: boom") {
+		t.Errorf("error render:\n%s", failed)
+	}
+	if _, ok := deliver(t, newDetails().Resize(80, 10), nil, errors.New("boom")).Open(); ok {
+		t.Error("Open is true after an error")
+	}
+	other := map[string]any{"name": "other-app"}
+	if got := sendForeign(newDetails().Resize(80, 10), other).Render(); !strings.Contains(got, "Loading details") {
+		t.Errorf("result of another key changed the loading view:\n%s", got)
+	}
+	loaded := deliver(t, newDetails().Resize(80, 10), detail, nil)
+	got := sendForeign(loaded, other).Render()
+	if !strings.Contains(got, `"name": "web-app"`) {
+		t.Errorf("result of another key replaced the details:\n%s", got)
+	}
+	for _, bad := range []string{"other-app", "null", "Failed"} {
+		if strings.Contains(got, bad) {
+			t.Errorf("result of another key shows %q:\n%s", bad, got)
+		}
+	}
+}
+
+func TestDetailsShowsIndentedJSON(t *testing.T) {
+	v := deliver(t, newDetails().Resize(80, 10), detail, nil)
+	lines := strings.Split(v.Render(), "\n")
+	for i, l := range lines {
+		lines[i] = strings.TrimRight(l, " ")
+	}
+	got := strings.Join(lines, "\n")
+	if !strings.Contains(got, "\n  \"id\": \"/r/web\",\n") {
+		t.Errorf("top-level key is not indented by two spaces:\n%s", got)
+	}
+	if !strings.Contains(got, "\n    \"env\": \"prod\"") {
+		t.Errorf("nested value is not indented by two spaces per level:\n%s", got)
+	}
+	if !strings.Contains(got, `"url": "https://x/?a=1&b=<2>"`) {
+		t.Errorf("HTML characters are escaped:\n%s", got)
+	}
+	if _, ok := v.Open(); ok {
+		t.Error("details Open is true")
+	}
+}
+
+func TestDetailsScrolls(t *testing.T) {
+	big := map[string]any{}
+	for i := range 40 {
+		big[fmt.Sprintf("k%02d", i)] = i
+	}
+	v := deliver(t, newDetails().Resize(80, 6), big, nil)
+	if got := v.Render(); !strings.Contains(got, "k00") || strings.Contains(got, "k20") {
+		t.Fatalf("initial render:\n%s", got)
+	}
+	for range 3 {
+		v, _ = press(v, keyDown)
+	}
+	got := v.Render()
+	if strings.Contains(got, "k00") || strings.Contains(got, "k01") || !strings.Contains(got, "k02") {
+		t.Errorf("render after scrolling:\n%s", got)
+	}
+	for range 50 {
+		v, _ = press(v, keyDown)
+	}
+	lines := strings.Split(v.Render(), "\n")
+	if last := strings.TrimSpace(lines[len(lines)-1]); last != "}" {
+		t.Errorf("last line at the end = %q, want }", last)
+	}
+}
+
+func TestDetailsRefresh(t *testing.T) {
+	v := deliver(t, newDetails().Resize(80, 10), detail, nil)
+	v, cmd := press(v, keyR)
+	msgs := collect(cmd)
+	want := data.FetchMsg{Key: data.Key{Kind: data.Details, Subscription: "id-1", ID: "/r/web"}, Force: true}
+	if len(msgs) != 1 || msgs[0] != want {
+		t.Errorf("r returned %v, want %v", msgs, want)
+	}
+	if got := v.Render(); !strings.Contains(got, "web-app") {
+		t.Errorf("content vanished while refreshing:\n%s", got)
+	}
+}
+
+func TestRenderFitsSize(t *testing.T) {
+	manySubs := make([]azure.Subscription, 100)
+	for i := range manySubs {
+		manySubs[i] = azure.Subscription{ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("sub-%d", i), State: "Enabled"}
+	}
+	bigDetail := map[string]any{"long": strings.Repeat("x", 300)}
+	for i := range 100 {
+		bigDetail[fmt.Sprintf("k%d", i)] = i
+	}
+	long := errors.New(strings.Repeat("very long error text without end ", 20))
+
+	tests := []struct {
+		name string
+		view func(w, h int) View
+	}{
+		{"loading", func(w, h int) View { return NewSubscriptions().Resize(w, h) }},
+		{"table", func(w, h int) View { return deliver(t, NewSubscriptions().Resize(w, h), manySubs, nil) }},
+		{"long error", func(w, h int) View { return deliver(t, NewSubscriptions().Resize(w, h), nil, long) }},
+		{"empty", func(w, h int) View { return deliver(t, NewSubscriptions().Resize(w, h), nil, nil) }},
+		{"details loading", func(w, h int) View { return newDetails().Resize(w, h) }},
+		{"details", func(w, h int) View { return deliver(t, newDetails().Resize(w, h), bigDetail, nil) }},
+		{"details error", func(w, h int) View { return deliver(t, newDetails().Resize(w, h), nil, long) }},
+	}
+	sizes := [][2]int{{40, 10}, {120, 20}, {20, 4}, {0, 0}, {1, 1}, {0, 10}, {40, 0}}
+	for _, tt := range tests {
+		for _, s := range sizes {
+			w, h := s[0], s[1]
+			out := tt.view(w, h).Render()
+			if w == 0 || h == 0 {
+				if out != "" {
+					t.Errorf("%s %dx%d: render = %q, want empty", tt.name, w, h, out)
+				}
+				continue
+			}
+			if out == "" {
+				t.Errorf("%s %dx%d: render is empty", tt.name, w, h)
+			}
+			if got := lipgloss.Height(out); got > h {
+				t.Errorf("%s %dx%d: height = %d\n%s", tt.name, w, h, got, out)
+			}
+			if got := lipgloss.Width(out); got > w {
+				t.Errorf("%s %dx%d: width = %d\n%s", tt.name, w, h, got, out)
+			}
+		}
+	}
+}
+
+func TestResizeSetsTableHeight(t *testing.T) {
+	many := make([]azure.Subscription, 50)
+	for i := range many {
+		many[i] = azure.Subscription{ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("sub-%d", i), State: "Enabled"}
+	}
+	v := deliver(t, NewSubscriptions().Resize(80, 6), many, nil)
+	for range 10 {
+		v, _ = press(v, keyDown)
+	}
+	if got := v.Render(); !strings.Contains(got, "sub-10") {
+		t.Errorf("cursor row is scrolled out of view:\n%s", got)
+	}
+}
+
+func TestSpinnerStopsOnceLoaded(t *testing.T) {
+	views := map[string]View{"list": NewSubscriptions(), "details": newDetails()}
+	for name, v := range views {
+		var tick tea.Msg
+		for _, msg := range collect(v.Init()) {
+			if _, ok := msg.(data.FetchMsg); !ok {
+				tick = msg
+			}
+		}
+		if _, cmd := v.Update(tick); cmd == nil {
+			t.Errorf("%s: spinner stopped while loading", name)
+		}
+		v = deliver(t, v, nil, nil)
+		if _, cmd := v.Update(tick); cmd != nil {
+			t.Errorf("%s: spinner keeps ticking after load", name)
+		}
+	}
+}
+
+func TestDetailsShowsEncodingError(t *testing.T) {
+	v := deliver(t, newDetails().Resize(80, 10), map[string]any{"bad": make(chan int)}, nil)
+	if got := v.Render(); !strings.Contains(got, "Failed to load details") {
+		t.Errorf("render:\n%s", got)
+	}
+}

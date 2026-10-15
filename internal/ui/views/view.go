@@ -13,4 +13,6 @@ type View interface {
 	Render() string
 	// Title is shown in the pane border, the tab bar and the status bar.
 	Title() string
+	// Open returns the view for the selected item; false if nothing opens.
+	Open() (View, bool)
 }
