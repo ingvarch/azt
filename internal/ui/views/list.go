@@ -1,6 +1,9 @@
 package views
 
 import (
+	"slices"
+	"strings"
+
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
@@ -19,6 +22,8 @@ type listConfig[T any] struct {
 	columns []table.Column
 	row     func(T) table.Row
 	open    func(T) View
+	// keep, when set, drops the items it rejects.
+	keep func(T) bool
 }
 
 type list[T any] struct {
@@ -47,6 +52,9 @@ func (l list[T]) Update(msg tea.Msg) (View, tea.Cmd) {
 		d, ok := l.result(msg)
 		if ok {
 			l.items, _ = d.([]T)
+			if l.cfg.keep != nil {
+				l.items = slices.DeleteFunc(slices.Clone(l.items), func(it T) bool { return !l.cfg.keep(it) })
+			}
 			l.table.SetRows(mapRows(l.items, l.cfg.row))
 			if l.table.Cursor() < 0 {
 				l.table.SetCursor(0)
@@ -125,7 +133,30 @@ func NewResourceGroups(sub azure.Subscription) View {
 }
 
 func NewResources(subscriptionID string, group azure.ResourceGroup) View {
-	return newList(listConfig[azure.Resource]{
+	return newList(resourcesConfig(subscriptionID, group))
+}
+
+// NewResourcesOfType lists the resources of one type in a resource group; it
+// shares its data with NewResources.
+func NewResourcesOfType(subscriptionID string, group azure.ResourceGroup, resourceType string) View {
+	cfg := resourcesConfig(subscriptionID, group)
+	cfg.title = ShortType(resourceType)
+	cfg.empty = "No resources of this type in this resource group."
+	cfg.keep = func(r azure.Resource) bool { return strings.EqualFold(r.Type, resourceType) }
+	return newList(cfg)
+}
+
+// ShortType drops the leading "microsoft." from a resource type.
+func ShortType(t string) string {
+	const prefix = "microsoft."
+	if len(t) >= len(prefix) && strings.EqualFold(t[:len(prefix)], prefix) {
+		return t[len(prefix):]
+	}
+	return t
+}
+
+func resourcesConfig(subscriptionID string, group azure.ResourceGroup) listConfig[azure.Resource] {
+	return listConfig[azure.Resource]{
 		key:   data.Key{Kind: data.Resources, Subscription: subscriptionID, Group: group.Name},
 		title: group.Name,
 		noun:  "resources",
@@ -137,7 +168,7 @@ func NewResources(subscriptionID string, group azure.ResourceGroup) View {
 		},
 		row:  func(r azure.Resource) table.Row { return table.Row{r.Name, r.Type, r.Location} },
 		open: func(r azure.Resource) View { return NewDetails(subscriptionID, r) },
-	})
+	}
 }
 
 func mapRows[T any](items []T, row func(T) table.Row) []table.Row {

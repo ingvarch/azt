@@ -463,3 +463,64 @@ func TestDetailsShowsEncodingError(t *testing.T) {
 		t.Errorf("render:\n%s", got)
 	}
 }
+
+func TestShortType(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"microsoft.web/sites", "web/sites"},
+		{"Microsoft.Web/Sites", "Web/Sites"},
+		{"MICROSOFT.keyvault/vaults", "keyvault/vaults"},
+		{"contoso.web/sites", "contoso.web/sites"},
+		{"web/microsoft.sites", "web/microsoft.sites"},
+		{"microsoft.", ""},
+		{"", ""},
+	} {
+		if got := ShortType(c.in); got != c.want {
+			t.Errorf("ShortType(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestResourcesOfType(t *testing.T) {
+	all := []azure.Resource{
+		{ID: "/r/web", Name: "web-app", Type: "microsoft.web/sites", Location: "westeurope"},
+		{ID: "/r/kv", Name: "kv-prod", Type: "microsoft.keyvault/vaults", Location: "northeurope"},
+		{ID: "/r/api", Name: "api-app", Type: "Microsoft.Web/Sites", Location: "westeurope"},
+	}
+	newOfType := func() View { return NewResourcesOfType("id-1", groups[1], "microsoft.web/sites") }
+
+	v := newOfType()
+	if got, want := v.Title(), "web/sites"; got != want {
+		t.Errorf("Title() = %q, want %q", got, want)
+	}
+	if got, want := fetchKey(t, v), fetchKey(t, NewResources("id-1", groups[1])); got != want {
+		t.Errorf("key = %+v, want the key of NewResources %+v", got, want)
+	}
+
+	got := deliver(t, newOfType().Resize(120, 20), all, nil).Render()
+	for _, want := range []string{"web-app", "api-app", "Location"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("render lacks %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "kv-prod") {
+		t.Errorf("render shows a resource of another type:\n%s", got)
+	}
+
+	empty := deliver(t, newOfType().Resize(120, 20), []azure.Resource{all[1]}, nil).Render()
+	if want := "No resources of this type in this resource group."; !strings.Contains(empty, want) {
+		t.Errorf("empty render lacks %q:\n%s", want, empty)
+	}
+	if _, ok := deliver(t, newOfType(), []azure.Resource{all[1]}, nil).Open(); ok {
+		t.Error("Open() = true with no matching resources")
+	}
+
+	// Open uses the kept items: the cursor row is the first web resource, not kv-prod.
+	mixed := deliver(t, newOfType(), []azure.Resource{all[1], all[0]}, nil)
+	opened, ok := mixed.Open()
+	if !ok {
+		t.Fatal("Open() = false with a matching resource")
+	}
+	if got, want := opened.Title(), "web-app"; got != want {
+		t.Errorf("opened %q, want %q", got, want)
+	}
+}

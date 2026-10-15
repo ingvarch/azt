@@ -100,7 +100,15 @@ func (h *harness) fetch(k data.Key) (any, error) {
 	return "data-" + k.ID, nil
 }
 
+// newHarness hides the sidebar, so pane geometry is the whole window.
 func newHarness(w, h int) *harness {
+	hs := newSidebarHarness(w, h)
+	hs.prefix("e")
+	return hs
+}
+
+// newSidebarHarness keeps the sidebar visible, as at start.
+func newSidebarHarness(w, h int) *harness {
 	hs := &harness{}
 	hs.m = New(hs.newFake, hs.fetch)
 	hs.send(tea.WindowSizeMsg{Width: w, Height: h})
@@ -123,6 +131,14 @@ func key(s string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyEscape}
 	case "enter":
 		return tea.KeyPressMsg{Code: tea.KeyEnter}
+	case "left":
+		return tea.KeyPressMsg{Code: tea.KeyLeft}
+	case "down":
+		return tea.KeyPressMsg{Code: tea.KeyDown}
+	case "up":
+		return tea.KeyPressMsg{Code: tea.KeyUp}
+	case "right":
+		return tea.KeyPressMsg{Code: tea.KeyRight}
 	}
 	r := []rune(s)[0]
 	return tea.KeyPressMsg{Code: r, Text: s}
@@ -186,9 +202,12 @@ func (h *harness) frame() string { return sgr.ReplaceAllString(h.raw(), "") }
 
 func TestInitRunsFirstView(t *testing.T) {
 	h := newHarness(100, 30)
-	cmd := h.m.Init()
-	if cmd == nil || cmd() != "init-1" {
-		t.Errorf("Init did not return the first view's command")
+	msgs := collect(h.m.Init())
+	if !slices.Contains(msgs, any("init-1")) {
+		t.Errorf("Init messages = %v, lack the first view's", msgs)
+	}
+	if !slices.Contains(msgs, any(data.FetchMsg{Key: data.Key{Kind: data.Subscriptions}})) {
+		t.Errorf("Init messages = %v, lack the sidebar's fetch", msgs)
 	}
 	if h.recs[0].inits != 1 {
 		t.Errorf("Init calls = %d, want 1", h.recs[0].inits)

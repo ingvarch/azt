@@ -25,7 +25,11 @@ func newSession(t *testing.T) *session {
 		case data.ResourceGroups:
 			return []azure.ResourceGroup{{Name: "rg-a", Location: "westeurope", State: "Succeeded"}}, nil
 		case data.Resources:
-			return []azure.Resource{{ID: "/r/web", Name: "web-app", Type: "microsoft.web/sites", Location: "westeurope"}}, nil
+			return []azure.Resource{
+				{ID: "/r/web", Name: "web-app", Type: "microsoft.web/sites", Location: "westeurope"},
+				{ID: "/r/api", Name: "web-api", Type: "Microsoft.Web/sites", Location: "westeurope"},
+				{ID: "/r/sql", Name: "sql-db", Type: "microsoft.sql/servers", Location: "westeurope"},
+			}, nil
 		case data.Details:
 			return map[string]any{"name": "web-app", "kind": "app,linux"}, nil
 		}
@@ -107,5 +111,45 @@ func TestSplitSharesTheCache(t *testing.T) {
 			t.Errorf("Fetcher called more than once for %+v", k)
 		}
 		seen[k] = true
+	}
+}
+
+func TestSidebarOpensFilteredResources(t *testing.T) {
+	s := newSession(t)
+	s.settle(s.m.Init())
+	s.want(t, "start", "Explorer", "▸ Dev")
+
+	s.press("ctrl+w")
+	s.press("h")
+	s.press("l")
+	s.want(t, "subscription expanded", "▾ Dev", "▸ rg-a")
+
+	s.press("j")
+	s.press("l")
+	s.want(t, "group expanded", "▾ rg-a", "sql/servers 1", "web/sites 2")
+
+	s.press("j")
+	s.press("j")
+	s.press("enter")
+	s.want(t, "type opened", "Subscriptions › Dev › rg-a › web/sites", "web-app", "web-api")
+	if f := s.frame(); strings.Contains(f, "sql-db") {
+		t.Errorf("pane lists another type:\n%s", f)
+	}
+	if s.m.sidebarFocused {
+		t.Error("focus stayed in the sidebar")
+	}
+
+	s.press("esc")
+	s.want(t, "group resources", "Subscriptions › Dev › rg-a ", "web-app", "web-api", "sql-db")
+
+	seen := map[data.Key]bool{}
+	for _, k := range s.calls {
+		if seen[k] {
+			t.Errorf("Fetcher called more than once for %+v", k)
+		}
+		seen[k] = true
+	}
+	if len(s.calls) != 3 {
+		t.Errorf("fetched keys = %v, want 3", s.calls)
 	}
 }

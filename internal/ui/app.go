@@ -11,6 +11,7 @@ import (
 
 	"github.com/ingvarch/azt/internal/layout"
 	"github.com/ingvarch/azt/internal/ui/data"
+	"github.com/ingvarch/azt/internal/ui/sidebar"
 	"github.com/ingvarch/azt/internal/ui/views"
 )
 
@@ -18,14 +19,22 @@ const (
 	minPaneWidth  = 12
 	minPaneHeight = 4
 	resizeStep    = 0.05
+	sidebarWidth  = 32
 
-	normalHints = "enter open  esc back  r refresh  ^w v/s split  ^w h/j/k/l focus  ^w q close  ^w t tab  q quit"
-	pathSep     = " › "
-	pathCut     = "… › "
-	prefixHints = "v/s split  h/j/k/l focus  q close  z zoom  = equal  <>+- resize  t tab  n/p/1-9 switch  esc cancel"
+	sidebarHints       = "j/k move  l expand  h collapse  r refresh  enter open  ^w l panes  ^w e hide  q quit"
+	sidebarPrefixHints = "l/→ panes  e hide  t tab  n/p/1-9 switch  esc cancel"
+	normalHints        = "enter open  esc back  r refresh  ^w v/s split  ^w hjkl/←↓↑→ focus  ^w q close  ^w t tab  q quit"
+	pathSep            = " › "
+	pathCut            = "… › "
+	prefixHints        = "v/s split  hjkl/←↓↑→ focus  q close  z zoom  = equal  <>+- resize  t tab  n/p/1-9 switch  e explorer  esc cancel"
 )
 
 var (
+	// arrows after the prefix work like h, j, k, l.
+	arrows = map[string]string{"left": "h", "down": "j", "up": "k", "right": "l"}
+
+	sidebarPrefixKeys = []string{"l", "e", "t", "n", "p", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
+
 	focusColor   = lipgloss.Color("12")
 	borderColor  = lipgloss.Color("8")
 	reverseStyle = lipgloss.NewStyle().Reverse(true)
@@ -50,6 +59,10 @@ type Model struct {
 	nextID        layout.PaneID
 	width, height int
 	prefix        bool
+
+	sidebar        sidebar.Model
+	sidebarVisible bool
+	sidebarFocused bool
 }
 
 func New(newView func() views.View, fetch data.Fetcher) Model {
@@ -59,10 +72,13 @@ func New(newView func() views.View, fetch data.Fetcher) Model {
 		tabs:    []tab{{root: layout.Leaf(0), focus: 0}},
 		stacks:  map[layout.PaneID][]views.View{0: {newView()}},
 		nextID:  1,
+
+		sidebar:        sidebar.New(),
+		sidebarVisible: true,
 	}
 }
 
-func (m Model) Init() tea.Cmd { return m.top(0).Init() }
+func (m Model) Init() tea.Cmd { return tea.Batch(m.top(0).Init(), m.sidebar.Init()) }
 
 // top returns the view shown in pane id.
 func (m Model) top(id layout.PaneID) views.View {
@@ -76,6 +92,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.key(msg)
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.focusSidebar(m.sidebarFocused && m.sidebarDrawn())
 		m.resizeViews()
 		return m, nil
 	case data.FetchMsg:
@@ -83,7 +100,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case data.ResultMsg:
 		m.cache.Store(msg)
 	}
-	return m, m.broadcast(msg)
+	cmd := m.broadcast(msg)
+	return m, cmd
 }
 
 func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -95,6 +113,9 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.prefix = false
 		return m.runPrefix(k)
 	}
+	if m.sidebarFocused && k != "q" && k != "ctrl+w" {
+		return m.sidebarKey(msg)
+	}
 	switch k {
 	case "q":
 		return m, tea.Quit
@@ -102,12 +123,44 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.prefix = true
 		return m, nil
 	case "enter":
-		return m, m.open(m.tabs[m.active].focus)
+		cmd := m.open(m.tabs[m.active].focus)
+		return m, cmd
 	case "esc":
 		m.back(m.tabs[m.active].focus)
 		return m, nil
 	}
 	return m, m.sendTop(m.tabs[m.active].focus, msg)
+}
+
+// sidebarKey handles a key while the sidebar has focus.
+func (m Model) sidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if msg.String() != "enter" {
+		cmd := m.updateSidebar(msg)
+		return m, cmd
+	}
+	stack, ok := m.sidebar.Stack()
+	if !ok {
+		return m, nil
+	}
+	m.stacks[m.tabs[m.active].focus] = stack
+	m.focusSidebar(false)
+	m.resizeViews()
+	cmds := make([]tea.Cmd, len(stack))
+	for i, v := range stack {
+		cmds[i] = v.Init()
+	}
+	return m, tea.Batch(cmds...)
+}
+
+func (m *Model) updateSidebar(msg tea.Msg) tea.Cmd {
+	v, cmd := m.sidebar.Update(msg)
+	m.sidebar = v.(sidebar.Model)
+	return cmd
+}
+
+func (m *Model) focusSidebar(f bool) {
+	m.sidebarFocused = f
+	m.sidebar = m.sidebar.SetFocused(f)
 }
 
 // sendTop passes msg to the view shown in pane id.
@@ -137,9 +190,9 @@ func (m *Model) back(id layout.PaneID) {
 	}
 }
 
-// broadcast passes msg to every view of every stack of every tab.
+// broadcast passes msg to the sidebar and every view of every stack of every tab.
 func (m *Model) broadcast(msg tea.Msg) tea.Cmd {
-	var cmds []tea.Cmd
+	cmds := []tea.Cmd{m.updateSidebar(msg)}
 	for _, t := range m.tabs {
 		for _, id := range t.root.Panes() {
 			s := m.stacks[id]
@@ -155,7 +208,17 @@ func (m *Model) broadcast(msg tea.Msg) tea.Cmd {
 
 // runPrefix runs the action of key k after ctrl+w.
 func (m Model) runPrefix(k string) (tea.Model, tea.Cmd) {
+	if hjkl, ok := arrows[k]; ok {
+		k = hjkl
+	}
 	t := &m.tabs[m.active]
+	if m.sidebarFocused && !slices.Contains(sidebarPrefixKeys, k) {
+		return m, nil
+	}
+	if m.sidebarFocused && k == "l" {
+		m.focusSidebar(false)
+		return m, nil
+	}
 	switch k {
 	case "v", "s", "h", "j", "k", "l", "q", "=", "<", ">", "+", "-":
 		t.zoomed = false
@@ -168,13 +231,18 @@ func (m Model) runPrefix(k string) (tea.Model, tea.Cmd) {
 	case "s":
 		m.split(t, layout.Vertical)
 	case "h":
-		m.moveFocus(t, layout.Left)
+		if !m.moveFocus(t, layout.Left) && m.sidebarDrawn() {
+			m.focusSidebar(true)
+		}
 	case "j":
 		m.moveFocus(t, layout.Down)
 	case "k":
 		m.moveFocus(t, layout.Up)
 	case "l":
 		m.moveFocus(t, layout.Right)
+	case "e":
+		m.sidebarVisible = !m.sidebarVisible
+		m.focusSidebar(m.sidebarFocused && m.sidebarVisible)
 	case "q":
 		m.closePane(t)
 	case "z":
@@ -204,8 +272,20 @@ func (m Model) runPrefix(k string) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m Model) sidebarDrawn() bool {
+	return m.sidebarVisible && m.width >= sidebarWidth+minPaneWidth
+}
+
+func (m Model) sidebarRect() layout.Rect {
+	return layout.Rect{X: 0, Y: 1, W: sidebarWidth, H: max(m.height-2, 0)}
+}
+
 func (m Model) paneArea() layout.Rect {
-	return layout.Rect{X: 0, Y: 1, W: m.width, H: max(m.height-2, 0)}
+	area := layout.Rect{X: 0, Y: 1, W: m.width, H: max(m.height-2, 0)}
+	if m.sidebarDrawn() {
+		area.X, area.W = sidebarWidth, m.width-sidebarWidth
+	}
+	return area
 }
 
 // visible returns the rectangles of the panes drawn in the active tab.
@@ -218,6 +298,8 @@ func (m Model) visible() map[layout.PaneID]layout.Rect {
 }
 
 func (m *Model) resizeViews() {
+	r := m.sidebarRect()
+	m.sidebar = m.sidebar.Resize(max(r.W-2, 0), max(r.H-2, 0)).(sidebar.Model)
 	for id, r := range m.visible() {
 		s := m.stacks[id]
 		s[len(s)-1] = s[len(s)-1].Resize(max(r.W-2, 0), max(r.H-2, 0))
@@ -237,10 +319,13 @@ func (m *Model) split(t *tab, o layout.Orientation) {
 	t.root, t.focus = root, added
 }
 
-func (m *Model) moveFocus(t *tab, d layout.Direction) {
-	if id, ok := t.root.Neighbor(t.focus, d, m.paneArea()); ok {
+// moveFocus focuses the neighbor pane in direction d; false if there is none.
+func (m *Model) moveFocus(t *tab, d layout.Direction) bool {
+	id, ok := t.root.Neighbor(t.focus, d, m.paneArea())
+	if ok {
 		t.focus = id
 	}
+	return ok
 }
 
 func (m *Model) closePane(t *tab) {
@@ -301,7 +386,11 @@ func (m Model) frame() string {
 		if r.W < 2 || r.H < 2 {
 			continue
 		}
-		pane := renderPane(m.stacks[id], r, id == focus)
+		pane := renderPane(m.stacks[id], r, id == focus && !m.sidebarFocused)
+		comp.AddLayers(lipgloss.NewLayer(pane).X(r.X).Y(r.Y))
+	}
+	if r := m.sidebarRect(); m.sidebarDrawn() && r.H >= 2 {
+		pane := renderPane([]views.View{m.sidebar}, r, m.sidebarFocused)
 		comp.AddLayers(lipgloss.NewLayer(pane).X(r.X).Y(r.Y))
 	}
 	return lipgloss.NewCanvas(m.width, m.height).Compose(comp).Render()
@@ -321,10 +410,16 @@ func (m Model) tabBar() string {
 
 func (m Model) statusBar() string {
 	badge, hints := " NORMAL ", normalHints
-	if m.prefix {
+	path := strings.Join(titles(m.stacks[m.tabs[m.active].focus]), pathSep)
+	if m.sidebarFocused {
+		hints, path = sidebarHints, m.sidebar.Title()
+	}
+	switch {
+	case m.prefix && m.sidebarFocused:
+		badge, hints = " CTRL-W ", sidebarPrefixHints
+	case m.prefix:
 		badge, hints = " CTRL-W ", prefixHints
 	}
-	path := strings.Join(titles(m.stacks[m.tabs[m.active].focus]), pathSep)
 	bar := reverseStyle.Render(badge) + " " + path + "  " + hintStyle.Render(hints)
 	return lipgloss.NewStyle().MaxWidth(m.width).Render(bar)
 }
