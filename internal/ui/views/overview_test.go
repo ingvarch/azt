@@ -999,3 +999,13 @@ func TestColumnWidthsSplitAnOddWidth(t *testing.T) {
 		}
 	}
 }
+
+func TestAKSPoolSummarySkipsElementsThatAreNoMaps(t *testing.T) {
+	row := map[string]any{"properties": map[string]any{"agentPoolProfiles": []any{
+		"stray", map[string]any{"name": "np1", "mode": "System"}, 7.0,
+	}}}
+	got := plainAll(aksPoolSummary.lines(row, 100))
+	wantLines(t, got, []string{"Name  Mode    VM size  Nodes  Version  State", "np1   System  —        —      —        —"})
+	none := map[string]any{"properties": map[string]any{"agentPoolProfiles": []any{"stray"}}}
+	wantLines(t, plainAll(aksPoolSummary.lines(none, 100)), []string{"none"})
+}

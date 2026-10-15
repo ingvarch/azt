@@ -2,8 +2,11 @@ package views
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
+
+	"charm.land/lipgloss/v2"
 )
 
 func TestFormats(t *testing.T) {
@@ -231,5 +234,158 @@ func TestBoxWithoutPairsSaysNone(t *testing.T) {
 		if !reflect.DeepEqual(got, []string{"none"}) {
 			t.Errorf("split %v: lines = %q, want none", split, got)
 		}
+	}
+}
+
+// tableRow has maps and plain strings to draw as table elements.
+var tableRow = map[string]any{
+	"things": []any{
+		map[string]any{"name": "alpha", "meta": map[string]any{"id": "/x/y/ref-one"}, "up": true, "tags": []any{"t1", "t2"}, "state": "Running"},
+		map[string]any{"name": "beta", "meta": map[string]any{"id": "/x/y/ref-two"}, "up": false, "tags": []any{"t3"}, "state": "Failed"},
+	},
+	"words": []any{"pear", "fig", "apple"},
+}
+
+func TestTableDefColumnsAndLayout(t *testing.T) {
+	tb := tableDef{path: []string{"things"}, cols: []colDef{
+		{title: "Name", path: []string{"name"}},
+		{title: "Ref", path: []string{"meta", "id"}, format: fmtLast},
+		{title: "Shout", value: func(e any) string { return strings.ToUpper(str(e, "name")) }},
+	}}
+	got := plainAll(tb.lines(tableRow))
+	// Each column as wide as its widest cell, two spaces between, none after the last.
+	want := []string{"Name   Ref      Shout", "alpha  ref-one  ALPHA", "beta   ref-two  BETA"}
+	wantLines(t, got, want)
+	raw := tb.lines(tableRow)
+	if a := attrsOf(t, raw[0], "Name"); !a.bold || a.fg != fgMuted {
+		t.Errorf("header = %+v, want bold muted", a)
+	}
+	for i, l := range raw {
+		if strings.Contains(l, "\x1b[7m") {
+			t.Errorf("line %d is highlighted", i)
+		}
+	}
+}
+
+func TestTableDefFormats(t *testing.T) {
+	tb := tableDef{path: []string{"things"}, cols: []colDef{
+		{title: "Name", path: []string{"name"}},
+		{title: "Up", path: []string{"up"}, format: fmtOnOff},
+		{title: "Tags", path: []string{"tags"}, format: fmtCount},
+		{title: "List", path: []string{"tags"}, format: fmtJoin},
+		{title: "State", path: []string{"state"}, format: fmtState},
+		{title: "Gone", path: []string{"nope"}},
+	}}
+	raw := tb.lines(tableRow)
+	wantLines(t, plainAll(raw), []string{
+		"Name   Up   Tags  List    State      Gone",
+		"alpha  on   2     t1, t2  ● Running  —",
+		"beta   off  1     t3      ● Failed   —",
+	})
+	wantFg(t, raw[1], "on", fgGood)
+	wantFg(t, raw[2], "off", fgMuted)
+	wantFg(t, raw[1], "Running", fgGood)
+	wantFg(t, raw[2], "Failed", fgBad)
+}
+
+func TestTableDefPlainStringElements(t *testing.T) {
+	tb := tableDef{path: []string{"words"}, cols: []colDef{
+		{title: "Word", value: text},
+		{title: "Size", value: func(e any) string { return strconv.Itoa(len(text(e))) }},
+		{title: "Path", path: []string{"x"}},
+		{title: "Bare", format: fmtText},
+	}}
+	wantLines(t, plainAll(tb.lines(tableRow)), []string{
+		"Word   Size  Path  Bare",
+		"pear   4     —     pear",
+		"fig    3     —     fig",
+		"apple  5     —     apple",
+	})
+}
+
+func TestTableDefKeepAndOrder(t *testing.T) {
+	word := []colDef{{title: "Word", value: text}}
+	byLength := func(a, b any) int { return len(text(a)) - len(text(b)) }
+	tests := []struct {
+		name string
+		tb   tableDef
+		want []string
+	}{
+		{"list order by default", tableDef{path: []string{"words"}, cols: word}, []string{"Word", "pear", "fig", "apple"}},
+		{"keep drops", tableDef{path: []string{"words"}, cols: word, keep: func(e any) bool { return text(e) != "fig" }}, []string{"Word", "pear", "apple"}},
+		{"order sorts", tableDef{path: []string{"words"}, cols: word, order: byLength}, []string{"Word", "fig", "pear", "apple"}},
+		{"order sorts the kept ones", tableDef{path: []string{"words"}, cols: word, order: byLength, keep: func(e any) bool { return text(e) != "fig" }}, []string{"Word", "pear", "apple"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { wantLines(t, plainAll(tt.tb.lines(tableRow)), tt.want) })
+	}
+	if got := tableRow["words"].([]any); !reflect.DeepEqual(got, []any{"pear", "fig", "apple"}) {
+		t.Errorf("the row's list was changed: %v", got)
+	}
+}
+
+func TestTableDefOrderIsStable(t *testing.T) {
+	// Enough elements that an unstable sort would move equal ones.
+	var list []any
+	var want []string
+	for _, parity := range []int{0, 1} {
+		for i := parity; i < 60; i += 2 {
+			want = append(want, strconv.Itoa(i))
+		}
+	}
+	for i := range 60 {
+		list = append(list, strconv.Itoa(i))
+	}
+	odd := func(e any) int { n, _ := strconv.Atoi(text(e)); return n % 2 }
+	tb := tableDef{path: []string{"l"}, cols: []colDef{{title: "W", value: text}},
+		order: func(a, b any) int { return odd(a) - odd(b) }}
+	wantLines(t, plainAll(tb.lines(map[string]any{"l": list})), append([]string{"W"}, want...))
+}
+
+func TestTableDefEmpty(t *testing.T) {
+	col := []colDef{{title: "Word", value: text}}
+	dropAll := func(any) bool { return false }
+	tests := []struct {
+		name string
+		tb   tableDef
+		row  map[string]any
+		want string
+	}{
+		{"default text, no list", tableDef{path: []string{"nope"}, cols: col}, tableRow, "none"},
+		{"default text, empty list", tableDef{path: []string{"e"}, cols: col}, map[string]any{"e": []any{}}, "none"},
+		{"default text, nothing kept", tableDef{path: []string{"words"}, cols: col, keep: dropAll}, tableRow, "none"},
+		{"own text", tableDef{path: []string{"words"}, cols: col, keep: dropAll, empty: "no words"}, tableRow, "no words"},
+		{"own text, no list", tableDef{path: []string{"nope"}, cols: col, empty: "no words"}, tableRow, "no words"},
+		{"not a list", tableDef{path: []string{"name"}, cols: col}, map[string]any{"name": "x"}, "none"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { wantLines(t, plainAll(tt.tb.lines(tt.row)), []string{tt.want}) })
+	}
+}
+
+func TestBoxDefWithATable(t *testing.T) {
+	tb := &tableDef{path: []string{"words"}, cols: []colDef{{title: "Word", value: text}}}
+	b := boxDef{title: "Words", table: tb}
+	wantLines(t, plainAll(b.lines(tableRow, 80)), []string{"Word", "pear", "fig", "apple"})
+	wantLines(t, unbox(plainLines(strings.Join(boxesTab(b)(tableRow, 40), "\n"))), []string{"Words", "Word", "pear", "fig", "apple", ""})
+	if got := plainAll(b.asSection(tableRow, 40).lines); got[0] != "Word" {
+		t.Errorf("section lines = %q", got)
+	}
+}
+
+func TestBoxDefTableIsCutByTheBox(t *testing.T) {
+	row := map[string]any{"l": []any{"a-long-cell-that-does-not-fit-into-the-box"}}
+	tb := &tableDef{path: []string{"l"}, cols: []colDef{
+		{title: "A", value: text},
+		{title: "B", value: func(any) string { return "b" }},
+	}}
+	got := boxesTab(boxDef{title: "T", table: tb})(row, 24)
+	for _, l := range plainAll(got) {
+		if w := lipgloss.Width(l); w > 24 {
+			t.Errorf("line %q is %d cells wide, want at most 24", l, w)
+		}
+	}
+	if line := plainAll(got)[2]; !strings.Contains(line, "…") || strings.Contains(line, "b") {
+		t.Errorf("row = %q, want it cut with an ellipsis", line)
 	}
 }

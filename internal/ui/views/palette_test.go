@@ -147,3 +147,19 @@ func TestStateText(t *testing.T) {
 		t.Errorf("dash is styled: %q", got)
 	}
 }
+
+func TestStateToneOfNetworkStates(t *testing.T) {
+	for _, c := range []struct {
+		word string
+		want any
+	}{
+		{"Connected", good}, {"connected", good}, {"CONNECTED", good},
+		{"FullyInSync", good}, {"fullyinsync", good}, {"FULLYINSYNC", good},
+		{"Disconnected", bad}, {"disconnected", bad}, {"DISCONNECTED", bad},
+		{"Initiated", warn}, {"LocalNotInSync", warn}, {"RemoteNotInSync", warn},
+	} {
+		if got := stateTone(c.word); got != c.want {
+			t.Errorf("stateTone(%q) = %v, want %v", c.word, got, c.want)
+		}
+	}
+}

@@ -1,0 +1,113 @@
+{
+  "id": "/subscriptions/s7/resourceGroups/rg-net/providers/Microsoft.Network/virtualNetworks/vnet-prod",
+  "name": "vnet-prod",
+  "type": "microsoft.network/virtualnetworks",
+  "location": "swedencentral",
+  "resourceGroup": "rg-net",
+  "subscriptionId": "s7",
+  "subscription": "Prod",
+  "tags": {"owner": "netops"},
+  "properties": {
+    "provisioningState": "Succeeded",
+    "enableDdosProtection": true,
+    "addressSpace": {"addressPrefixes": ["10.10.0.0/16", "10.11.0.0/16"]},
+    "dhcpOptions": {"dnsServers": ["10.10.0.4", "10.10.0.5"]},
+    "subnets": [
+      {
+        "name": "snet-app",
+        "id": "/subscriptions/s7/resourceGroups/rg-net/providers/Microsoft.Network/virtualNetworks/vnet-prod/subnets/snet-app",
+        "type": "Microsoft.Network/virtualNetworks/subnets",
+        "etag": "W/\"e1\"",
+        "properties": {
+          "provisioningState": "Succeeded",
+          "addressPrefix": "10.10.1.0/24",
+          "ipConfigurations": [{"id": "/ip/1"}, {"id": "/ip/2"}, {"id": "/ip/3"}],
+          "networkSecurityGroup": {"id": "/subscriptions/s7/resourceGroups/rg-sec/providers/Microsoft.Network/networkSecurityGroups/nsg-app"},
+          "routeTable": {"id": "/subscriptions/s7/resourceGroups/rg-sec/providers/Microsoft.Network/routeTables/rt-egress"},
+          "natGateway": {"id": "/subscriptions/s7/resourceGroups/rg-sec/providers/Microsoft.Network/natGateways/nat-prod"},
+          "delegations": [{"name": "web", "properties": {"serviceName": "Microsoft.Web/serverFarms"}}],
+          "privateEndpointNetworkPolicies": "Enabled",
+          "privateLinkServiceNetworkPolicies": "Disabled"
+        }
+      },
+      {
+        "name": "snet-data",
+        "id": "/subscriptions/s7/resourceGroups/rg-net/providers/Microsoft.Network/virtualNetworks/vnet-prod/subnets/snet-data",
+        "type": "Microsoft.Network/virtualNetworks/subnets",
+        "etag": "W/\"e2\"",
+        "properties": {
+          "provisioningState": "Succeeded",
+          "addressPrefixes": ["10.10.2.0/25", "10.10.2.128/25"],
+          "ipConfigurations": [{"id": "/ip/4"}],
+          "delegations": [
+            {"name": "sql", "properties": {"serviceName": "Microsoft.Sql/managedInstances"}},
+            {"name": "batch", "properties": {"serviceName": "Microsoft.Batch/batchAccounts"}}
+          ],
+          "privateEndpointNetworkPolicies": "Disabled"
+        }
+      },
+      {
+        "name": "GatewaySubnet",
+        "id": "/subscriptions/s7/resourceGroups/rg-net/providers/Microsoft.Network/virtualNetworks/vnet-prod/subnets/GatewaySubnet",
+        "type": "Microsoft.Network/virtualNetworks/subnets",
+        "etag": "W/\"e3\"",
+        "properties": {
+          "provisioningState": "Succeeded",
+          "addressPrefix": "10.10.255.0/27",
+          "ipConfigurations": [{"id": "/ip/5"}, {"id": "/ip/6"}],
+          "delegations": []
+        }
+      },
+      {
+        "name": "snet-jobs",
+        "id": "/subscriptions/s7/resourceGroups/rg-net/providers/Microsoft.Network/virtualNetworks/vnet-prod/subnets/snet-jobs",
+        "type": "Microsoft.Network/virtualNetworks/subnets",
+        "etag": "W/\"e4\"",
+        "properties": {
+          "provisioningState": "Succeeded",
+          "addressPrefix": "10.10.3.0/24",
+          "networkSecurityGroup": {"id": "/subscriptions/s7/resourceGroups/rg-sec/providers/Microsoft.Network/networkSecurityGroups/nsg-jobs"},
+          "privateEndpointNetworkPolicies": "Enabled"
+        }
+      }
+    ],
+    "virtualNetworkPeerings": [
+      {
+        "name": "peer-hub",
+        "properties": {
+          "remoteVirtualNetwork": {"id": "/subscriptions/s9/resourceGroups/rg-hub/providers/Microsoft.Network/virtualNetworks/vnet-hub"},
+          "peeringState": "Connected",
+          "peeringSyncLevel": "FullyInSync",
+          "allowForwardedTraffic": true,
+          "allowGatewayTransit": false,
+          "useRemoteGateways": false,
+          "remoteAddressSpace": {"addressPrefixes": ["10.0.0.0/16"]}
+        }
+      },
+      {
+        "name": "peer-spoke",
+        "properties": {
+          "remoteVirtualNetwork": {"id": "/subscriptions/s9/resourceGroups/rg-spoke/providers/Microsoft.Network/virtualNetworks/vnet-spoke"},
+          "peeringState": "Initiated",
+          "peeringSyncLevel": "LocalNotInSync",
+          "allowForwardedTraffic": false,
+          "allowGatewayTransit": true,
+          "useRemoteGateways": false,
+          "remoteAddressSpace": {"addressPrefixes": ["10.20.0.0/16", "10.21.0.0/16"]}
+        }
+      },
+      {
+        "name": "peer-old",
+        "properties": {
+          "remoteVirtualNetwork": {"id": "/subscriptions/s9/resourceGroups/rg-old/providers/Microsoft.Network/virtualNetworks/vnet-legacy"},
+          "peeringState": "Disconnected",
+          "peeringSyncLevel": "RemoteNotInSync",
+          "allowForwardedTraffic": false,
+          "allowGatewayTransit": false,
+          "useRemoteGateways": true,
+          "remoteAddressSpace": {"addressPrefixes": ["10.30.0.0/16"]}
+        }
+      }
+    ]
+  }
+}

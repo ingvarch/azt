@@ -75,18 +75,77 @@ func (f fieldDef) text(row map[string]any) string {
 	return f.format(dig(row, f.path...))
 }
 
-// boxDef is a titled box of fields. extra adds pairs the fields cannot list,
-// drawn before them. split puts the fields in two columns, the first
-// half on the left, when the box is wide enough.
+// colDef is a column of a table: the value at path in an element in format
+// (text when nil), or whatever value returns for what a path cannot say.
+type colDef struct {
+	title  string
+	path   []string
+	format format
+	value  func(elem any) string
+}
+
+func (c colDef) text(elem any) string {
+	if c.value != nil {
+		return c.value(elem)
+	}
+	if c.format == nil {
+		return fmtText(dig(elem, c.path...))
+	}
+	return c.format(dig(elem, c.path...))
+}
+
+// tableDef is a table of the elements of the list at path in the row. keep
+// drops elements, order sorts the kept ones (the list order without it), and
+// empty is the line shown when none is left ("none" without it).
+type tableDef struct {
+	path  []string
+	cols  []colDef
+	keep  func(elem any) bool
+	order func(a, b any) int
+	empty string
+}
+
+func (t tableDef) lines(row map[string]any) []string {
+	list := slices.Clone(elems(dig(row, t.path...)))
+	if t.keep != nil {
+		list = slices.DeleteFunc(list, func(e any) bool { return !t.keep(e) })
+	}
+	if len(list) == 0 {
+		return []string{first(t.empty, "none")}
+	}
+	if t.order != nil {
+		slices.SortStableFunc(list, t.order)
+	}
+	cols := make([]column, len(t.cols))
+	for i, c := range t.cols {
+		cols[i] = column{title: c.title}
+	}
+	rows := make([][]string, len(list))
+	for i, e := range list {
+		rows[i] = make([]string, len(t.cols))
+		for j, c := range t.cols {
+			rows[i][j] = c.text(e)
+		}
+	}
+	return summaryTable(cols, rows)
+}
+
+// boxDef is a titled box of fields, or of a table. extra adds pairs the fields
+// cannot list, drawn before them. split puts the fields in two columns, the
+// first half on the left, when the box is wide enough.
 type boxDef struct {
 	title  string
 	fields []fieldDef
 	extra  func(row map[string]any) []pair
 	split  bool
+	table  *tableDef
 }
 
-// lines draws the fields in a box width cells wide inside, or "none" without any.
+// lines draws the table, or the fields in a box width cells wide inside, or "none" without any.
 func (b boxDef) lines(row map[string]any, width int) []string {
+	if b.table != nil {
+		return b.table.lines(row)
+	}
 	var pairs []pair
 	if b.extra != nil {
 		pairs = b.extra(row)

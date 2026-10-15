@@ -41,8 +41,11 @@ func TestUnknownTypeGetsGenericTabs(t *testing.T) {
 func TestTabsOfEveryKind(t *testing.T) {
 	for _, k := range kinds {
 		want := []string{"Overview", "JSON"}
-		if k.command == "aks" {
+		switch k.command {
+		case "aks":
 			want = aksTabNames
+		case "vnet":
+			want = []string{"Overview", "Subnets", "Peerings", "JSON"}
 		}
 		for _, typ := range k.types {
 			if got := Tabs(typ); !reflect.DeepEqual(got, want) {

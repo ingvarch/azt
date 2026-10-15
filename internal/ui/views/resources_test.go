@@ -79,7 +79,13 @@ func TestManagedIdentityTabs(t *testing.T) {
 // overviewBody is the unboxed Overview of a row at a pane width.
 func overviewBody(t *testing.T, row map[string]any, width int) []string {
 	t.Helper()
-	v := deliver(t, NewDetails("s1", azure.Resource{ID: "/r/x", Name: "x"}).Resize(width, 100), row, nil)
+	return bodyOfRow(t, row, "", width)
+}
+
+// bodyOfRow is the body of a details view showing row on tab, width cells wide.
+func bodyOfRow(t *testing.T, row map[string]any, tab string, width int) []string {
+	t.Helper()
+	v := deliver(t, openedAtRow(t, tab).Resize(width, 200), row, nil)
 	return renderBody(v)
 }
 
@@ -301,10 +307,10 @@ func TestKeyVaultTabs(t *testing.T) {
 	}
 }
 
-// resourceCases are details views of the Key Vault, managed identity, registry and storage fixtures on every tab.
+// resourceCases are details views of the resource fixtures on every tab.
 func resourceCases(t *testing.T) []renderCase {
 	var cases []renderCase
-	for name, typ := range map[string]string{"kv": kvType, "mi": miType, "acr": acrType, "storage": storageType} {
+	for name, typ := range map[string]string{"kv": kvType, "mi": miType, "acr": acrType, "storage": storageType, "vnet": vnetType} {
 		row := fixture(t, name)
 		for _, tab := range Tabs(typ) {
 			cases = append(cases, renderCase{name + " " + tab, func(w, h int) View {
