@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"charm.land/lipgloss/v2"
 )
@@ -17,6 +18,18 @@ func fmtText(v any) string { return orDash(text(v)) }
 func fmtState(v any) string { return stateText(fmtText(v)) }
 
 func fmtOnOff(v any) string { return switchText(onOff(v)) }
+
+// fmtEnabled draws the strings "enabled" and "disabled" and a bool like fmtOnOff; other text stays.
+func fmtEnabled(v any) string { return switchText(enabledState(v)) }
+
+// fmtDate is the UTC date of an RFC 3339 time; text that is no time stays.
+func fmtDate(v any) string {
+	s := text(v)
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t.UTC().Format(time.DateOnly)
+	}
+	return orDash(s)
+}
 
 // fmtCount is the number of elements of a list or keys of a map, "0" when missing.
 func fmtCount(v any) string {

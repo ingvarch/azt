@@ -77,6 +77,7 @@ func TestTypeCommands(t *testing.T) {
 		{"app", "web apps in every subscription", "microsoft.web/sites"},
 		{"vnet", "virtual networks in every subscription", "microsoft.network/virtualnetworks"},
 		{"mi", "managed identities in every subscription", "microsoft.managedidentity/userassignedidentities"},
+		{"acr", "container registries in every subscription", "microsoft.containerregistry/registries"},
 	}
 	if got := TypeCommands(); !reflect.DeepEqual(got, want) {
 		t.Errorf("TypeCommands() = %v, want %v", got, want)

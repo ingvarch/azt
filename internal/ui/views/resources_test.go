@@ -156,13 +156,14 @@ func TestKeyVaultMissingFields(t *testing.T) {
 }
 
 // kvRow is a vault row with the properties from the JSON text.
-func kvRow(t *testing.T, props string) map[string]any {
+// typedRow is a row of resource type typ with the given properties (JSON).
+func typedRow(t *testing.T, typ, props string) map[string]any {
 	t.Helper()
 	var p map[string]any
 	if err := json.Unmarshal([]byte(props), &p); err != nil {
 		t.Fatal(err)
 	}
-	return map[string]any{"type": kvType, "properties": p}
+	return map[string]any{"type": typ, "properties": p}
 }
 
 func TestKeyVaultValues(t *testing.T) {
@@ -182,7 +183,7 @@ func TestKeyVaultValues(t *testing.T) {
 		{`{"networkAcls":{}}`, "Default action         Allow"},
 		{`{}`, "Default action         Allow"},
 	} {
-		if got := overviewBody(t, kvRow(t, c.props), 80); !contains(got, c.want) {
+		if got := overviewBody(t, typedRow(t, kvType, c.props), 80); !contains(got, c.want) {
 			t.Errorf("%s: lacks %q:\n%s", c.props, c.want, strings.Join(got, "\n"))
 		}
 	}
@@ -205,7 +206,7 @@ func TestKeyVaultFlagsReadTheirOwnProperty(t *testing.T) {
 		"Template deployment": "enabledForTemplateDeployment",
 	}
 	for label, prop := range flags {
-		lines := overviewBody(t, kvRow(t, `{"`+prop+`":true}`), 80)
+		lines := overviewBody(t, typedRow(t, kvType, `{"`+prop+`":true}`), 80)
 		for other := range flags {
 			want := "—"
 			if other == label {
@@ -256,7 +257,7 @@ func TestKeyVaultAttention(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := alertLines(kvAttention(kvRow(t, tt.props)))
+			got := alertLines(kvAttention(typedRow(t, kvType, tt.props)))
 			if len(got) == 0 && len(tt.want) == 0 {
 				return
 			}
@@ -279,7 +280,7 @@ func TestKeyVaultAttentionIsWarning(t *testing.T) {
 }
 
 func TestKeyVaultAttentionBox(t *testing.T) {
-	got := overviewBody(t, kvRow(t, `{"enablePurgeProtection":false,"networkAcls":{"defaultAction":"Deny"}}`), 80)
+	got := overviewBody(t, typedRow(t, kvType, `{"enablePurgeProtection":false,"networkAcls":{"defaultAction":"Deny"}}`), 80)
 	i := slices.Index(got, "Attention")
 	if i < 0 || got[i-2] != "Private endpoints      0" || got[i+1] != "▲ purge protection is off" || got[i+3] != "Tags" {
 		t.Errorf("Attention is not between Network and Tags:\n%s", strings.Join(got, "\n"))
@@ -287,7 +288,7 @@ func TestKeyVaultAttentionBox(t *testing.T) {
 	if safe := bodyOf(t, "kv", "", 100); contains(safe, "Attention") {
 		t.Errorf("Attention shown without alerts:\n%s", strings.Join(safe, "\n"))
 	}
-	v := deliver(t, NewDetails("s1", azure.Resource{ID: "/r/x", Name: "x"}).Resize(80, 100), kvRow(t, `{}`), nil)
+	v := deliver(t, NewDetails("s1", azure.Resource{ID: "/r/x", Name: "x"}).Resize(80, 100), typedRow(t, kvType, `{}`), nil)
 	wantFg(t, styledLine(t, v, "╭ Attention"), "Attention", fgWarn)
 }
 
@@ -297,10 +298,10 @@ func TestKeyVaultTabs(t *testing.T) {
 	}
 }
 
-// resourceCases are details views of the Key Vault and managed identity fixtures on every tab.
+// resourceCases are details views of the Key Vault, managed identity and registry fixtures on every tab.
 func resourceCases(t *testing.T) []renderCase {
 	var cases []renderCase
-	for name, typ := range map[string]string{"kv": kvType, "mi": miType} {
+	for name, typ := range map[string]string{"kv": kvType, "mi": miType, "acr": acrType} {
 		row := fixture(t, name)
 		for _, tab := range Tabs(typ) {
 			cases = append(cases, renderCase{name + " " + tab, func(w, h int) View {

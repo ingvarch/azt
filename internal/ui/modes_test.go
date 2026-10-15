@@ -628,7 +628,7 @@ func TestHelpListsEveryKey(t *testing.T) {
 }
 
 func TestHelpDescribesTheCommandDialog(t *testing.T) {
-	want := "command dialog: ↑ ↓ choose, tab completes, enter runs, esc closes"
+	want := "command dialog (↑ ↓ choose, tab completes)"
 	for _, s := range helpSections {
 		if s.title != "Commands" {
 			continue

@@ -350,10 +350,10 @@ func TestDialogBoxGeometry(t *testing.T) {
 		bw   int
 		bh   int
 	}{
-		{100, 40, "", 64, 17},
+		{100, 40, "", 64, 18},
 		{100, 40, "st", 64, 5},
 		{100, 40, "zzz", 64, 5},
-		{50, 40, "", 46, 17},
+		{50, 40, "", 46, 18},
 		{100, 12, "", 64, 8},
 		{100, 20, "", 64, 16},
 	}
@@ -387,7 +387,8 @@ func TestDialogContent(t *testing.T) {
 	wantIn(t, "first row", lines[3], "  subs     subscriptions")
 	wantIn(t, "storage row", lines[9], "  storage  storage accounts in every subscription")
 	wantIn(t, "managed identities row", lines[12], "  mi       managed identities in every subscription")
-	wantIn(t, "last row", lines[15], "  q        quit")
+	wantIn(t, "registries row", lines[13], "  acr      container registries in every subscription")
+	wantIn(t, "last row", lines[16], "  q        quit")
 	if strings.Contains(strings.Join(lines, ""), "▌") {
 		t.Error("a row is offered before any key")
 	}
@@ -454,7 +455,7 @@ func TestDialogRowsScrollToKeepTheOfferVisible(t *testing.T) {
 	if strings.Contains(got, "subs") {
 		t.Errorf("the window did not scroll:\n%s", got)
 	}
-	for range 12 {
+	for range 13 {
 		h.send(key("up"))
 	}
 	wantIn(t, "dialog", strings.Join(dialogLines(t, h), "\n"), "▌ subs")
