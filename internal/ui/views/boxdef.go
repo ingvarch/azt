@@ -116,7 +116,7 @@ func (t tableDef) source(row map[string]any) []any {
 	return elems(dig(row, t.path...))
 }
 
-func (t tableDef) lines(row map[string]any) []string {
+func (t tableDef) lines(row map[string]any, width int) []string {
 	list := slices.Clone(t.source(row))
 	if t.keep != nil {
 		list = slices.DeleteFunc(list, func(e any) bool { return !t.keep(e) })
@@ -138,7 +138,7 @@ func (t tableDef) lines(row map[string]any) []string {
 			rows[i][j] = c.text(e)
 		}
 	}
-	return summaryTable(cols, rows)
+	return summaryTable(cols, rows, width)
 }
 
 // boxDef is a titled box of fields, or of a table. extra adds pairs the fields
@@ -155,7 +155,7 @@ type boxDef struct {
 // lines draws the table, or the fields in a box width cells wide inside, or "none" without any.
 func (b boxDef) lines(row map[string]any, width int) []string {
 	if b.table != nil {
-		return b.table.lines(row)
+		return b.table.lines(row, width)
 	}
 	var pairs []pair
 	if b.extra != nil {

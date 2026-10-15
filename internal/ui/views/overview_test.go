@@ -229,10 +229,13 @@ var (
 	aksTags = []string{"Tags", "env = dev", "owner = team-a", ""}
 )
 
-func overviewLines(essentials []string) []string {
+func overviewLines(essentials []string) []string { return overviewWithPools(essentials, aksPoolTable) }
+
+// overviewWithPools is overviewLines with the given node pool table.
+func overviewWithPools(essentials, pools []string) []string {
 	out := append([]string{"Essentials"}, essentials...)
 	out = append(out, "", "Node pools")
-	out = append(out, aksPoolTable...)
+	out = append(out, pools...)
 	out = append(out, "")
 	out = append(out, aksAttentionLines...)
 	return append(out, aksTags...)
@@ -303,7 +306,7 @@ func TestAKSOverviewTakesOneColumnRatherThanCut(t *testing.T) {
 }
 
 func TestAKSOverviewOneColumn(t *testing.T) {
-	want := overviewLines([]string{
+	essentials := []string{
 		"Status               ● Running · Succeeded",
 		"Resource group       rg-app",
 		"Location             westeurope",
@@ -315,9 +318,18 @@ func TestAKSOverviewOneColumn(t *testing.T) {
 		"Private cluster      no",
 		"Support plan         KubernetesOfficial",
 		"Auto-upgrade         patch / NodeImage",
-	})
-	wantLines(t, bodyOf(t, "aks", "", 70), cutAll(want, innerWidth(68)))
-	wantLines(t, bodyOf(t, "aks", "", 40), cutAll(want, innerWidth(38)))
+	}
+	head := []string{"Name", "Mode", "VM size", "Nodes", "Version", "State"}
+	// Inside 64 the longest pool columns are cut to 14 cells.
+	pools70 := wantTable([]int{6, 6, 14, 7, 7}, head,
+		[]string{"system", "System", "Standard_D4s_…", "3 (2–5)", "1.30.4", "● Running"},
+		[]string{"work", "User", "Standard_E8s_…", "4", "1.29.8", "● Stopped · U…"})
+	// Inside 34 the columns stop at 8 cells and the box cuts the lines.
+	pools40 := wantTable([]int{6, 6, 8, 7, 7}, head,
+		[]string{"system", "System", "Standar…", "3 (2–5)", "1.30.4", "● Runnin…"},
+		[]string{"work", "User", "Standar…", "4", "1.29.8", "● Stoppe…"})
+	wantLines(t, bodyOf(t, "aks", "", 70), cutAll(overviewWithPools(essentials, pools70), innerWidth(68)))
+	wantLines(t, bodyOf(t, "aks", "", 40), cutAll(overviewWithPools(essentials, pools40), innerWidth(38)))
 }
 
 // cutAll cuts the lines to width cells, ending a cut line with "…".
