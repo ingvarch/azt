@@ -51,6 +51,12 @@ func flag(v any, path ...string) (on, ok bool) {
 	return on, ok
 }
 
+// number reads a number; ok is false when it is missing or no number.
+func number(v any, path ...string) (n float64, ok bool) {
+	n, ok = dig(v, path...).(float64)
+	return n, ok
+}
+
 // flagText shows a boolean as on or off, dash when missing.
 func flagText(on, off string, v any, path ...string) string {
 	b, ok := flag(v, path...)

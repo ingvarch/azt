@@ -30,6 +30,8 @@ var kinds = []resourceKind{
 	{types: []string{"microsoft.managedidentity/userassignedidentities"}, command: "mi", desc: "managed identities in every subscription", tabs: miTabs},
 	{types: []string{"microsoft.containerregistry/registries"}, command: "acr", desc: "container registries in every subscription", tabs: acrTabs, attention: acrAttention},
 	{types: []string{"microsoft.network/networksecuritygroups"}, command: "nsg", desc: "network security groups in every subscription", tabs: nsgTabs, attention: nsgAttention},
+	{types: []string{"microsoft.network/dnszones"}, command: "dns", desc: "DNS zones in every subscription", tabs: dnsTabs, attention: dnsAttention},
+	{types: []string{"microsoft.network/privatednszones"}, command: "pdns", desc: "private DNS zones in every subscription", tabs: pdnsTabs, attention: pdnsAttention},
 }
 
 // kindOf is the kind of a resource type; the zero kind for a type no kind lists.

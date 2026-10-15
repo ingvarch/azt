@@ -53,7 +53,7 @@ var helpSections = []struct {
 		{"vm aks kv sql", "all resources of that type, in every subscription"},
 		{"storage app vnet", "storage accounts, web apps, virtual networks"},
 		{"mi acr", "managed identities, container registries"},
-		{"nsg", "network security groups"},
+		{"nsg dns pdns", "network security groups, DNS zones, private DNS zones"},
 		{"type <type>", "all resources of a resource type"},
 		{"help  q", "this help, quit"},
 	}},

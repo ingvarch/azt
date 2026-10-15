@@ -1,0 +1,20 @@
+{
+  "id": "/subscriptions/s9/resourceGroups/rg-dns/providers/Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net",
+  "name": "privatelink.blob.core.windows.net",
+  "type": "microsoft.network/privatednszones",
+  "location": "global",
+  "resourceGroup": "rg-dns",
+  "subscriptionId": "s9",
+  "subscription": "Prod",
+  "tags": {"env": "prod"},
+  "properties": {
+    "internalId": "aaaaaaaa-0000-0000-0000-bbbbbbbbbbbb",
+    "maxNumberOfRecordSets": 25000,
+    "maxNumberOfVirtualNetworkLinks": 1000,
+    "maxNumberOfVirtualNetworkLinksWithRegistration": 100,
+    "numberOfRecordSets": 7,
+    "numberOfVirtualNetworkLinks": 3,
+    "numberOfVirtualNetworkLinksWithRegistration": 2,
+    "provisioningState": "Succeeded"
+  }
+}
