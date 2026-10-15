@@ -550,7 +550,7 @@ func TestTabBarAndStatusBar(t *testing.T) {
 		t.Errorf("tab bar = %q", lines[0])
 	}
 	status := lines[len(lines)-1]
-	for _, want := range []string{"NORMAL", "Fake1", "^w v/s split", "q quit"} {
+	for _, want := range []string{"NORMAL", "^w v/s split", "q quit"} {
 		if !strings.Contains(status, want) {
 			t.Errorf("status %q lacks %q", status, want)
 		}
@@ -1054,10 +1054,7 @@ func TestTabLabelAndStatusBarShowPath(t *testing.T) {
 	if !strings.Contains(lines[0], " 1 Fake3 ") {
 		t.Errorf("tab bar = %q", lines[0])
 	}
-	status := lines[len(lines)-1]
-	for _, want := range []string{"NORMAL  Fake1 › Fake2 › Fake3  enter open", normalHints} {
-		if !strings.Contains(status, want) {
-			t.Errorf("status %q lacks %q", status, want)
-		}
+	if status := lines[len(lines)-1]; !strings.Contains(status, normalHints) || strings.Contains(status, "Fake") {
+		t.Errorf("status %q: want the hints and no path", status)
 	}
 }

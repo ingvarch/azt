@@ -333,7 +333,7 @@ func TestSidebarStatusBar(t *testing.T) {
 	h.prefix("h")
 	lines := strings.Split(h.frame(), "\n")
 	status := lines[len(lines)-1]
-	for _, want := range []string{"NORMAL", "Explorer", "j/k move  l expand  h collapse  r refresh  enter open  ^w l panes  ^w e hide  : command  ? help  q quit"} {
+	for _, want := range []string{"NORMAL", "j/k move  l expand  h collapse  r refresh  enter open  ^w l panes  ^w e hide  : command  ? help  q quit"} {
 		if !strings.Contains(status, want) {
 			t.Errorf("status %q lacks %q", status, want)
 		}
