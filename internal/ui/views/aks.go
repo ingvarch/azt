@@ -2,39 +2,25 @@ package views
 
 import (
 	"fmt"
-	"image/color"
 	"slices"
 	"strconv"
 	"strings"
-
-	"charm.land/lipgloss/v2"
 )
 
 var aksTabs = []tabDef{
 	{overviewTab, aksOverview},
 	{"Node pools", aksPools},
-	{"Networking", aksNetworking},
-	{"Identity", aksIdentity},
-	{"Add-ons", aksAddons},
+	{"Networking", boxesTab(aksNetworking)},
+	{"Identity", boxesTab(aksIdentity)},
+	{"Add-ons", boxesTab(aksAddons)},
 	{"JSON", jsonTab},
 }
 
-const (
-	// twoColumnWidth is the narrowest box inside that shows the essentials in two columns.
-	twoColumnWidth = 90
-	// columnGap is the number of cells between the two columns.
-	columnGap = 4
-)
-
 func aksOverview(row map[string]any, width int) []string {
-	secs := []section{
-		{title: "Essentials", lines: aksEssentials(row, innerWidth(width))},
-		{title: overviewPools, lines: poolTable(row)},
-	}
-	if alerts := attention(row); len(alerts) > 0 {
-		secs = append(secs, alertSection(alerts))
-	}
-	return sections(width, append(secs, section{title: "Tags", lines: tagLines(row)})...)
+	return sections(width,
+		section{title: "Essentials", lines: aksEssentials(row, innerWidth(width))},
+		section{title: overviewPools, lines: poolTable(row)},
+	)
 }
 
 // overviewPools is the title of the box with the node pools.
@@ -54,26 +40,11 @@ func aksEssentials(row map[string]any, width int) []string {
 		{"Kubernetes", orDash(clusterVersion(p))},
 		{"Tier", tier(row)},
 		{"API server", apiServer(p)},
-		{"Private cluster", choose(private(p), "yes", "no")},
+		{"Private cluster", privateText(p)},
 		{"Support plan", field(p, "supportPlan")},
 		{"Auto-upgrade", orDash(join(" / ", str(p, "autoUpgradeProfile", "upgradeChannel"), str(p, "autoUpgradeProfile", "nodeOSUpgradeChannel")))},
 	}
-	if width < twoColumnWidth {
-		return block(append(left, right...))
-	}
-	return twoColumns(block(left), block(right), width)
-}
-
-// twoColumns puts the lines side by side in a width split between them; a
-// line longer than its column ends with "…".
-func twoColumns(left, right []string, width int) []string {
-	leftWidth := (width - columnGap) / 2
-	rightWidth := width - columnGap - leftWidth
-	out := make([]string, max(len(left), len(right)))
-	for i := range out {
-		out[i] = fitCell(cellAt(left, i), leftWidth) + strings.Repeat(" ", columnGap) + ellipsize(cellAt(right, i), rightWidth)
-	}
-	return out
+	return columns(left, right, width)
 }
 
 func clusterVersion(props any) string {
@@ -160,42 +131,6 @@ func poolTable(row map[string]any) []string {
 	return summaryTable(cols, rows)
 }
 
-// alert is an item of the Attention box: an error, or else a warning.
-type alert struct {
-	text   string
-	severe bool
-}
-
-func (a alert) tone() color.Color {
-	if a.severe {
-		return bad
-	}
-	return warn
-}
-
-// line is the item with its symbol: "✗" for an error, "▲" for a warning.
-func (a alert) line() string {
-	if a.severe {
-		return "✗ " + a.text
-	}
-	return "▲ " + a.text
-}
-
-func (a alert) render() string { return lipgloss.NewStyle().Foreground(a.tone()).Render(a.line()) }
-
-// alertSection is the Attention box; it is bad when an item is an error, else warn.
-func alertSection(alerts []alert) section {
-	lines := make([]string, len(alerts))
-	tone := warn
-	for i, a := range alerts {
-		lines[i] = a.render()
-		if a.severe {
-			tone = bad
-		}
-	}
-	return section{title: "Attention", lines: lines, tone: tone}
-}
-
 func isStopped(v any) bool { return strings.EqualFold(str(v, "powerState", "code"), "Stopped") }
 
 // provisioning is the item for a provisioning state that is not Succeeded.
@@ -207,7 +142,7 @@ func provisioning(what, state string) []alert {
 }
 
 // attention lists what needs a look in a cluster row.
-func attention(row map[string]any) []alert {
+func aksAttention(row map[string]any) []alert {
 	p := dig(row, "properties")
 	var out []alert
 	if isStopped(p) {
@@ -281,47 +216,68 @@ func diskSize(pool map[string]any) string {
 	return ""
 }
 
-func aksNetworking(row map[string]any, width int) []string {
-	p := dig(row, "properties")
-	n := dig(p, "networkProfile")
+var aksNetworking = boxDef{title: "Networking", fields: []fieldDef{
+	{label: "Network plugin", value: networkPlugin},
+	{label: "Network policy", path: []string{"properties", "networkProfile", "networkPolicy"}},
+	{label: "Dataplane", path: []string{"properties", "networkProfile", "networkDataplane"}},
+	{label: "Pod CIDR", value: func(row map[string]any) string { return cidrs(row, "podCidr", "podCidrs") }},
+	{label: "Service CIDR", value: func(row map[string]any) string { return cidrs(row, "serviceCidr", "serviceCidrs") }},
+	{label: "DNS service IP", path: []string{"properties", "networkProfile", "dnsServiceIP"}},
+	{label: "Outbound type", path: []string{"properties", "networkProfile", "outboundType"}},
+	{label: "Load balancer SKU", path: []string{"properties", "networkProfile", "loadBalancerSku"}},
+	{label: "IP families", path: []string{"properties", "networkProfile", "ipFamilies"}, format: fmtJoin},
+	{label: "Private cluster", value: fromProps(privateText)},
+	{label: "Authorized IP ranges", value: authorizedRanges},
+	{label: "API server", value: fromProps(apiServer)},
+	{label: "Private FQDN", path: []string{"properties", "privateFQDN"}},
+}}
+
+func networkPlugin(row map[string]any) string {
+	n := dig(row, "properties", "networkProfile")
 	plugin := str(n, "networkPlugin")
 	if mode := str(n, "networkPluginMode"); mode != "" {
 		plugin += " (" + mode + ")"
 	}
-	return sections(width, section{title: "Networking", lines: block([]pair{
-		{"Network plugin", orDash(plugin)},
-		{"Network policy", field(n, "networkPolicy")},
-		{"Dataplane", field(n, "networkDataplane")},
-		{"Pod CIDR", orDash(first(str(n, "podCidr"), strings.Join(items(n, "podCidrs"), ", ")))},
-		{"Service CIDR", orDash(first(str(n, "serviceCidr"), strings.Join(items(n, "serviceCidrs"), ", ")))},
-		{"DNS service IP", field(n, "dnsServiceIP")},
-		{"Outbound type", field(n, "outboundType")},
-		{"Load balancer SKU", field(n, "loadBalancerSku")},
-		{"IP families", joined(n, "ipFamilies")},
-		{"Private cluster", choose(private(p), "yes", "no")},
-		{"Authorized IP ranges", first(strings.Join(items(p, "apiServerAccessProfile", "authorizedIPRanges"), ", "), "any")},
-		{"API server", apiServer(p)},
-		{"Private FQDN", field(p, "privateFQDN")},
-	})})
+	return orDash(plugin)
 }
 
-func aksIdentity(row map[string]any, width int) []string {
-	p := dig(row, "properties")
-	return sections(width, section{title: "Identity", lines: block([]pair{
-		{"Identity", field(row, "identity", "type")},
-		{"User-assigned identities", userAssigned(row)},
-		{"Kubelet identity", orDash(lastSegment(str(p, "identityProfile", "kubeletidentity", "resourceId")))},
-		{"Kubernetes RBAC", onOff(p, "enableRBAC")},
-		{"Microsoft Entra ID", entra(p)},
-		{"Azure RBAC", onOff(p, "aadProfile", "enableAzureRBAC")},
-		{"Admin groups", adminGroups(p)},
-		{"Local accounts", localAccounts(p)},
-		{"OIDC issuer", onOff(p, "oidcIssuerProfile", "enabled")},
-		{"Workload identity", onOff(p, "securityProfile", "workloadIdentity", "enabled")},
-		{"Defender", onOff(p, "securityProfile", "defender", "securityMonitoring", "enabled")},
-		{"Image cleaner", onOff(p, "securityProfile", "imageCleaner", "enabled")},
-	})})
+// cidrs is the single CIDR of the network profile, else the list of them.
+func cidrs(row map[string]any, one, many string) string {
+	n := dig(row, "properties", "networkProfile")
+	return orDash(first(str(n, one), strings.Join(items(n, many), ", ")))
 }
+
+func authorizedRanges(row map[string]any) string {
+	return first(strings.Join(items(row, "properties", "apiServerAccessProfile", "authorizedIPRanges"), ", "), "any")
+}
+
+// fromProps applies f to the properties of a row.
+func fromProps(f func(any) string) func(row map[string]any) string {
+	return func(row map[string]any) string { return f(dig(row, "properties")) }
+}
+
+// privateText is "yes" for a private cluster, else "no".
+func privateText(props any) string { return choose(private(props), "yes", "no") }
+
+// rawOnOff reads a flag as on, off or dash, without color.
+func rawOnOff(path ...string) func(row map[string]any) string {
+	return func(row map[string]any) string { return onOff(row, path...) }
+}
+
+var aksIdentity = boxDef{title: "Identity", fields: []fieldDef{
+	{label: "Identity", path: []string{"identity", "type"}},
+	{label: "User-assigned identities", value: userAssigned},
+	{label: "Kubelet identity", path: []string{"properties", "identityProfile", "kubeletidentity", "resourceId"}, format: fmtLast},
+	{label: "Kubernetes RBAC", value: rawOnOff("properties", "enableRBAC")},
+	{label: "Microsoft Entra ID", value: fromProps(entra)},
+	{label: "Azure RBAC", value: rawOnOff("properties", "aadProfile", "enableAzureRBAC")},
+	{label: "Admin groups", value: fromProps(adminGroups)},
+	{label: "Local accounts", value: fromProps(localAccounts)},
+	{label: "OIDC issuer", value: rawOnOff("properties", "oidcIssuerProfile", "enabled")},
+	{label: "Workload identity", value: rawOnOff("properties", "securityProfile", "workloadIdentity", "enabled")},
+	{label: "Defender", value: rawOnOff("properties", "securityProfile", "defender", "securityMonitoring", "enabled")},
+	{label: "Image cleaner", value: rawOnOff("properties", "securityProfile", "imageCleaner", "enabled")},
+}}
 
 func userAssigned(row map[string]any) string {
 	ids := mapKeys(dig(row, "identity", "userAssignedIdentities"))
@@ -353,24 +309,22 @@ func localAccounts(props any) string {
 	return warnStyle.Render("enabled")
 }
 
-func aksAddons(row map[string]any, width int) []string {
-	p := dig(row, "properties")
+var aksAddons = boxDef{title: "Add-ons", extra: addonProfiles, fields: []fieldDef{
+	{label: "Web app routing", path: []string{"properties", "ingressProfile", "webAppRouting", "enabled"}, format: fmtOnOff},
+	{label: "KEDA", path: []string{"properties", "workloadAutoScalerProfile", "keda", "enabled"}, format: fmtOnOff},
+	{label: "Vertical pod autoscaler", path: []string{"properties", "workloadAutoScalerProfile", "verticalPodAutoscaler", "enabled"}, format: fmtOnOff},
+	{label: "Service mesh", path: []string{"properties", "serviceMeshProfile", "mode"}},
+	{label: "Managed Prometheus", path: []string{"properties", "azureMonitorProfile", "metrics", "enabled"}, format: fmtOnOff},
+	{label: "Cost analysis", path: []string{"properties", "metricsProfile", "costAnalysis", "enabled"}, format: fmtOnOff},
+}}
+
+// addonProfiles lists the add-ons the cluster has, whatever their names.
+func addonProfiles(row map[string]any) []pair {
 	var pairs []pair
-	addons := dig(p, "addonProfiles")
+	addons := dig(row, "properties", "addonProfiles")
 	for _, name := range mapKeys(addons) {
 		a := dig(addons, name)
 		pairs = append(pairs, pair{name, join(" · ", switchText(onOff(a, "enabled")), lastSegment(str(a, "config", "logAnalyticsWorkspaceResourceID")))})
 	}
-	fixed := []pair{
-		{"Web app routing", onOff(p, "ingressProfile", "webAppRouting", "enabled")},
-		{"KEDA", onOff(p, "workloadAutoScalerProfile", "keda", "enabled")},
-		{"Vertical pod autoscaler", onOff(p, "workloadAutoScalerProfile", "verticalPodAutoscaler", "enabled")},
-		{"Service mesh", field(p, "serviceMeshProfile", "mode")},
-		{"Managed Prometheus", onOff(p, "azureMonitorProfile", "metrics", "enabled")},
-		{"Cost analysis", onOff(p, "metricsProfile", "costAnalysis", "enabled")},
-	}
-	for i := range fixed {
-		fixed[i].value = switchText(fixed[i].value)
-	}
-	return sections(width, section{title: "Add-ons", lines: block(append(pairs, fixed...))})
+	return pairs
 }

@@ -1,0 +1,31 @@
+{
+  "id": "/subscriptions/s3/resourceGroups/rg-sec/providers/Microsoft.KeyVault/vaults/kv-demo",
+  "name": "kv-demo",
+  "type": "microsoft.keyvault/vaults",
+  "location": "westeurope",
+  "resourceGroup": "rg-sec",
+  "subscriptionId": "s3",
+  "subscription": "Dev",
+  "tags": {"env": "dev"},
+  "properties": {
+    "accessPolicies": [{"objectId": "o1"}, {"objectId": "o2"}],
+    "enableRbacAuthorization": false,
+    "enableSoftDelete": true,
+    "enablePurgeProtection": true,
+    "enabledForDeployment": false,
+    "enabledForDiskEncryption": true,
+    "enabledForTemplateDeployment": false,
+    "provisioningState": "Succeeded",
+    "publicNetworkAccess": "Enabled",
+    "sku": {"family": "A", "name": "standard"},
+    "softDeleteRetentionInDays": 90,
+    "tenantId": "33333333-3333-3333-3333-333333333333",
+    "vaultUri": "https://kv-demo.vault.azure.net/",
+    "networkAcls": {
+      "defaultAction": "Deny",
+      "ipRules": [{"value": "10.0.0.0/24"}],
+      "virtualNetworkRules": [{"id": "/subnets/a"}, {"id": "/subnets/b"}]
+    },
+    "privateEndpointConnections": [{"name": "pe-1"}, {"name": "pe-2"}, {"name": "pe-3"}]
+  }
+}

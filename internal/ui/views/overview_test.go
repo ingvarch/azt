@@ -122,6 +122,23 @@ func TestTabs(t *testing.T) {
 }
 
 func TestGenericOverview(t *testing.T) {
+	// Inner width 94: two columns of 45 and a gap of 4.
+	want := []string{
+		"Essentials",
+		twoCol("Status          ● Succeeded", "Type   web/sites", 45),
+		twoCol("Resource group  rg-web", "Kind   app,linux", 45),
+		twoCol("Location        northeurope", "SKU    P1v3 PremiumV3", 45),
+		twoCol("Subscription    Prod", "Zones  1, 2", 45),
+		"",
+		"Tags",
+		"cost = 42",
+		"team = web",
+		"",
+	}
+	wantLines(t, bodyOf(t, "webapp", "", 100), want)
+}
+
+func TestGenericOverviewOneColumn(t *testing.T) {
 	want := []string{
 		"Essentials",
 		"Status          ● Succeeded",
@@ -138,7 +155,14 @@ func TestGenericOverview(t *testing.T) {
 		"team = web",
 		"",
 	}
-	wantLines(t, bodyOf(t, "webapp", "", 100), want)
+	wantLines(t, bodyOf(t, "webapp", "", 80), want)
+	// Inner width 89 is one column, 90 is two.
+	if got := bodyOf(t, "webapp", "", 95); got[1] != want[1] {
+		t.Errorf("inner width 89: line 1 = %q", got[1])
+	}
+	if got := bodyOf(t, "webapp", "", 96); !strings.Contains(got[1], "Type") {
+		t.Errorf("inner width 90: line 1 = %q", got[1])
+	}
 }
 
 func TestGenericOverviewMissingFields(t *testing.T) {
@@ -193,7 +217,7 @@ var (
 		"system  System  Standard_D4s_v5  3 (2–5)  1.30.4   ● Running",
 		"work    User    Standard_E8s_v5  4        1.29.8   ● Stopped · Updating",
 	}
-	aksAttention = []string{
+	aksAttentionLines = []string{
 		"Attention",
 		"✗ node pool work is stopped",
 		"▲ node pool work is Updating",
@@ -210,7 +234,7 @@ func overviewLines(essentials []string) []string {
 	out = append(out, "", "Node pools")
 	out = append(out, aksPoolTable...)
 	out = append(out, "")
-	out = append(out, aksAttention...)
+	out = append(out, aksAttentionLines...)
 	return append(out, aksTags...)
 }
 
@@ -244,33 +268,38 @@ func TestAKSOverviewTwoColumns(t *testing.T) {
 	wantLines(t, bodyOf(t, "aks", "", 120), overviewLines(essentials))
 }
 
-func TestAKSOverviewColumnSwitchAt90(t *testing.T) {
-	// A pane 4 cells wider than the box inside it, plus the margins.
-	one := bodyOf(t, "aks", "", 95)
-	if !strings.HasPrefix(one[1], "Status               ● Running") || strings.Contains(one[1], "Kubernetes") {
-		t.Errorf("inner width 89: not one column:\n%s", strings.Join(one, "\n"))
-	}
+func TestAKSOverviewTwoColumnsOnceEverythingFits(t *testing.T) {
+	// A pane 6 cells wider than the box inside it. The API server line needs
+	// 54 cells and the node resource group line 50: inner width 111 gives
+	// columns of 53 and 54, inner width 110 two of 53.
+	one := bodyOf(t, "aks", "", 116)
 	if one[6] != "Kubernetes           1.30.4" {
-		t.Errorf("inner width 89: line 6 = %q", one[6])
+		t.Errorf("inner width 110: not one column:\n%s", strings.Join(one, "\n"))
 	}
-	two := bodyOf(t, "aks", "", 96)
-	if !strings.Contains(two[1], "Kubernetes       1.30.4") {
-		t.Errorf("inner width 90: not two columns:\n%s", strings.Join(two, "\n"))
+	two := bodyOf(t, "aks", "", 117)
+	if !strings.Contains(two[3], "API server       aks-demo-abc.hcp.westeurope.azmk8s.io") {
+		t.Errorf("inner width 111: not two columns:\n%s", strings.Join(two, "\n"))
 	}
 }
 
-func TestAKSOverviewCutsValuesToTheirColumn(t *testing.T) {
+func TestAKSOverviewTakesOneColumnRatherThanCut(t *testing.T) {
+	// Inner width 90 would give columns of 43: the API server and the node
+	// resource group do not fit, so the essentials stay in one column.
 	got := bodyOf(t, "aks", "", 96)
-	// Inner width 90: two columns of 43 and a gap of 4.
 	want := []string{
-		twoCol("Status               ● Running · Succeeded", "Kubernetes       1.30.4", 43),
-		twoCol("Resource group       rg-app", "Tier             Standard", 43),
-		twoCol("Location             westeurope", "API server       aks-demo-abc.hcp.westeuro…", 43),
-		twoCol("Subscription         Dev", "Private cluster  no", 43),
-		twoCol("Node resource group  MC_rg-app_aks-demo_we…", "Support plan     KubernetesOfficial", 43),
-		twoCol("", "Auto-upgrade     patch / NodeImage", 43),
+		"Status               ● Running · Succeeded",
+		"Resource group       rg-app",
+		"Location             westeurope",
+		"Subscription         Dev",
+		"Node resource group  MC_rg-app_aks-demo_westeurope",
+		"Kubernetes           1.30.4",
+		"Tier                 Standard",
+		"API server           aks-demo-abc.hcp.westeurope.azmk8s.io",
+		"Private cluster      no",
+		"Support plan         KubernetesOfficial",
+		"Auto-upgrade         patch / NodeImage",
 	}
-	wantLines(t, got[1:7], want)
+	wantLines(t, got[1:12], want)
 }
 
 func TestAKSOverviewOneColumn(t *testing.T) {
@@ -644,7 +673,7 @@ func alertLines(items []alert) []string {
 }
 
 func TestAttentionIgnoresEmptyRanges(t *testing.T) {
-	got := alertLines(attention(safeRow(t, `{"apiServerAccessProfile":{"authorizedIPRanges":[""]}}`)))
+	got := alertLines(aksAttention(safeRow(t, `{"apiServerAccessProfile":{"authorizedIPRanges":[""]}}`)))
 	want := []string{"▲ the API server accepts connections from any IP address"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("attention = %q, want %q", got, want)
@@ -730,7 +759,7 @@ func TestAttention(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := alertLines(attention(safeRow(t, tt.props)))
+			got := alertLines(aksAttention(safeRow(t, tt.props)))
 			if len(got) == 0 && len(tt.want) == 0 {
 				return
 			}
@@ -743,8 +772,8 @@ func TestAttention(t *testing.T) {
 
 func TestAttentionOfEmptyRow(t *testing.T) {
 	want := []string{"▲ local accounts are enabled", "▲ the API server accepts connections from any IP address"}
-	if got := alertLines(attention(nil)); !reflect.DeepEqual(got, want) {
-		t.Errorf("attention(nil) = %q, want %q", got, want)
+	if got := alertLines(aksAttention(nil)); !reflect.DeepEqual(got, want) {
+		t.Errorf("aksAttention(nil) = %q, want %q", got, want)
 	}
 }
 
@@ -951,7 +980,7 @@ func TestIdentityColors(t *testing.T) {
 	if a := valueAttrs(t, v, "Local accounts"); a.fg != fgWarn {
 		t.Errorf("enabled local accounts = %+v, want warn", a)
 	}
-	for _, line := range []string{"Kubernetes RBAC", "Microsoft Entra ID", "│ Identity  ", "Azure RBAC", "Defender", "OIDC issuer"} {
+	for _, line := range []string{"Kubernetes RBAC", "Microsoft Entra ID", "│ Identity  ", "Azure RBAC", "Defender", "OIDC issuer", "Workload identity", "Image cleaner"} {
 		if a := valueAttrs(t, v, line); a.fg != "" {
 			t.Errorf("%s value = %+v, want the default", line, a)
 		}
@@ -962,13 +991,11 @@ func TestIdentityColors(t *testing.T) {
 	}
 }
 
-func TestTwoColumnsSplitAnOddWidth(t *testing.T) {
-	got := twoColumns([]string{"a", "bb"}, []string{"0123456789"}, 21)
-	// 21 cells: a left column of 8, a gap of 4, a right column of 9.
-	want := []string{"a       " + "    " + "01234567…", "bb      " + "    "}
-	for i, l := range got {
-		if plain(l) != want[i] {
-			t.Errorf("line %d = %q, want %q", i, plain(l), want[i])
+func TestColumnWidthsSplitAnOddWidth(t *testing.T) {
+	// The gap takes 4 cells; an odd rest gives the extra cell to the right.
+	for _, c := range []struct{ width, left, right int }{{21, 8, 9}, {90, 43, 43}, {91, 43, 44}} {
+		if l, r := columnWidths(c.width); l != c.left || r != c.right {
+			t.Errorf("columnWidths(%d) = %d, %d, want %d, %d", c.width, l, r, c.left, c.right)
 		}
 	}
 }
