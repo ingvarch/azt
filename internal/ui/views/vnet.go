@@ -2,7 +2,6 @@ package views
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 )
 
@@ -84,7 +83,7 @@ func vnetAttention(row map[string]any) []alert {
 	var out []alert
 	for _, s := range elems(dig(row, "properties", "subnets")) {
 		name := str(s, "name")
-		if str(s, "properties", "networkSecurityGroup", "id") == "" && !slices.ContainsFunc(nsgExempt, func(n string) bool { return strings.EqualFold(n, name) }) {
+		if str(s, "properties", "networkSecurityGroup", "id") == "" && !containsFold(nsgExempt, name) {
 			out = append(out, alert{text: fmt.Sprintf("subnet %s has no network security group", orDash(name))})
 		}
 	}

@@ -46,6 +46,8 @@ func TestTabsOfEveryKind(t *testing.T) {
 			want = aksTabNames
 		case "vnet":
 			want = []string{"Overview", "Subnets", "Peerings", "JSON"}
+		case "nsg":
+			want = []string{"Overview", "Rules", "JSON"}
 		}
 		for _, typ := range k.types {
 			if got := Tabs(typ); !reflect.DeepEqual(got, want) {
@@ -81,6 +83,7 @@ func TestTypeCommands(t *testing.T) {
 		{"vnet", "virtual networks in every subscription", "microsoft.network/virtualnetworks"},
 		{"mi", "managed identities in every subscription", "microsoft.managedidentity/userassignedidentities"},
 		{"acr", "container registries in every subscription", "microsoft.containerregistry/registries"},
+		{"nsg", "network security groups in every subscription", "microsoft.network/networksecuritygroups"},
 	}
 	if got := TypeCommands(); !reflect.DeepEqual(got, want) {
 		t.Errorf("TypeCommands() = %v, want %v", got, want)

@@ -310,7 +310,7 @@ func TestKeyVaultTabs(t *testing.T) {
 // resourceCases are details views of the resource fixtures on every tab.
 func resourceCases(t *testing.T) []renderCase {
 	var cases []renderCase
-	for name, typ := range map[string]string{"kv": kvType, "mi": miType, "acr": acrType, "storage": storageType, "vnet": vnetType} {
+	for name, typ := range map[string]string{"kv": kvType, "mi": miType, "acr": acrType, "storage": storageType, "vnet": vnetType, "nsg": nsgType} {
 		row := fixture(t, name)
 		for _, tab := range Tabs(typ) {
 			cases = append(cases, renderCase{name + " " + tab, func(w, h int) View {
