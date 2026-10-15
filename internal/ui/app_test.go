@@ -531,14 +531,15 @@ func TestTabs(t *testing.T) {
 
 func TestNewTabInsertsAfterActive(t *testing.T) {
 	h := newHarness(100, 30)
-	h.prefix("t") // [1 2]
+	h.prefix("t") // [1 2], active 2
+	h.m.tabs[1].name = "two"
 	h.prefix("1")
-	h.prefix("t") // [1 3 2], active 3
-	lines := strings.Split(h.frame(), "\n")
-	bar := lines[0]
-	i1, i3, i2 := strings.Index(bar, " 1 Fake1"), strings.Index(bar, " 2 Fake3"), strings.Index(bar, " 3 Fake2")
-	if i1 < 0 || i2 < 0 || i3 < 0 || i1 >= i3 || i3 >= i2 {
-		t.Errorf("tab bar = %q", bar)
+	h.prefix("t") // [1 new two]
+	if got, want := strings.TrimRight(h.bar(), " "), " 1   2   3 two"; got != want {
+		t.Errorf("tab bar = %q, want %q", got, want)
+	}
+	if h.m.active != 1 {
+		t.Errorf("active = %d, want 1", h.m.active)
 	}
 }
 
@@ -546,7 +547,7 @@ func TestTabBarAndStatusBar(t *testing.T) {
 	h := newHarness(200, 30)
 	h.prefix("v")
 	lines := strings.Split(h.frame(), "\n")
-	if !strings.Contains(lines[0], " 1 Fake1 ") {
+	if !strings.Contains(lines[0], " 1 ") {
 		t.Errorf("tab bar = %q", lines[0])
 	}
 	status := lines[len(lines)-1]
@@ -768,7 +769,6 @@ func TestStyles(t *testing.T) {
 	checks := []struct {
 		name, line, want string
 	}{
-		{"active tab", lines[0], lipgloss.NewStyle().Reverse(true).Render(" 1 Fake1 ")},
 		{"focused border", lines[1], strings.TrimSuffix(lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Render("┌"), "\x1b[m")},
 		{"focused title", lines[1], strings.TrimSuffix(lipgloss.NewStyle().Bold(true).Render(" Fake1 "), "\x1b[m")},
 		{"normal badge", lines[len(lines)-1], lipgloss.NewStyle().Reverse(true).Render(" NORMAL ")},
@@ -1046,13 +1046,13 @@ func TestBorderTitleShowsPath(t *testing.T) {
 	}
 }
 
-func TestTabLabelAndStatusBarShowPath(t *testing.T) {
+func TestTabLabelIgnoresPathAndStatusBarShowsNoPath(t *testing.T) {
 	h := newHarness(200, 10)
 	h.send(key("enter"))
 	h.send(key("enter"))
 	lines := strings.Split(h.frame(), "\n")
-	if !strings.Contains(lines[0], " 1 Fake3 ") {
-		t.Errorf("tab bar = %q", lines[0])
+	if got := strings.TrimRight(lines[0], " "); got != " 1" {
+		t.Errorf("tab bar = %q", got)
 	}
 	if status := lines[len(lines)-1]; !strings.Contains(status, normalHints) || strings.Contains(status, "Fake") {
 		t.Errorf("status %q: want the hints and no path", status)
