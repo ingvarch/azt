@@ -326,7 +326,7 @@ func TestRenameFlow(t *testing.T) {
 	if h.m.mode != modeNormal || h.m.tabs[0].name != "Prod" {
 		t.Errorf("after enter: mode %v, name %q", h.m.mode, h.m.tabs[0].name)
 	}
-	wantIn(t, "tab bar", strings.Split(h.frame(), "\n")[0], " 1 Prod ")
+	wantIn(t, "tab bar", strings.Split(h.frame(), "\n")[0], "  1 Prod  ")
 
 	h.prefix(",")
 	wantIn(t, "status", h.status(), "rename tab: Prod")
@@ -350,7 +350,7 @@ func TestRenameFlow(t *testing.T) {
 	if h.m.tabs[0].name != "" {
 		t.Errorf("name = %q, want cleared", h.m.tabs[0].name)
 	}
-	if got := strings.TrimRight(strings.Split(h.frame(), "\n")[0], " "); got != " 1   +" {
+	if got := strings.TrimRight(strings.Split(h.frame(), "\n")[0], " "); got != "   1    "+" "+" +" {
 		t.Errorf("tab bar = %q, want the number and the plus", got)
 	}
 }
@@ -362,7 +362,7 @@ func TestRenameAppliesToActiveTabOnly(t *testing.T) {
 	h.typ("Two")
 	h.send(key("enter"))
 	bar := strings.Split(h.frame(), "\n")[0]
-	if got := strings.TrimRight(bar, " "); got != " 1   2 Two   +" {
+	if got := strings.TrimRight(bar, " "); got != "   1    "+" "+"  2 Two  "+" "+" +" {
 		t.Errorf("tab bar = %q", got)
 	}
 	if h.m.tabs[0].name != "" {

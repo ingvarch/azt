@@ -19,6 +19,9 @@ import (
 // bar is line 0 of the frame without styling codes.
 func (h *harness) bar() string { return strings.Split(h.frame(), "\n")[0] }
 
+// rawBar is line 0 of the frame with styling codes.
+func (h *harness) rawBar() string { return strings.Split(h.raw(), "\n")[0] }
+
 // barLayouts are the window setups where the tab bar starts in a different column.
 var barLayouts = []struct {
 	name  string
@@ -35,8 +38,8 @@ func TestTabBarStartsWhereThePanesStart(t *testing.T) {
 	for _, tt := range barLayouts {
 		t.Run(tt.name, func(t *testing.T) {
 			bar := []rune(tt.build().bar() + strings.Repeat(" ", 40)) // padded: a short bar fails instead of panicking
-			if got := string(bar[tt.start : tt.start+3]); got != " 1 " {
-				t.Errorf("bar from column %d = %q, want %q (bar %q)", tt.start, got, " 1 ", string(bar))
+			if got := string(bar[tt.start : tt.start+8]); got != "   1    " {
+				t.Errorf("bar from column %d = %q, want %q (bar %q)", tt.start, got, "   1    ", string(bar))
 			}
 			if got := strings.TrimSpace(string(bar[:tt.start])); tt.start > 0 && !strings.HasPrefix(got, "┌ Explorer ") {
 				t.Errorf("left of the bar = %q, want the explorer border", got)
@@ -80,8 +83,32 @@ func TestTabLabels(t *testing.T) {
 	h.prefix("t")
 	h.prefix("t")
 	h.m.tabs[1].name = "ab"
-	if got, want := strings.TrimRight(h.bar(), " "), " 1   2 ab   3   +"; got != want {
+	if got, want := strings.TrimRight(h.bar(), " "), "   1    "+" "+"  2 ab  "+" "+"   3    "+" "+" +"; got != want {
 		t.Errorf("bar = %q, want %q", got, want)
+	}
+}
+
+func TestTabLabelWidths(t *testing.T) {
+	tests := []struct {
+		name  string
+		tab   string // name of the second tab
+		label string
+	}{
+		{"number only", "", "   2    "},
+		{"short name", "prod", "  2 prod  "},
+		{"odd padding", "a", "  2 a   "},
+		{"five cells", "abc", "  2 abc  "},
+		{"long name", "verylongname", "  2 verylongname  "},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(100, 30)
+			h.prefix("t")
+			h.m.tabs[1].name = tt.tab
+			if got := h.m.tabLabel(1); got != tt.label {
+				t.Errorf("label = %q, want %q", got, tt.label)
+			}
+		})
 	}
 }
 
@@ -90,7 +117,7 @@ func TestTabLabelsIgnoreViews(t *testing.T) {
 	h.prefix("t")
 	check := func(step string) {
 		t.Helper()
-		if got, want := strings.TrimRight(h.bar(), " "), " 1   2   +"; got != want {
+		if got, want := strings.TrimRight(h.bar(), " "), "   1    "+" "+"   2    "+" "+" +"; got != want {
 			t.Errorf("after %s: bar = %q, want %q", step, got, want)
 		}
 	}
@@ -107,7 +134,7 @@ func TestTabBarStyles(t *testing.T) {
 	h.prefix("t")
 	h.prefix("t")
 	h.prefix("2")
-	line := strings.Split(h.raw(), "\n")[0]
+	line := h.rawBar()
 	attrs := func(label string) []string {
 		m := regexp.MustCompile("\x1b\\[([0-9;]*)m" + label).FindStringSubmatch(line)
 		if m == nil {
@@ -116,10 +143,10 @@ func TestTabBarStyles(t *testing.T) {
 		return strings.Split(m[1], ";")
 	}
 	// 94 is the foreground color 12 (bright blue)
-	if got := attrs(" 2 "); !slices.Contains(got, "1") || !slices.Contains(got, "7") || !slices.Contains(got, "94") {
+	if got := attrs("   2    "); !slices.Contains(got, "1") || !slices.Contains(got, "7") || !slices.Contains(got, "94") {
 		t.Errorf("active label attributes = %v, want bold, reverse and the focus color", got)
 	}
-	for _, label := range []string{" 1 ", " 3 "} {
+	for _, label := range []string{"   1    ", "   3    "} {
 		got := attrs(label)
 		if !slices.Equal(got, []string{"2"}) {
 			t.Errorf("label %q attributes = %v, want faint only", label, got)
@@ -128,43 +155,43 @@ func TestTabBarStyles(t *testing.T) {
 }
 
 func TestPressOnTabLabels(t *testing.T) {
-	// labels: " 1 " 0-2, " 2 " 4-6, " 3 ab " 8-13
+	// tabs: 0-7, 9-16, 18-28 (the third is named); gaps at 8, 17 and 29; plus 30-32
 	tests := []struct {
-		name    string
-		sidebar bool
-		x       int
-		active  int
+		name string
+		x    int
+		from int // active tab before the press
+		want int
 	}{
-		{"hidden, first start", false, 0, 0},
-		{"hidden, first end", false, 2, 0},
-		{"hidden, gap", false, 3, 1},
-		{"hidden, second start", false, 4, 1},
-		{"hidden, second end", false, 6, 1},
-		{"hidden, gap before the third", false, 7, 1},
-		{"hidden, third start", false, 8, 2},
-		{"hidden, third end", false, 13, 2},
-		{"hidden, past the last", false, 14, 1},
-		{"shown, first start", true, sidebarWidth, 0},
-		{"shown, second start", true, sidebarWidth + 4, 1},
-		{"shown, third end", true, sidebarWidth + 13, 2},
-		{"shown, gap", true, sidebarWidth + 3, 1},
-		{"shown, past the last", true, sidebarWidth + 14, 1},
+		{"first start", 0, 2, 0},
+		{"first end", 7, 2, 0},
+		{"gap", 8, 2, 2},
+		{"second start", 9, 0, 1},
+		{"second end", 16, 2, 1},
+		{"gap before the third", 17, 0, 0},
+		{"third start", 18, 0, 2},
+		{"third end", 28, 1, 2},
+		{"gap before the plus", 29, 1, 1},
+		{"past the plus", 33, 1, 1},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := newSidebarHarness(100, 30)
-			if !tt.sidebar {
-				h.prefix("e")
-			}
-			h.prefix("t")
-			h.prefix("t")
-			h.m.tabs[2].name = "ab"
-			h.m.active = 1
-			h.press(tt.x, 0)
-			if h.m.active != tt.active {
-				t.Errorf("active = %d, want %d", h.m.active, tt.active)
-			}
-		})
+	for _, shown := range []bool{true, false} {
+		for _, tt := range tests {
+			t.Run(fmt.Sprint("explorer ", shown, ", ", tt.name), func(t *testing.T) {
+				h := newSidebarHarness(100, 30)
+				start := sidebarWidth
+				if !shown {
+					h.prefix("e")
+					start = 0
+				}
+				h.prefix("t")
+				h.prefix("t")
+				h.m.tabs[2].name = "abcde"
+				h.m.active = tt.from
+				h.press(start+tt.x, 0)
+				if h.m.active != tt.want {
+					t.Errorf("active = %d, want %d", h.m.active, tt.want)
+				}
+			})
+		}
 	}
 }
 
@@ -176,29 +203,34 @@ func TestPressOnLineZeroOverExplorerGoesToExplorer(t *testing.T) {
 	if h.m.active != 0 || !h.m.sidebarFocused {
 		t.Errorf("active %d, sidebar focused %v", h.m.active, h.m.sidebarFocused)
 	}
-	h.press(sidebarWidth+4, 0)
+	h.press(sidebarWidth+9, 0)
 	if h.m.active != 1 {
 		t.Errorf("active = %d, want 1", h.m.active)
 	}
 }
 
 func TestFrameFitsWithManyNamedTabs(t *testing.T) {
-	for _, w := range []int{100, 44, 43, 13, 5} {
-		for _, sidebar := range []bool{true, false} {
-			h := newSidebarHarness(w, 10)
-			if !sidebar {
-				h.prefix("e")
-			}
-			for range 8 {
-				h.prefix("t")
-				h.m.tabs[h.m.active].name = "a long tab name"
-			}
-			f := h.frame()
-			if got := lipgloss.Height(f); got != 10 {
-				t.Errorf("w=%d sidebar=%v: height = %d", w, sidebar, got)
-			}
-			if got := lipgloss.Width(f); got > w {
-				t.Errorf("w=%d sidebar=%v: width = %d", w, sidebar, got)
+	for _, shaded := range []bool{false, true} {
+		for _, w := range []int{100, 44, 43, 13, 5} {
+			for _, sidebar := range []bool{true, false} {
+				h := newSidebarHarness(w, 10)
+				if !sidebar {
+					h.prefix("e")
+				}
+				if shaded {
+					h.background("#1e1e2e")
+				}
+				for range 8 {
+					h.prefix("t")
+					h.m.tabs[h.m.active].name = "a long tab name"
+				}
+				f := h.frame()
+				if got := lipgloss.Height(f); got != 10 {
+					t.Errorf("shaded=%v w=%d sidebar=%v: height = %d", shaded, w, sidebar, got)
+				}
+				if got := lipgloss.Width(f); got > w {
+					t.Errorf("shaded=%v w=%d sidebar=%v: width = %d", shaded, w, sidebar, got)
+				}
 			}
 		}
 	}
@@ -217,13 +249,13 @@ func TestRestoredSessionKeepsNamesInLabels(t *testing.T) {
 	}
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	line := strings.Split(sgr.ReplaceAllString(next.(Model).View().Content, ""), "\n")[0]
-	if want := " 1 work   2   3 second "; !strings.Contains(line, want) {
+	if want := "  1 work  " + " " + "   2    " + " " + "  3 second  "; !strings.Contains(line, want) {
 		t.Errorf("bar = %q, want it to contain %q", line, want)
 	}
 }
 
 // plusX is the column of the " + " label after n tabs without names, for a bar starting at start.
-func plusX(start, n int) int { return start + n*4 }
+func plusX(start, n int) int { return start + n*9 }
 
 func TestPlusLabelFollowsTheLastTab(t *testing.T) {
 	plusStyle := regexp.MustCompile("\x1b\\[([0-9;]*)m \\+ ")
@@ -241,11 +273,25 @@ func TestPlusLabelFollowsTheLastTab(t *testing.T) {
 			if got := string(bar[x-1]); got != " " {
 				t.Errorf("%s n=%d: no gap before the plus: %q", l.name, n, got)
 			}
-			raw := strings.Split(h.raw(), "\n")[0]
+			raw := h.rawBar()
 			match := plusStyle.FindStringSubmatch(raw)
 			if match == nil || !slices.Equal(strings.Split(match[1], ";"), []string{"2"}) {
 				t.Errorf("%s n=%d: plus style = %v, want faint only", l.name, n, match)
 			}
+		}
+	}
+}
+
+func TestPlusFollowsNamedTabs(t *testing.T) {
+	for _, l := range barLayouts {
+		h := l.build()
+		h.prefix("t")
+		h.prefix("t")
+		h.m.tabs[1].name = "prod"
+		bar := []rune(h.bar() + strings.Repeat(" ", 60))
+		got := strings.TrimRight(string(bar[l.start:l.start+33]), " ")
+		if want := "   1    " + " " + "  2 prod  " + " " + "   3    " + " " + " +"; got != want {
+			t.Errorf("%s: bar = %q, want %q", l.name, got, want)
 		}
 	}
 }
@@ -283,11 +329,11 @@ func TestPlusTabNameFlow(t *testing.T) {
 		end   string
 		label string
 	}{
-		{"typed name", " Prod ", "enter", " 2 Prod "},
-		{"enter with nothing typed", "", "enter", " 2 "},
-		{"blank name", "   ", "enter", " 2 "},
-		{"esc", "", "esc", " 2 "},
-		{"esc after typing", "x", "esc", " 2 "},
+		{"typed name", " Prod ", "enter", "  2 Prod  "},
+		{"enter with nothing typed", "", "enter", "   2    "},
+		{"blank name", "   ", "enter", "   2    "},
+		{"esc", "", "esc", "   2    "},
+		{"esc after typing", "x", "esc", "   2    "},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
