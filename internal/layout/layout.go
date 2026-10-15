@@ -29,6 +29,17 @@ const (
 
 type Rect struct{ X, Y, W, H int }
 
+// Branch picks a child of a split.
+type Branch int
+
+const (
+	A Branch = iota
+	B
+)
+
+// Path leads from the root to a split node.
+type Path []Branch
+
 // Node is a pane (leaf) or a split of two subtrees.
 type Node struct {
 	Pane  PaneID      // leaves
@@ -110,7 +121,14 @@ func (n *Node) fill(area Rect, out map[PaneID]Rect) {
 		out[n.Pane] = area
 		return
 	}
-	a, b := area, area
+	a, b := n.areas(area)
+	n.A.fill(a, out)
+	n.B.fill(b, out)
+}
+
+// areas splits area between the children of a split.
+func (n *Node) areas(area Rect) (a, b Rect) {
+	a, b = area, area
 	if n.Split == Horizontal {
 		a.W = int(float64(area.W) * n.Ratio)
 		b.X, b.W = area.X+a.W, area.W-a.W
@@ -118,8 +136,88 @@ func (n *Node) fill(area Rect, out map[PaneID]Rect) {
 		a.H = int(float64(area.H) * n.Ratio)
 		b.Y, b.H = area.Y+a.H, area.H-a.H
 	}
-	n.A.fill(a, out)
-	n.B.fill(b, out)
+	return a, b
+}
+
+// Boundary returns the split whose boundary holds cell (x, y): the last
+// column of A or the first column of B for a Horizontal split, the last row
+// of A or the first row of B for a Vertical one, within the split's area.
+// The deepest split wins.
+func (n *Node) Boundary(area Rect, x, y int) (Path, bool) {
+	if n.IsLeaf() {
+		return nil, false
+	}
+	a, b := n.areas(area)
+	if p, ok := n.A.Boundary(a, x, y); ok {
+		return append(Path{A}, p...), true
+	}
+	if p, ok := n.B.Boundary(b, x, y); ok {
+		return append(Path{B}, p...), true
+	}
+	if n.onBoundary(area, a, b, x, y) {
+		return Path{}, true
+	}
+	return nil, false
+}
+
+func (n *Node) onBoundary(area, a, b Rect, x, y int) bool {
+	if n.Split == Horizontal {
+		inRows := y >= area.Y && y < area.Y+area.H
+		return inRows && (a.W > 0 && x == a.X+a.W-1 || b.W > 0 && x == b.X)
+	}
+	inCols := x >= area.X && x < area.X+area.W
+	return inCols && (a.H > 0 && y == a.Y+a.H-1 || b.H > 0 && y == b.Y)
+}
+
+// SplitArea returns the area the split at p covers; false when p does not
+// end at a split.
+// SplitAt returns the split node at p; false when p does not end at a split.
+func (n *Node) SplitAt(p Path) (*Node, bool) {
+	for _, b := range p {
+		if n.IsLeaf() {
+			return nil, false
+		}
+		if b == A {
+			n = n.A
+		} else {
+			n = n.B
+		}
+	}
+	if n.IsLeaf() {
+		return nil, false
+	}
+	return n, true
+}
+
+func (n *Node) SplitArea(p Path, area Rect) (Rect, bool) {
+	if n.IsLeaf() {
+		return Rect{}, false
+	}
+	if len(p) == 0 {
+		return area, true
+	}
+	a, b := n.areas(area)
+	if p[0] == A {
+		return n.A.SplitArea(p[1:], a)
+	}
+	return n.B.SplitArea(p[1:], b)
+}
+
+// SetRatio sets the ratio of the split at p, clamped to [MinRatio, MaxRatio];
+// a path that does not end at a split changes nothing.
+func (n *Node) SetRatio(p Path, ratio float64) *Node {
+	if n.IsLeaf() {
+		return n
+	}
+	if len(p) == 0 {
+		c := *n
+		c.Ratio = clamp(ratio)
+		return &c
+	}
+	if p[0] == A {
+		return n.withChildren(n.A.SetRatio(p[1:], ratio), n.B)
+	}
+	return n.withChildren(n.A, n.B.SetRatio(p[1:], ratio))
 }
 
 // Neighbor returns the pane touching from's edge on side d, preferring the

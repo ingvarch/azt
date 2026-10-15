@@ -33,6 +33,7 @@ func (f filt) Resize(int, int) views.View { return f }
 func (f filt) Render() string             { return "filterable" }
 func (f filt) Title() string              { return "Filt" }
 func (f filt) Open() (views.View, bool)   { return nil, false }
+func (f filt) Spec() views.Spec           { return views.Spec{Kind: "filt"} }
 func (f filt) Filter() string             { return f.rec.filter }
 func (f filt) SetFilter(q string) views.View {
 	f.rec.filter = q

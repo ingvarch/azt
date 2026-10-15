@@ -2,6 +2,7 @@ package layout
 
 import (
 	"reflect"
+	"slices"
 	"strconv"
 	"testing"
 )
@@ -428,4 +429,186 @@ func dump(n *Node) string {
 		o = "V"
 	}
 	return o + "(" + dump(n.A) + "," + dump(n.B) + ")"
+}
+
+func TestBoundary(t *testing.T) {
+	// Root: left 0..49, right 50..99 (Horizontal at x 49|50), the right side
+	// split Vertical at rows 19|20.
+	nested := split(Horizontal, 0.5, Leaf(1), split(Vertical, 0.5, Leaf(2), Leaf(3)))
+	// Root: top 0..19, bottom 20..39 (Vertical), the bottom split Horizontal at x 49|50.
+	stacked := split(Vertical, 0.5, Leaf(1), split(Horizontal, 0.5, Leaf(2), Leaf(3)))
+	// Root Horizontal at x 49|50, the left side split Vertical at rows 19|20.
+	nestedA := split(Horizontal, 0.5, split(Vertical, 0.5, Leaf(1), Leaf(2)), Leaf(3))
+	area := Rect{0, 0, 100, 40}
+
+	tests := []struct {
+		name string
+		tree *Node
+		x, y int
+		want Path
+		ok   bool
+	}{
+		{"horizontal last column of A", nested, 49, 5, Path{}, true},
+		{"horizontal first column of B", nested, 50, 5, Path{}, true},
+		{"horizontal on the last row", nested, 49, 39, Path{}, true},
+		{"inside A", nested, 48, 5, nil, false},
+		{"inside B", nested, 51, 5, nil, false},
+		{"outside the area", nested, 49, 40, nil, false},
+		{"nested vertical last row of A", nested, 70, 19, Path{B}, true},
+		{"nested vertical first row of B", nested, 70, 20, Path{B}, true},
+		{"nested vertical next to boundary", nested, 70, 18, nil, false},
+		{"nested vertical left of its area", nested, 49, 19, Path{}, true},
+		{"deepest wins at a crossing", nested, 50, 19, Path{B}, true},
+		{"deepest wins at a crossing, other cell", nested, 50, 20, Path{B}, true},
+		{"vertical last row of A", stacked, 10, 19, Path{}, true},
+		{"vertical first row of B", stacked, 10, 20, Path{}, true},
+		{"vertical next to boundary", stacked, 10, 18, nil, false},
+		{"nested horizontal last column of A", stacked, 49, 30, Path{B}, true},
+		{"nested horizontal first column of B", stacked, 50, 30, Path{B}, true},
+		{"nested horizontal does not reach above its area", stacked, 49, 5, nil, false},
+		{"deepest wins at a crossing vertical root", stacked, 49, 20, Path{B}, true},
+		{"nested in A, last row of A", nestedA, 10, 19, Path{A}, true},
+		{"nested in A, first row of B", nestedA, 10, 20, Path{A}, true},
+		{"nested in A, next to boundary", nestedA, 10, 18, nil, false},
+		{"nested in A, root boundary", nestedA, 49, 5, Path{}, true},
+		{"deepest in A wins at a crossing", nestedA, 49, 19, Path{A}, true},
+		{"nested in A does not reach the root B side", nestedA, 60, 19, nil, false},
+		{"leaf", Leaf(1), 0, 0, nil, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			orig := clone(tt.tree)
+			got, ok := tt.tree.Boundary(area, tt.x, tt.y)
+			if ok != tt.ok || !slices.Equal(got, tt.want) {
+				t.Errorf("got (%v, %v), want (%v, %v)", got, ok, tt.want, tt.ok)
+			}
+			assertUnchanged(t, tt.tree, orig)
+		})
+	}
+}
+
+func TestBoundaryZeroSizeSide(t *testing.T) {
+	tree := split(Horizontal, 0.1, Leaf(1), Leaf(2))
+	if got, ok := tree.Boundary(Rect{0, 0, 5, 3}, 0, 1); !ok || len(got) != 0 {
+		t.Errorf("first column of B: got (%v, %v)", got, ok)
+	}
+	if _, ok := tree.Boundary(Rect{0, 0, 5, 3}, -1, 1); ok {
+		t.Error("a column left of the area matched")
+	}
+}
+
+func TestBoundaryEmptyB(t *testing.T) {
+	tree := split(Horizontal, 1, Leaf(1), Leaf(2))
+	if _, ok := tree.Boundary(Rect{0, 0, 5, 3}, 5, 1); ok {
+		t.Error("a column right of the area matched")
+	}
+}
+
+func TestBoundaryZeroSizeSideVertical(t *testing.T) {
+	tree := split(Vertical, 0.1, Leaf(1), Leaf(2))
+	if got, ok := tree.Boundary(Rect{0, 0, 3, 5}, 1, 0); !ok || len(got) != 0 {
+		t.Errorf("first row of B: got (%v, %v)", got, ok)
+	}
+	if _, ok := tree.Boundary(Rect{0, 0, 3, 5}, 1, -1); ok {
+		t.Error("a row above the area matched")
+	}
+}
+
+func TestBoundaryEmptyBVertical(t *testing.T) {
+	tree := split(Vertical, 1, Leaf(1), Leaf(2))
+	if _, ok := tree.Boundary(Rect{0, 0, 3, 5}, 1, 5); ok {
+		t.Error("a row below the area matched")
+	}
+}
+
+func TestSplitAreaNestedInA(t *testing.T) {
+	tree := split(Horizontal, 0.5, split(Vertical, 0.5, Leaf(1), Leaf(2)), Leaf(3))
+	got, ok := tree.SplitArea(Path{A}, Rect{0, 0, 100, 40})
+	if want := (Rect{0, 0, 50, 40}); !ok || got != want {
+		t.Errorf("got (%v, %v), want (%v, true)", got, ok, want)
+	}
+}
+
+func TestSplitArea(t *testing.T) {
+	tree := split(Horizontal, 0.5, Leaf(1), split(Vertical, 0.5, split(Horizontal, 0.5, Leaf(2), Leaf(3)), Leaf(4)))
+	area := Rect{0, 0, 100, 40}
+
+	tests := []struct {
+		name string
+		path Path
+		want Rect
+		ok   bool
+	}{
+		{"root", Path{}, Rect{0, 0, 100, 40}, true},
+		{"nil path is the root", nil, Rect{0, 0, 100, 40}, true},
+		{"nested", Path{B}, Rect{50, 0, 50, 40}, true},
+		{"deeper", Path{B, A}, Rect{50, 0, 50, 20}, true},
+		{"ends at a leaf", Path{A}, Rect{}, false},
+		{"goes through a leaf", Path{A, A}, Rect{}, false},
+		{"ends at a deep leaf", Path{B, B}, Rect{}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := tree.SplitArea(tt.path, area)
+			if got != tt.want || ok != tt.ok {
+				t.Errorf("got (%v, %v), want (%v, %v)", got, ok, tt.want, tt.ok)
+			}
+		})
+	}
+}
+
+func TestSetRatio(t *testing.T) {
+	base := split(Horizontal, 0.5, Leaf(1), split(Vertical, 0.5, Leaf(2), Leaf(3)))
+
+	tests := []struct {
+		name  string
+		path  Path
+		ratio float64
+		want  *Node
+	}{
+		{"root", Path{}, 0.3, split(Horizontal, 0.3, Leaf(1), split(Vertical, 0.5, Leaf(2), Leaf(3)))},
+		{"nested", Path{B}, 0.7, split(Horizontal, 0.5, Leaf(1), split(Vertical, 0.7, Leaf(2), Leaf(3)))},
+		{"clamps high", Path{}, 2, split(Horizontal, MaxRatio, Leaf(1), split(Vertical, 0.5, Leaf(2), Leaf(3)))},
+		{"clamps low", Path{B}, -1, split(Horizontal, 0.5, Leaf(1), split(Vertical, MinRatio, Leaf(2), Leaf(3)))},
+		{"ends at a leaf", Path{A}, 0.3, base},
+		{"goes through a leaf", Path{A, B}, 0.3, base},
+		{"too deep", Path{B, B, A}, 0.3, base},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			orig := clone(base)
+			got := base.SetRatio(tt.path, tt.ratio)
+			if !sameTree(got, tt.want) {
+				t.Errorf("got %s, want %s", dump(got), dump(tt.want))
+			}
+			assertUnchanged(t, base, orig)
+		})
+	}
+}
+
+func TestSetRatioOnLeaf(t *testing.T) {
+	if got := Leaf(1).SetRatio(Path{}, 0.3); !sameTree(got, Leaf(1)) {
+		t.Errorf("got %s", dump(got))
+	}
+}
+
+func TestSplitAt(t *testing.T) {
+	inner := split(Vertical, 0.3, Leaf(2), Leaf(3))
+	tree := split(Horizontal, 0.5, Leaf(1), inner)
+	tests := []struct {
+		name string
+		path Path
+		want *Node
+	}{
+		{"root", Path{}, tree},
+		{"nested", Path{B}, inner},
+		{"ends at a leaf", Path{A}, nil},
+		{"goes through a leaf", Path{A, A}, nil},
+	}
+	for _, tt := range tests {
+		got, ok := tree.SplitAt(tt.path)
+		if got != tt.want || ok != (tt.want != nil) {
+			t.Errorf("%s: got (%p, %v), want %p", tt.name, got, ok, tt.want)
+		}
+	}
 }

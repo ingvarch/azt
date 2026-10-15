@@ -15,6 +15,8 @@ type View interface {
 	Title() string
 	// Open returns the view for the selected item; false if nothing opens.
 	Open() (View, bool)
+	// Spec describes the view so Build can make it again.
+	Spec() Spec
 }
 
 // Filterer is a View whose rows can be filtered.
@@ -23,4 +25,12 @@ type Filterer interface {
 	Filter() string
 	// SetFilter keeps the rows with a cell that contains query, ignoring case.
 	SetFilter(query string) View
+}
+
+// Clicker is a View that reacts to a mouse click.
+type Clicker interface {
+	View
+	// Click takes coordinates inside the view's inner area; hit reports
+	// whether they fell on a row.
+	Click(x, y int) (v View, cmd tea.Cmd, hit bool)
 }

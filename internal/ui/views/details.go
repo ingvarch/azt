@@ -17,6 +17,7 @@ import (
 type details struct {
 	loader
 	title         string
+	spec          Spec
 	viewport      viewport.Model
 	width, height int
 }
@@ -26,6 +27,7 @@ func NewDetails(subscriptionID string, r azure.Resource) View {
 	return details{
 		loader:   newLoader(data.Key{Kind: data.Details, Subscription: subscriptionID, ID: r.ID}, "details"),
 		title:    r.Name,
+		spec:     Spec{Kind: "details", Subscription: subscriptionID, ResourceID: r.ID, ResourceName: r.Name},
 		viewport: viewport.New(),
 	}
 }
@@ -85,6 +87,8 @@ func (d details) Render() string {
 	}
 	return d.viewport.View()
 }
+
+func (d details) Spec() Spec { return d.spec }
 
 func (details) Open() (View, bool) { return nil, false }
 

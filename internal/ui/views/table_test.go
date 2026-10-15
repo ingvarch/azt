@@ -1,0 +1,281 @@
+package views
+
+import (
+	"fmt"
+	"regexp"
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+)
+
+var sgrSeq = regexp.MustCompile("\x1b\\[[0-9;:]*m")
+
+func plain(s string) string { return sgrSeq.ReplaceAllString(s, "") }
+
+func testTable(width, height int, rows ...[]string) table {
+	t := newTable([]column{{"Name", 6}, {"ID", 4}})
+	t.resize(width, height)
+	t.setRows(rows)
+	return t
+}
+
+func numbered(n int) [][]string {
+	rows := make([][]string, n)
+	for i := range rows {
+		rows[i] = []string{fmt.Sprintf("r%d", i), "x"}
+	}
+	return rows
+}
+
+func TestTableView(t *testing.T) {
+	rows := [][]string{{"alpha", "1"}, {"toolongname", "22"}, {"b", "333333"}, {"d", "4"}}
+	tests := []struct {
+		name          string
+		width, height int
+		want          []string
+	}{
+		{"header, rule, rows", 40, 5, []string{
+			"Name   ID  ",
+			"───────────",
+			"alpha  1   ",
+			"toolo… 22  ",
+			"b      333…",
+		}},
+		{"lines are cut to the width", 8, 4, []string{
+			"Name   I",
+			"────────",
+			"alpha  1",
+			"toolo… 2",
+		}},
+		{"rows are cut to the height", 40, 3, []string{
+			"Name   ID  ",
+			"───────────",
+			"alpha  1   ",
+		}},
+		{"only the header and the rule", 40, 2, []string{"Name   ID  ", "───────────"}},
+		{"only the header", 40, 1, []string{"Name   ID  "}},
+		{"no height", 40, 0, nil},
+		{"no width", 0, 5, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tb := testTable(tt.width, tt.height, rows...)
+			got := plain(tb.view())
+			if want := strings.Join(tt.want, "\n"); got != want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, want)
+			}
+		})
+	}
+}
+
+func TestTableStyles(t *testing.T) {
+	tb := testTable(40, 5, []string{"alpha", "1"}, []string{"b", "2"})
+	lines := strings.Split(tb.view(), "\n")
+	want := []string{
+		lipgloss.NewStyle().Bold(true).Render("Name   ID  "),
+		"───────────",
+		lipgloss.NewStyle().Reverse(true).Render("alpha  1   "),
+		"b      2   ",
+	}
+	for i, w := range want {
+		if lines[i] != w {
+			t.Errorf("line %d = %q, want %q", i, lines[i], w)
+		}
+	}
+}
+
+func TestTableWideAndEmptyCells(t *testing.T) {
+	tb := newTable([]column{{"A", 4}, {"B", 1}, {"C", 0}})
+	tb.resize(20, 4)
+	tb.setRows([][]string{{"日本語", "xy", "z"}, {"", "", ""}})
+	got := strings.Split(plain(tb.view()), "\n")
+	for i, line := range got {
+		if w := lipgloss.Width(line); w > 20 {
+			t.Errorf("line %d is %d wide: %q", i, w, line)
+		}
+	}
+	if !strings.HasPrefix(got[2], "日… ") {
+		t.Errorf("wide cell cut = %q, want prefix %q", got[2], "日… ")
+	}
+	if !strings.Contains(got[2], "…") || strings.Contains(got[2], "xy") {
+		t.Errorf("single-column cell not cut to the ellipsis: %q", got[2])
+	}
+}
+
+var (
+	kDown   = tea.KeyPressMsg{Code: tea.KeyDown}
+	kUp     = tea.KeyPressMsg{Code: tea.KeyUp}
+	kPgDown = tea.KeyPressMsg{Code: tea.KeyPgDown}
+	kPgUp   = tea.KeyPressMsg{Code: tea.KeyPgUp}
+	kHome   = tea.KeyPressMsg{Code: tea.KeyHome}
+	kEnd    = tea.KeyPressMsg{Code: tea.KeyEnd}
+)
+
+func letter(r rune) tea.KeyPressMsg { return tea.KeyPressMsg{Code: r, Text: string(r)} }
+
+func TestTableKeys(t *testing.T) {
+	// 10 rows, height 6: four rows are visible.
+	tests := []struct {
+		name      string
+		keys      []tea.KeyPressMsg
+		cursor    int
+		top       int
+		startLast bool
+	}{
+		{"down", []tea.KeyPressMsg{kDown}, 1, 0, false},
+		{"j", []tea.KeyPressMsg{letter('j')}, 1, 0, false},
+		{"up at the first row", []tea.KeyPressMsg{kUp}, 0, 0, false},
+		{"k at the first row", []tea.KeyPressMsg{letter('k')}, 0, 0, false},
+		{"down scrolls", []tea.KeyPressMsg{kDown, kDown, kDown, kDown}, 4, 1, false},
+		{"up", []tea.KeyPressMsg{kUp}, 8, 6, true},
+		{"k", []tea.KeyPressMsg{letter('k')}, 8, 6, true},
+		{"down at the last row", []tea.KeyPressMsg{kDown}, 9, 6, true},
+		{"pgdown", []tea.KeyPressMsg{kPgDown}, 4, 1, false},
+		{"f", []tea.KeyPressMsg{letter('f')}, 4, 1, false},
+		{"pgdown stops at the last row", []tea.KeyPressMsg{kPgDown, kPgDown, kPgDown}, 9, 6, false},
+		{"pgup", []tea.KeyPressMsg{kPgUp}, 5, 5, true},
+		{"b", []tea.KeyPressMsg{letter('b')}, 5, 5, true},
+		{"pgup stops at the first row", []tea.KeyPressMsg{kPgUp}, 0, 0, false},
+		{"end", []tea.KeyPressMsg{kEnd}, 9, 6, false},
+		{"G", []tea.KeyPressMsg{letter('G')}, 9, 6, false},
+		{"home", []tea.KeyPressMsg{kHome}, 0, 0, true},
+		{"g", []tea.KeyPressMsg{letter('g')}, 0, 0, true},
+		{"other keys", []tea.KeyPressMsg{letter('x'), {Code: tea.KeyEnter}}, 0, 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tb := testTable(40, 6, numbered(10)...)
+			if tt.startLast {
+				tb.press(kEnd)
+			}
+			for _, k := range tt.keys {
+				tb.press(k)
+			}
+			if tb.cursor != tt.cursor || tb.top != tt.top {
+				t.Errorf("cursor, top = %d, %d; want %d, %d", tb.cursor, tb.top, tt.cursor, tt.top)
+			}
+		})
+	}
+}
+
+func TestTableKeysWithoutRows(t *testing.T) {
+	tb := testTable(40, 6)
+	for _, k := range []tea.KeyPressMsg{kDown, kUp, kPgDown, kPgUp, kHome, kEnd} {
+		tb.press(k)
+		if tb.cursor != -1 {
+			t.Fatalf("%v selected row %d of an empty table", k, tb.cursor)
+		}
+	}
+}
+
+func TestTablePageOnTinyHeight(t *testing.T) {
+	tb := testTable(40, 2, numbered(5)...)
+	tb.press(kPgDown)
+	if tb.cursor != 1 {
+		t.Errorf("pgdown with no visible rows moved to %d, want 1", tb.cursor)
+	}
+}
+
+func TestTableSelectionStaysVisible(t *testing.T) {
+	tb := testTable(40, 12, numbered(10)...)
+	tb.press(kEnd)
+	tb.resize(40, 5) // three rows
+	if tb.top != 7 {
+		t.Errorf("after shrinking top = %d, want 7", tb.top)
+	}
+	tb.resize(40, 12)
+	if tb.top != 0 {
+		t.Errorf("after growing top = %d, want 0 (no blank rows below the last)", tb.top)
+	}
+	tb.resize(40, 5)
+	tb.selectRow(0)
+	if tb.top != 0 || tb.cursor != 0 {
+		t.Errorf("selectRow(0): cursor, top = %d, %d", tb.cursor, tb.top)
+	}
+	tb.selectRow(99)
+	if tb.cursor != 9 {
+		t.Errorf("selectRow(99) cursor = %d, want 9", tb.cursor)
+	}
+	tb.selectRow(-3)
+	if tb.cursor != 0 {
+		t.Errorf("selectRow(-3) cursor = %d, want 0", tb.cursor)
+	}
+}
+
+func TestTableSetRows(t *testing.T) {
+	tb := testTable(40, 6)
+	if tb.cursor != -1 {
+		t.Errorf("empty table cursor = %d, want -1", tb.cursor)
+	}
+	tb.setRows(numbered(10))
+	if tb.cursor != 0 {
+		t.Errorf("first rows: cursor = %d, want 0", tb.cursor)
+	}
+	tb.press(kEnd)
+	tb.setRows(numbered(3))
+	if tb.cursor != 2 || tb.top != 0 {
+		t.Errorf("fewer rows: cursor, top = %d, %d; want 2, 0", tb.cursor, tb.top)
+	}
+	tb.setRows(numbered(5))
+	if tb.cursor != 2 {
+		t.Errorf("more rows moved the cursor to %d, want 2", tb.cursor)
+	}
+	tb.setRows(nil)
+	if tb.cursor != -1 || tb.view() == "" {
+		t.Errorf("no rows: cursor = %d", tb.cursor)
+	}
+	if _, ok := tb.RowAt(2); ok {
+		t.Error("RowAt found a row in an empty table")
+	}
+}
+
+func TestTableRowAt(t *testing.T) {
+	tb := testTable(40, 6, numbered(10)...)
+	tb.press(kEnd) // top = 6: r6..r9 on lines 2..5
+	few := testTable(40, 6, numbered(2)...)
+	tests := []struct {
+		name string
+		tb   table
+		y    int
+		want int
+		ok   bool
+	}{
+		{"header", tb, 0, 0, false},
+		{"rule", tb, 1, 0, false},
+		{"first visible row", tb, 2, 6, true},
+		{"last visible row", tb, 5, 9, true},
+		{"below the visible rows", tb, 6, 0, false},
+		{"below the visible rows with more rows after", testTable(40, 6, numbered(10)...), 6, 0, false},
+		{"negative", tb, -1, 0, false},
+		{"below the last row of a short table", few, 4, 0, false},
+		{"second row of a short table", few, 3, 1, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := tt.tb.RowAt(tt.y)
+			if got != tt.want || ok != tt.ok {
+				t.Errorf("RowAt(%d) = (%d, %v), want (%d, %v)", tt.y, got, ok, tt.want, tt.ok)
+			}
+		})
+	}
+}
+
+func TestTableSelectedRowIsTheCursorRow(t *testing.T) {
+	tb := testTable(40, 5, numbered(3)...)
+	tb.press(kDown)
+	lines := strings.Split(tb.view(), "\n")
+	for i, selected := range []bool{false, true, false} {
+		if got := strings.Contains(lines[i+2], "\x1b[7m"); got != selected {
+			t.Errorf("row %d reversed = %v, want %v", i, got, selected)
+		}
+	}
+}
+
+func TestTableCellWithNewlineStaysOnOneLine(t *testing.T) {
+	tb := testTable(40, 5, []string{"a\nb", "1"}, []string{"c", "2"})
+	if got := strings.Count(tb.view(), "\n"); got != 3 {
+		t.Errorf("view has %d line breaks, want 3:\n%s", got, tb.view())
+	}
+}

@@ -88,6 +88,9 @@ func (m Model) Init() tea.Cmd { return data.Fetch(data.Key{Kind: data.Subscripti
 
 func (m Model) Open() (views.View, bool) { return nil, false }
 
+// Spec is never saved: the sidebar is not part of a pane stack.
+func (m Model) Spec() views.Spec { return views.Spec{Kind: "explorer"} }
+
 func (m Model) Update(msg tea.Msg) (views.View, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
@@ -99,6 +102,12 @@ func (m Model) Update(msg tea.Msg) (views.View, tea.Cmd) {
 		cmd = m.press(msg.String())
 	}
 	return m.fix(), cmd
+}
+
+func (m Model) Click(x, y int) (views.View, tea.Cmd, bool) {
+	m.nodes = cloneAll(m.nodes)
+	cmd, hit := m.click(x, y)
+	return m.fix(), cmd, hit
 }
 
 func (m Model) Resize(width, height int) views.View {
@@ -207,8 +216,11 @@ func appendRows(rows []row, parents []*node, n *node) []row {
 
 var oneLine = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ")
 
+// Cells of the indent per depth level and of the marker after it.
+const indentWidth, markerWidth = 2, 2
+
 func line(depth int, marker, label string) string {
-	return strings.Repeat("  ", depth) + marker + oneLine.Replace(label)
+	return strings.Repeat(" ", indentWidth*depth) + marker + oneLine.Replace(label)
 }
 
 // fix keeps the selection on its node, or on its nearest ancestor row when the node is gone,
@@ -366,6 +378,26 @@ func (m *Model) press(k string) tea.Cmd {
 	return nil
 }
 
+// click selects the row on line y; a click on the marker of a subscription or
+// group also toggles it. It returns the fetch that expanding asks for.
+func (m *Model) click(x, y int) (tea.Cmd, bool) {
+	rows := m.rows()
+	i := m.top + y
+	if y < 0 || y >= m.height || i >= len(rows) {
+		return nil, false
+	}
+	r := rows[i]
+	m.sel = r.id
+	if r.n == nil || x < r.indent() || x >= r.indent()+markerWidth {
+		return nil, true
+	}
+	if r.n.expanded {
+		r.n.expanded = false
+		return nil, true
+	}
+	return m.expand(rows, i), true
+}
+
 // refresh reloads the children of the selected node, or of its parent for a
 // type or status row; without rows it reloads the subscriptions.
 func refresh(rows []row, i int) tea.Cmd {
@@ -396,6 +428,9 @@ func (m *Model) expand(rows []row, i int) tea.Cmd {
 	n.loading = true
 	return data.Fetch(n.key)
 }
+
+// indent is the number of cells before the marker.
+func (r row) indent() int { return indentWidth * (len(r.path) - 1) }
 
 func (r row) pathIDs() []string {
 	ids := make([]string, len(r.path))

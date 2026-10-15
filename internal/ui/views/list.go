@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
-	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -17,11 +16,12 @@ import (
 // listConfig describes one table view over items of type T.
 type listConfig[T any] struct {
 	key     data.Key
+	spec    Spec
 	title   string
 	noun    string
 	empty   string
-	columns []table.Column
-	row     func(T) table.Row
+	columns []column
+	row     func(T) []string
 	open    func(T) View
 	// keep, when set, drops the items it rejects.
 	keep func(T) bool
@@ -33,7 +33,7 @@ type list[T any] struct {
 	items         []T // after cfg.keep
 	shown         []T // items that match filter
 	filter        string
-	table         table.Model
+	table         table
 	width, height int
 }
 
@@ -41,7 +41,7 @@ func newList[T any](cfg listConfig[T]) View {
 	return list[T]{
 		loader: newLoader(cfg.key, cfg.noun),
 		cfg:    cfg,
-		table:  table.New(table.WithColumns(cfg.columns), table.WithFocused(true)),
+		table:  newTable(cfg.columns),
 	}
 }
 
@@ -61,9 +61,6 @@ func (l list[T]) Update(msg tea.Msg) (View, tea.Cmd) {
 			l.items = slices.DeleteFunc(slices.Clone(l.items), func(it T) bool { return !l.cfg.keep(it) })
 		}
 		l.applyFilter()
-		if l.table.Cursor() < 0 {
-			l.table.SetCursor(0)
-		}
 		return l.fit(), nil
 	case spinner.TickMsg:
 		cmd := l.tick(msg)
@@ -73,10 +70,9 @@ func (l list[T]) Update(msg tea.Msg) (View, tea.Cmd) {
 			cmd := l.refresh()
 			return l.fit(), cmd
 		}
+		l.table.press(msg)
 	}
-	var cmd tea.Cmd
-	l.table, cmd = l.table.Update(msg)
-	return l, cmd
+	return l, nil
 }
 
 func (l list[T]) Resize(width, height int) View {
@@ -86,8 +82,7 @@ func (l list[T]) Resize(width, height int) View {
 
 // fit sizes the table, leaving a line for the info line.
 func (l list[T]) fit() list[T] {
-	l.table.SetWidth(l.width)
-	l.table.SetHeight(l.height - lines(l.hasInfo()))
+	l.table.resize(l.width, l.height-lines(l.hasInfo()))
 	return l
 }
 
@@ -95,13 +90,19 @@ func (l list[T]) hasInfo() bool { return l.filter != "" || l.refreshing }
 
 func (l list[T]) Filter() string { return l.filter }
 
+func (l list[T]) Spec() Spec {
+	s := l.cfg.spec
+	s.Filter = l.filter
+	return s
+}
+
 func (l list[T]) SetFilter(query string) View {
 	if query == l.filter {
 		return l
 	}
 	l.filter = query
 	l.applyFilter()
-	l.table.SetCursor(0)
+	l.table.selectRow(0)
 	return l.fit()
 }
 
@@ -113,7 +114,7 @@ func (l *list[T]) applyFilter() {
 			return strings.Contains(strings.ToLower(cell), query)
 		})
 	})
-	l.table.SetRows(mapRows(l.shown, l.cfg.row))
+	l.table.setRows(mapRows(l.shown, l.cfg.row))
 }
 
 func (l list[T]) info() string {
@@ -141,7 +142,7 @@ func (l list[T]) Render() string {
 	case len(l.shown) == 0:
 		body = wrap("No matches.", l.width)
 	default:
-		body = l.table.View()
+		body = l.table.view()
 	}
 	if l.hasInfo() {
 		body = lipgloss.JoinVertical(lipgloss.Left, l.info(), body)
@@ -149,25 +150,38 @@ func (l list[T]) Render() string {
 	return clip(body, l.width, l.height)
 }
 
+// hasRows reports whether the table is drawn.
+func (l list[T]) hasRows() bool { return l.ready() && len(l.shown) > 0 }
+
 func (l list[T]) Open() (View, bool) {
-	if !l.ready() || len(l.shown) == 0 {
+	if !l.hasRows() {
 		return nil, false
 	}
-	return l.cfg.open(l.shown[l.table.Cursor()]), true
+	return l.cfg.open(l.shown[l.table.cursor]), true
+}
+
+// Click selects the row drawn on line y; the info line is line 0 when shown.
+func (l list[T]) Click(x, y int) (View, tea.Cmd, bool) {
+	i, ok := l.table.RowAt(y - lines(l.hasInfo()))
+	if ok {
+		l.table.selectRow(i)
+	}
+	return l, nil, ok
 }
 
 func NewSubscriptions() View {
 	return newList(listConfig[azure.Subscription]{
 		key:   data.Key{Kind: data.Subscriptions},
+		spec:  Spec{Kind: "subscriptions"},
 		title: "Subscriptions",
 		noun:  "subscriptions",
 		empty: "No subscriptions found. Check the account you signed in with az login.",
-		columns: []table.Column{
-			{Title: "Name", Width: 32},
-			{Title: "Subscription ID", Width: 36},
-			{Title: "State", Width: 10},
+		columns: []column{
+			{"Name", 32},
+			{"Subscription ID", 36},
+			{"State", 10},
 		},
-		row:  func(s azure.Subscription) table.Row { return table.Row{s.Name, s.ID, s.State} },
+		row:  func(s azure.Subscription) []string { return []string{s.Name, s.ID, s.State} },
 		open: func(s azure.Subscription) View { return NewResourceGroups(s) },
 	})
 }
@@ -175,15 +189,16 @@ func NewSubscriptions() View {
 func NewResourceGroups(sub azure.Subscription) View {
 	return newList(listConfig[azure.ResourceGroup]{
 		key:   data.Key{Kind: data.ResourceGroups, Subscription: sub.ID},
+		spec:  Spec{Kind: "resourceGroups", Subscription: sub.ID, SubscriptionName: sub.Name},
 		title: sub.Name,
 		noun:  "resource groups",
 		empty: "No resource groups in this subscription.",
-		columns: []table.Column{
-			{Title: "Name", Width: 40},
-			{Title: "Location", Width: 16},
-			{Title: "State", Width: 12},
+		columns: []column{
+			{"Name", 40},
+			{"Location", 16},
+			{"State", 12},
 		},
-		row:  func(g azure.ResourceGroup) table.Row { return table.Row{g.Name, g.Location, g.State} },
+		row:  func(g azure.ResourceGroup) []string { return []string{g.Name, g.Location, g.State} },
 		open: func(g azure.ResourceGroup) View { return NewResources(sub.ID, g) },
 	})
 }
@@ -196,6 +211,7 @@ func NewResources(subscriptionID string, group azure.ResourceGroup) View {
 // shares its data with NewResources.
 func NewResourcesOfType(subscriptionID string, group azure.ResourceGroup, resourceType string) View {
 	cfg := resourcesConfig(subscriptionID, group)
+	cfg.spec.Kind, cfg.spec.Type = "resourcesOfType", resourceType
 	cfg.title = ShortType(resourceType)
 	cfg.empty = "No resources of this type in this resource group."
 	cfg.keep = func(r azure.Resource) bool { return strings.EqualFold(r.Type, resourceType) }
@@ -214,15 +230,16 @@ func ShortType(t string) string {
 func resourcesConfig(subscriptionID string, group azure.ResourceGroup) listConfig[azure.Resource] {
 	return listConfig[azure.Resource]{
 		key:   data.Key{Kind: data.Resources, Subscription: subscriptionID, Group: group.Name},
+		spec:  Spec{Kind: "resources", Subscription: subscriptionID, Group: group.Name},
 		title: group.Name,
 		noun:  "resources",
 		empty: "No resources in this resource group.",
-		columns: []table.Column{
-			{Title: "Name", Width: 36},
-			{Title: "Type", Width: 44},
-			{Title: "Location", Width: 16},
+		columns: []column{
+			{"Name", 36},
+			{"Type", 44},
+			{"Location", 16},
 		},
-		row:  func(r azure.Resource) table.Row { return table.Row{r.Name, r.Type, r.Location} },
+		row:  func(r azure.Resource) []string { return []string{r.Name, r.Type, r.Location} },
 		open: func(r azure.Resource) View { return NewDetails(subscriptionID, r) },
 	}
 }
@@ -230,16 +247,17 @@ func resourcesConfig(subscriptionID string, group azure.ResourceGroup) listConfi
 func NewAllResourceGroups() View {
 	return newList(listConfig[azure.ResourceGroup]{
 		key:   data.Key{Kind: data.AllResourceGroups},
+		spec:  Spec{Kind: "allResourceGroups"},
 		title: "Resource groups",
 		noun:  "resource groups",
 		empty: "No resource groups found.",
-		columns: []table.Column{
-			{Title: "Name", Width: 36},
-			{Title: "Subscription", Width: 28},
-			{Title: "Location", Width: 16},
-			{Title: "State", Width: 12},
+		columns: []column{
+			{"Name", 36},
+			{"Subscription", 28},
+			{"Location", 16},
+			{"State", 12},
 		},
-		row:  func(g azure.ResourceGroup) table.Row { return table.Row{g.Name, g.Subscription, g.Location, g.State} },
+		row:  func(g azure.ResourceGroup) []string { return []string{g.Name, g.Subscription, g.Location, g.State} },
 		open: func(g azure.ResourceGroup) View { return NewResources(g.SubscriptionID, g) },
 	})
 }
@@ -248,24 +266,25 @@ func NewAllResourceGroups() View {
 func NewResourcesByType(resourceType string) View {
 	return newList(listConfig[azure.Resource]{
 		key:   data.Key{Kind: data.ResourcesOfType, Type: resourceType},
+		spec:  Spec{Kind: "resourcesByType", Type: resourceType},
 		title: ShortType(resourceType),
 		noun:  "resources",
 		empty: "No resources of this type.",
-		columns: []table.Column{
-			{Title: "Name", Width: 32},
-			{Title: "Resource group", Width: 28},
-			{Title: "Subscription", Width: 24},
-			{Title: "Location", Width: 16},
+		columns: []column{
+			{"Name", 32},
+			{"Resource group", 28},
+			{"Subscription", 24},
+			{"Location", 16},
 		},
-		row: func(r azure.Resource) table.Row {
-			return table.Row{r.Name, r.ResourceGroup, r.Subscription, r.Location}
+		row: func(r azure.Resource) []string {
+			return []string{r.Name, r.ResourceGroup, r.Subscription, r.Location}
 		},
 		open: func(r azure.Resource) View { return NewDetails(r.SubscriptionID, r) },
 	})
 }
 
-func mapRows[T any](items []T, row func(T) table.Row) []table.Row {
-	rows := make([]table.Row, len(items))
+func mapRows[T any](items []T, row func(T) []string) [][]string {
+	rows := make([][]string, len(items))
 	for i, it := range items {
 		rows[i] = row(it)
 	}

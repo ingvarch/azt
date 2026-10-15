@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -29,6 +30,7 @@ type fake struct {
 	w, h    int
 	results []data.ResultMsg
 	fetches int
+	clicks  [][2]int
 }
 
 type record struct {
@@ -62,6 +64,12 @@ func (f fake) Update(msg tea.Msg) (views.View, tea.Cmd) {
 	return f, nil
 }
 
+// Click records the click; line 0 counts as a header, every other line as a row.
+func (f fake) Click(x, y int) (views.View, tea.Cmd, bool) {
+	f.clicks = append(f.clicks[:len(f.clicks):len(f.clicks)], [2]int{x, y})
+	return f, nil, y > 0
+}
+
 func (f fake) reply(prefix string) tea.Cmd {
 	return func() tea.Msg { return fmt.Sprintf("%s-%d", prefix, f.rec.id) }
 }
@@ -78,8 +86,9 @@ func (f fake) Open() (views.View, bool) {
 	return f.next(), true
 }
 
-func (f fake) Render() string { return fmt.Sprintf("view %d", f.rec.id) }
-func (f fake) Title() string  { return fmt.Sprintf("Fake%d", f.rec.id) }
+func (f fake) Render() string   { return fmt.Sprintf("view %d", f.rec.id) }
+func (f fake) Title() string    { return fmt.Sprintf("Fake%d", f.rec.id) }
+func (f fake) Spec() views.Spec { return views.Spec{Kind: "fake"} }
 
 // harness builds fake views and tracks them in creation order.
 type harness struct {
@@ -87,6 +96,7 @@ type harness struct {
 	calls []data.Key // keys the Fetcher was called with
 	ask   *data.Key  // new views ask for this key in Init
 	m     Model
+	clock time.Time // what the model reads as now
 }
 
 func (h *harness) newFake() views.View {
@@ -111,6 +121,7 @@ func newHarness(w, h int) *harness {
 func newSidebarHarness(w, h int) *harness {
 	hs := &harness{}
 	hs.m = New(hs.newFake, hs.fetch)
+	hs.m.now = func() time.Time { return hs.clock }
 	hs.send(tea.WindowSizeMsg{Width: w, Height: h})
 	return hs
 }
@@ -685,6 +696,7 @@ func (s stub) Resize(int, int) views.View           { return s }
 func (s stub) Render() string                       { return s.body }
 func (s stub) Title() string                        { return s.title }
 func (s stub) Open() (views.View, bool)             { return nil, false }
+func (s stub) Spec() views.Spec                     { return views.Spec{Kind: "stub"} }
 
 func TestRenderPaneClipsTitleAndBody(t *testing.T) {
 	long := strings.Repeat("x", 50)

@@ -1,22 +1,29 @@
 package ui
 
 import (
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/ingvarch/azt/internal/azure"
+	"github.com/ingvarch/azt/internal/session"
 	"github.com/ingvarch/azt/internal/ui/data"
 	"github.com/ingvarch/azt/internal/ui/views"
 )
 
-// session runs the root model with real views and a Fetcher returning fixed data.
-type session struct{ *harness }
+// scenario runs the root model with real views and a Fetcher returning fixed data.
+type scenario struct {
+	*harness
+	fetcher data.Fetcher
+}
 
-func newSession(t *testing.T) *session {
+func newScenario(t *testing.T) *scenario {
 	t.Helper()
-	s := &session{&harness{}}
+	s := &scenario{harness: &harness{}}
 	fetch := func(k data.Key) (any, error) {
 		s.calls = append(s.calls, k)
 		switch k.Kind {
@@ -24,6 +31,8 @@ func newSession(t *testing.T) *session {
 			return []azure.Subscription{{ID: "sub-1", Name: "Dev", State: "Enabled"}}, nil
 		case data.ResourceGroups:
 			return []azure.ResourceGroup{{Name: "rg-a", Location: "westeurope", State: "Succeeded"}}, nil
+		case data.AllResourceGroups:
+			return []azure.ResourceGroup{{Name: "rg-a", Subscription: "Dev", SubscriptionID: "sub-1"}}, nil
 		case data.Resources:
 			return []azure.Resource{
 				{ID: "/r/web", Name: "web-app", Type: "microsoft.web/sites", Location: "westeurope"},
@@ -45,13 +54,15 @@ func newSession(t *testing.T) *session {
 		t.Fatalf("unexpected key %+v", k)
 		return nil, nil
 	}
+	s.fetcher = fetch
 	s.m = New(views.NewSubscriptions, fetch)
+	s.m.now = func() time.Time { return s.clock }
 	s.send(tea.WindowSizeMsg{Width: 140, Height: 30})
 	return s
 }
 
 // settle runs cmd and feeds fetch and result messages back to the model until none are left.
-func (s *session) settle(cmd tea.Cmd) {
+func (s *scenario) settle(cmd tea.Cmd) {
 	for _, msg := range collect(cmd) {
 		switch msg.(type) {
 		case data.FetchMsg, data.ResultMsg:
@@ -60,15 +71,15 @@ func (s *session) settle(cmd tea.Cmd) {
 	}
 }
 
-func (s *session) press(k string) { s.settle(s.send(key(k))) }
+func (s *scenario) press(k string) { s.settle(s.send(key(k))) }
 
-func (s *session) typ(text string) {
+func (s *scenario) typ(text string) {
 	for _, r := range text {
 		s.press(string(r))
 	}
 }
 
-func (s *session) want(t *testing.T, step string, texts ...string) {
+func (s *scenario) want(t *testing.T, step string, texts ...string) {
 	t.Helper()
 	f := s.frame()
 	for _, text := range texts {
@@ -79,7 +90,7 @@ func (s *session) want(t *testing.T, step string, texts ...string) {
 }
 
 func TestDrillDownAndBack(t *testing.T) {
-	s := newSession(t)
+	s := newScenario(t)
 	s.settle(s.m.Init())
 	s.want(t, "start", "Subscription ID", "Dev", "sub-1")
 
@@ -102,7 +113,7 @@ func TestDrillDownAndBack(t *testing.T) {
 }
 
 func TestSplitSharesTheCache(t *testing.T) {
-	s := newSession(t)
+	s := newScenario(t)
 	s.settle(s.m.Init())
 	for range 3 {
 		s.press("enter")
@@ -130,7 +141,7 @@ func TestSplitSharesTheCache(t *testing.T) {
 }
 
 func TestSidebarOpensFilteredResources(t *testing.T) {
-	s := newSession(t)
+	s := newScenario(t)
 	s.settle(s.m.Init())
 	s.want(t, "start", "Explorer", "▸ Dev")
 
@@ -170,7 +181,7 @@ func TestSidebarOpensFilteredResources(t *testing.T) {
 }
 
 func TestPaletteFilterRenameHelp(t *testing.T) {
-	s := newSession(t)
+	s := newScenario(t)
 	s.settle(s.m.Init())
 
 	s.press(":")
@@ -221,4 +232,55 @@ func TestPaletteFilterRenameHelp(t *testing.T) {
 	s.typ("st")
 	s.press("tab")
 	s.want(t, "completion", ":storage")
+}
+
+func TestMouseSessionRoundTrip(t *testing.T) {
+	s := newScenario(t)
+	s.settle(s.m.Init())
+
+	s.settle(s.harness.press(1, 2)) // marker of Dev
+	s.want(t, "subscription expanded", "▾ Dev", "▸ rg-a")
+
+	s.settle(s.harness.press(10, 3))
+	s.settle(s.harness.press(10, 3)) // double press on rg-a
+	s.want(t, "group opened", "Subscriptions › Dev › rg-a", "web-app", "sql-db")
+	if s.m.sidebarFocused {
+		t.Error("sidebar kept focus after the double press")
+	}
+
+	s.prefix("v")
+	s.harness.press(32+54-1, 5) // boundary of the split
+	s.motion(32+27, 5)
+	s.release(32+27, 5)
+
+	saved := s.m.Session()
+	node := saved.Tabs[0].Layout
+	if node.Split != "h" || node.Ratio != s.m.tabs[0].root.Ratio {
+		t.Fatalf("saved layout = %q %v, want h %v", node.Split, node.Ratio, s.m.tabs[0].root.Ratio)
+	}
+	if r := s.m.tabs[0].root.Rects(s.m.paneArea()); r[s.m.tabs[0].root.Panes()[0]].W != 27 {
+		t.Fatalf("dragged pane width = %d, want 27", r[s.m.tabs[0].root.Panes()[0]].W)
+	}
+	want := []string{"Subscriptions", "Dev", "rg-a"}
+	for _, pane := range []*session.Node{node.A, node.B} {
+		var got []string
+		for _, sp := range pane.Stack {
+			v, err := views.Build(sp)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got = append(got, v.Title())
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("saved stack titles = %v, want %v", got, want)
+		}
+	}
+
+	restored, err := Restore(saved, views.NewSubscriptions, s.fetcher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(restored.Session(), saved) {
+		t.Errorf("restored session differs:\n got %+v\nwant %+v", restored.Session(), saved)
+	}
 }

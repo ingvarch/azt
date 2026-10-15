@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -78,6 +79,9 @@ type Model struct {
 	mode          mode
 	input         textinput.Model // serves the filter, the palette and the rename
 	notice        string          // command error shown until the next key
+	now           func() time.Time
+	drag          *drag
+	last          *lastPress
 
 	sidebar        sidebar.Model
 	sidebarVisible bool
@@ -85,6 +89,15 @@ type Model struct {
 }
 
 func New(newView func() views.View, fetch data.Fetcher) Model {
+	m := newModel(newView, fetch)
+	m.tabs = []tab{{root: layout.Leaf(0), focus: 0}}
+	m.stacks = map[layout.PaneID][]views.View{0: {newView()}}
+	m.nextID = 1
+	return m
+}
+
+// newModel returns a model without tabs.
+func newModel(newView func() views.View, fetch data.Fetcher) Model {
 	input := textinput.New()
 	input.Prompt = ""
 	styles := textinput.DefaultStyles(true)
@@ -95,18 +108,28 @@ func New(newView func() views.View, fetch data.Fetcher) Model {
 	input.KeyMap.Paste.SetEnabled(false)
 	return Model{
 		input:   input,
+		now:     time.Now,
 		newView: newView,
 		cache:   data.NewCache(fetch),
-		tabs:    []tab{{root: layout.Leaf(0), focus: 0}},
-		stacks:  map[layout.PaneID][]views.View{0: {newView()}},
-		nextID:  1,
+		stacks:  map[layout.PaneID][]views.View{},
 
 		sidebar:        sidebar.New(),
 		sidebarVisible: true,
 	}
 }
 
-func (m Model) Init() tea.Cmd { return tea.Batch(m.top(0).Init(), m.sidebar.Init()) }
+// Init starts every view of every stack of every tab, and the sidebar.
+func (m Model) Init() tea.Cmd {
+	cmds := []tea.Cmd{m.sidebar.Init()}
+	for _, t := range m.tabs {
+		for _, id := range t.root.Panes() {
+			for _, v := range m.stacks[id] {
+				cmds = append(cmds, v.Init())
+			}
+		}
+	}
+	return tea.Batch(cmds...)
+}
 
 // top returns the view shown in pane id.
 func (m Model) top(id layout.PaneID) views.View {
@@ -127,6 +150,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.cache.Request(msg)
 	case data.ResultMsg:
 		m.cache.Store(msg)
+	case tea.MouseMsg:
+		return m.mouse(msg)
 	case tea.PasteMsg:
 		if m.typing() {
 			cmd := m.editInput(msg)
@@ -143,6 +168,7 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	m.notice = ""
+	m.drag, m.last = nil, nil
 	switch {
 	case m.mode == modePrefix:
 		m.mode = modeNormal
@@ -283,9 +309,15 @@ func (m Model) sidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cmd := m.updateSidebar(msg)
 		return m, cmd
 	}
+	cmd := m.openFromSidebar()
+	return m, cmd
+}
+
+// openFromSidebar shows the stack of the selected sidebar node in the focused pane.
+func (m *Model) openFromSidebar() tea.Cmd {
 	stack, ok := m.sidebar.Stack()
 	if !ok {
-		return m, nil
+		return nil
 	}
 	m.stacks[m.tabs[m.active].focus] = stack
 	m.focusSidebar(false)
@@ -294,7 +326,7 @@ func (m Model) sidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	for i, v := range stack {
 		cmds[i] = v.Init()
 	}
-	return m, tea.Batch(cmds...)
+	return tea.Batch(cmds...)
 }
 
 func (m *Model) updateSidebar(msg tea.Msg) tea.Cmd {
@@ -314,6 +346,18 @@ func (m *Model) sendTop(id layout.PaneID, msg tea.Msg) tea.Cmd {
 	v, cmd := s[len(s)-1].Update(msg)
 	s[len(s)-1] = v
 	return cmd
+}
+
+// clickTop passes a click at (x, y) inside the view shown in pane id, if it takes clicks.
+func (m *Model) clickTop(id layout.PaneID, x, y int) (tea.Cmd, bool) {
+	s := m.stacks[id]
+	c, ok := s[len(s)-1].(views.Clicker)
+	if !ok {
+		return nil, false
+	}
+	v, cmd, hit := c.Click(x, y)
+	s[len(s)-1] = v
+	return cmd, hit
 }
 
 // open pushes the view for the selected item onto the stack of pane id.
@@ -528,6 +572,7 @@ func (m Model) View() tea.View {
 	}
 	v := tea.NewView(content)
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
@@ -538,18 +583,18 @@ func (m Model) frame() string {
 	)
 	focus := m.tabs[m.active].focus
 	for id, r := range m.visible() {
-		if r.W < 2 || r.H < 2 {
+		if !drawn(r) {
 			continue
 		}
 		pane := renderPane(m.stacks[id], r, id == focus && !m.sidebarFocused)
 		comp.AddLayers(lipgloss.NewLayer(pane).X(r.X).Y(r.Y))
 	}
-	if r := m.sidebarRect(); m.sidebarDrawn() && r.H >= 2 {
+	if r := m.sidebarRect(); m.sidebarDrawn() && drawn(r) {
 		pane := renderPane([]views.View{m.sidebar}, r, m.sidebarFocused)
 		comp.AddLayers(lipgloss.NewLayer(pane).X(r.X).Y(r.Y))
 	}
 	if m.mode == modeHelp {
-		if r := m.helpRect(); r.W >= 2 && r.H >= 2 {
+		if r := m.helpRect(); drawn(r) {
 			box := renderBox([]string{"Help"}, strings.Join(helpLines(), "\n"), r, true)
 			comp.AddLayers(lipgloss.NewLayer(box).X(r.X).Y(r.Y))
 		}
@@ -566,18 +611,24 @@ func (m Model) helpRect() layout.Rect {
 
 func (m Model) tabBar() string {
 	var b strings.Builder
-	for i, t := range m.tabs {
-		name := t.name
-		if name == "" {
-			name = m.top(t.focus).Title()
-		}
-		label := " " + strconv.Itoa(i+1) + " " + name + " "
+	for i := range m.tabs {
+		label := m.tabLabel(i)
 		if i == m.active {
 			label = reverseStyle.Render(label)
 		}
 		b.WriteString(label)
 	}
 	return lipgloss.NewStyle().MaxWidth(m.width).Render(b.String())
+}
+
+// tabLabel is tab i as drawn in the tab bar, without the active mark.
+func (m Model) tabLabel(i int) string {
+	t := m.tabs[i]
+	name := t.name
+	if name == "" {
+		name = m.top(t.focus).Title()
+	}
+	return " " + strconv.Itoa(i+1) + " " + name + " "
 }
 
 func (m Model) statusBar() string {

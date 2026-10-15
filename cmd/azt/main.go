@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
 
+	"github.com/ingvarch/azt/internal/session"
 	"github.com/ingvarch/azt/internal/ui"
 	"github.com/ingvarch/azt/internal/ui/data"
 	"github.com/ingvarch/azt/internal/ui/views"
@@ -38,6 +39,20 @@ func run() error {
 	defer cancel()
 
 	fetch := data.NewFetcher(ctx, graph)
-	_, err = tea.NewProgram(ui.New(views.NewSubscriptions, fetch)).Run()
-	return err
+	// Without a state directory azt still runs, but forgets the layout.
+	var m ui.Model
+	path, pathErr := session.DefaultPath()
+	if pathErr != nil {
+		m = ui.New(views.NewSubscriptions, fetch)
+	} else {
+		m = ui.LoadOrNew(path, views.NewSubscriptions, fetch)
+	}
+	final, err := tea.NewProgram(m).Run()
+	if err != nil || path == "" {
+		return err
+	}
+	if err := session.Save(path, final.(ui.Model).Session()); err != nil {
+		return fmt.Errorf("save session: %w", err)
+	}
+	return nil
 }
