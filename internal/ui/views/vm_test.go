@@ -1,7 +1,6 @@
 package views
 
 import (
-	"encoding/json"
 	"reflect"
 	"slices"
 	"strings"
@@ -109,17 +108,6 @@ func TestVMTabs(t *testing.T) {
 	}
 }
 
-// vmRow is a virtual machine row from the JSON text of its fields.
-func vmRow(t *testing.T, body string) map[string]any {
-	t.Helper()
-	var row map[string]any
-	if err := json.Unmarshal([]byte(body), &row); err != nil {
-		t.Fatal(err)
-	}
-	row["type"] = vmType
-	return row
-}
-
 // vmValue is the value of an Overview line of the row.
 func vmValue(t *testing.T, row map[string]any, label string) string {
 	t.Helper()
@@ -146,7 +134,7 @@ func TestVMStatus(t *testing.T) {
 		{"nothing", `{}`, "—"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			if got := vmValue(t, vmRow(t, c.body), "Status"); got != c.want {
+			if got := vmValue(t, bodyRow(t, vmType, c.body), "Status"); got != c.want {
 				t.Errorf("Status = %q, want %q", got, c.want)
 			}
 		})
@@ -225,7 +213,7 @@ func TestVMPriority(t *testing.T) {
 }
 
 func TestVMEssentialsValues(t *testing.T) {
-	row := vmRow(t, `{"zones":["1","3"],"identity":{"type":"SystemAssigned"},
+	row := bodyRow(t, vmType, `{"zones":["1","3"],"identity":{"type":"SystemAssigned"},
 		"properties":{"timeCreated":"2024-11-02T23:59:59Z","hardwareProfile":{"vmSize":"Standard_B2s"},
 		"osProfile":{"computerName":"host9","adminUsername":"root9"}}}`)
 	for label, want := range map[string]string{
@@ -240,7 +228,7 @@ func TestVMEssentialsValues(t *testing.T) {
 
 func TestVMEssentialsDefaults(t *testing.T) {
 	// Identity null, as Azure returns it for a VM without one.
-	row := vmRow(t, `{"identity":null,"zones":null,"properties":{}}`)
+	row := bodyRow(t, vmType, `{"identity":null,"zones":null,"properties":{}}`)
 	for _, label := range []string{"Status", "Size", "OS", "Image", "Computer name", "Admin user", "Zones", "Created", "Identity", "Resource group", "Location", "Subscription"} {
 		if got := vmValue(t, row, label); got != "—" {
 			t.Errorf("%s = %q, want a dash", label, got)

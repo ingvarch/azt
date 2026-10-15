@@ -12,32 +12,32 @@ var pgTabs = []tabDef{
 }
 
 var pgEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{
-	{label: "Status", path: pgPath("state"), format: fmtState},
+	{label: "Status", path: propPath("state"), format: fmtState},
 	{label: "Version", value: pgVersion},
 	{label: "SKU", value: pgSKU},
-	{label: "Server name", path: pgPath("fullyQualifiedDomainName")},
-	{label: "Admin", path: pgPath("administratorLogin")},
-	{label: "Zone", path: pgPath("availabilityZone")},
+	{label: "Server name", path: propPath("fullyQualifiedDomainName")},
+	{label: "Admin", path: propPath("administratorLogin")},
+	{label: "Zone", path: propPath("availabilityZone")},
 	resourceGroupField,
 	locationField,
 	subscriptionField,
 }}
 
 var pgStorage = boxDef{title: "Storage and backup", fields: []fieldDef{
-	{label: "Size", path: pgPath("storage", "storageSizeGB"), format: fmtGB},
-	{label: "Type", path: pgPath("storage", "type")},
-	{label: "Tier", path: pgPath("storage", "tier")},
-	{label: "IOPS", path: pgPath("storage", "iops")},
-	{label: "Auto-grow", path: pgPath("storage", "autoGrow"), format: fmtEnabled},
-	{label: "Backup retention", path: pgPath("backup", "backupRetentionDays"), format: fmtUnit("days")},
-	{label: "Geo-redundant backup", path: pgPath("backup", "geoRedundantBackup"), format: fmtEnabled},
-	{label: "Earliest restore", path: pgPath("backup", "earliestRestoreDate"), format: fmtDateTime},
+	{label: "Size", path: propPath("storage", "storageSizeGB"), format: fmtGB},
+	{label: "Type", path: propPath("storage", "type")},
+	{label: "Tier", path: propPath("storage", "tier")},
+	{label: "IOPS", path: propPath("storage", "iops")},
+	{label: "Auto-grow", path: propPath("storage", "autoGrow"), format: fmtEnabled},
+	{label: "Backup retention", path: propPath("backup", "backupRetentionDays"), format: fmtUnit("days")},
+	{label: "Geo-redundant backup", path: propPath("backup", "geoRedundantBackup"), format: fmtEnabled},
+	{label: "Earliest restore", path: propPath("backup", "earliestRestoreDate"), format: fmtDateTime},
 }}
 
 var pgAvailability = boxDef{title: "High availability", fields: []fieldDef{
-	{label: "Mode", path: pgPath("highAvailability", "mode"), format: fmtEnabled},
-	{label: "State", path: pgPath("highAvailability", "state")},
-	{label: "Standby zone", path: pgPath("highAvailability", "standbyAvailabilityZone")},
+	{label: "Mode", path: propPath("highAvailability", "mode"), format: fmtEnabled},
+	{label: "State", path: propPath("highAvailability", "state")},
+	{label: "Standby zone", path: propPath("highAvailability", "standbyAvailabilityZone")},
 	{label: "Replication role", value: pgReplica("role", "replicationRole")},
 	{label: "Replica capacity", value: pgReplica("capacity", "replicaCapacity")},
 }}
@@ -45,25 +45,22 @@ var pgAvailability = boxDef{title: "High availability", fields: []fieldDef{
 var pgNetwork = boxDef{title: "Network and auth", fields: []fieldDef{
 	{label: "Public network access", path: pgPublicAccess, format: fmtEnabled},
 	{label: "Delegated subnet", value: pgDelegatedSubnet},
-	{label: "Private DNS zone", path: pgPath("network", "privateDnsZoneArmResourceId"), format: fmtLast},
-	{label: "Entra ID auth", path: pgPath("authConfig", "activeDirectoryAuth"), format: fmtEnabled},
-	{label: "Password auth", path: pgPath("authConfig", "passwordAuth"), format: fmtEnabled},
+	{label: "Private DNS zone", path: propPath("network", "privateDnsZoneArmResourceId"), format: fmtLast},
+	{label: "Entra ID auth", path: propPath("authConfig", "activeDirectoryAuth"), format: fmtEnabled},
+	{label: "Password auth", path: propPath("authConfig", "passwordAuth"), format: fmtEnabled},
 	{label: "Maintenance window", value: pgMaintenance},
 	{label: "Data encryption", value: pgEncryption},
 }}
 
-// pgPath is the path of a property of a server.
-func pgPath(keys ...string) []string { return append([]string{"properties"}, keys...) }
-
-var pgPublicAccess = pgPath("network", "publicNetworkAccess")
+var pgPublicAccess = propPath("network", "publicNetworkAccess")
 
 // pgVersion is "<version>.<minor version>", the major version alone without a minor one.
 func pgVersion(row map[string]any) string {
-	major := str(row, pgPath("version")...)
+	major := str(row, propPath("version")...)
 	if major == "" {
 		return dash
 	}
-	return join(".", major, str(row, pgPath("minorVersion")...))
+	return join(".", major, str(row, propPath("minorVersion")...))
 }
 
 // pgSKU is "<name> (<tier>)", the name alone without a tier.
@@ -81,18 +78,18 @@ func pgSKU(row map[string]any) string {
 // pgReplica reads a replica setting, from the old key of the server when the replica object lacks it.
 func pgReplica(key, old string) func(row map[string]any) string {
 	return func(row map[string]any) string {
-		return orDash(first(str(row, pgPath("replica", key)...), str(row, pgPath(old)...)))
+		return orDash(first(str(row, propPath("replica", key)...), str(row, propPath(old)...)))
 	}
 }
 
 // pgDelegatedSubnet is the subnet of a private server as <network>/<subnet>.
 func pgDelegatedSubnet(row map[string]any) string {
-	return orDash(subnetName(str(row, pgPath("network", "delegatedSubnetResourceId")...)))
+	return orDash(subnetName(str(row, propPath("network", "delegatedSubnetResourceId")...)))
 }
 
 // pgMaintenance is the custom maintenance window; a server without one is patched when Azure chooses.
 func pgMaintenance(row map[string]any) string {
-	window := dig(row, pgPath("maintenanceWindow")...)
+	window := dig(row, propPath("maintenanceWindow")...)
 	if !strings.EqualFold(str(window, "customWindow"), "Enabled") {
 		return "System managed"
 	}
@@ -103,7 +100,7 @@ func pgMaintenance(row map[string]any) string {
 }
 
 func pgEncryption(row map[string]any) string {
-	switch kind := str(row, pgPath("dataEncryption", "type")...); strings.ToLower(kind) {
+	switch kind := str(row, propPath("dataEncryption", "type")...); strings.ToLower(kind) {
 	case "systemmanaged":
 		return microsoftKey
 	case "azurekeyvault":
@@ -116,7 +113,7 @@ func pgEncryption(row map[string]any) string {
 // pgAttention lists what needs a look in a flexible server row.
 func pgAttention(row map[string]any) []alert {
 	var out []alert
-	switch state := str(row, pgPath("state")...); strings.ToLower(state) {
+	switch state := str(row, propPath("state")...); strings.ToLower(state) {
 	case "stopped":
 		out = append(out, alert{text: "Stopped: Azure starts it again after seven days"})
 	case "disabled", "dropping":

@@ -26,6 +26,7 @@ var kinds = []resourceKind{
 	{types: []string{"microsoft.keyvault/vaults"}, command: "kv", desc: "key vaults in every subscription", tabs: kvTabs, attention: kvAttention},
 	{types: []string{"microsoft.sql/servers"}, command: "sql", desc: "SQL servers in every subscription"},
 	{types: []string{"microsoft.dbforpostgresql/flexibleservers"}, command: "pg", desc: "PostgreSQL servers in every subscription", tabs: pgTabs, attention: pgAttention},
+	{types: []string{"microsoft.documentdb/mongoclusters"}, command: "docdb", desc: "DocumentDB clusters in every subscription", tabs: docdbTabs, attention: docdbAttention},
 	{types: []string{"microsoft.storage/storageaccounts"}, command: "storage", desc: "storage accounts in every subscription", tabs: storageTabs, attention: storageAttention},
 	{types: []string{"microsoft.web/sites"}, command: "app", desc: "web apps in every subscription"},
 	{types: []string{"microsoft.network/virtualnetworks"}, command: "vnet", desc: "virtual networks in every subscription", tabs: vnetTabs, attention: vnetAttention},

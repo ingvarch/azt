@@ -94,6 +94,9 @@ func jsonTab(row map[string]any, _ int) []string { return jsonLines(row) }
 
 func aclPath(key string) []string { return []string{"properties", "networkAcls", key} }
 
+// propPath is the path of a property of a resource.
+func propPath(keys ...string) []string { return append([]string{"properties"}, keys...) }
+
 // publicAccessText is publicNetworkAccess; a row without it is Enabled.
 func publicAccessText(row map[string]any) string {
 	return first(str(row, "properties", "publicNetworkAccess"), "Enabled")

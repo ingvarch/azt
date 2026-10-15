@@ -172,6 +172,17 @@ func typedRow(t *testing.T, typ, props string) map[string]any {
 	return map[string]any{"type": typ, "properties": p}
 }
 
+// bodyRow is a row of resource type typ from the JSON text of its fields.
+func bodyRow(t *testing.T, typ, body string) map[string]any {
+	t.Helper()
+	var row map[string]any
+	if err := json.Unmarshal([]byte(body), &row); err != nil {
+		t.Fatal(err)
+	}
+	row["type"] = typ
+	return row
+}
+
 func TestKeyVaultValues(t *testing.T) {
 	for _, c := range []struct{ props, want string }{
 		{`{"enableRbacAuthorization":true,"accessPolicies":[{}]}`, "Permission model     Azure RBAC"},

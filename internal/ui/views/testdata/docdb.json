@@ -1,0 +1,29 @@
+{
+  "id": "/subscriptions/s9/resourceGroups/rg-orders/providers/Microsoft.DocumentDB/mongoClusters/dc-orders",
+  "name": "dc-orders",
+  "type": "microsoft.documentdb/mongoclusters",
+  "location": "northeurope",
+  "resourceGroup": "rg-orders",
+  "subscriptionId": "s9",
+  "subscription": "Prod",
+  "identity": null,
+  "sku": null,
+  "zones": null,
+  "tags": {"team": "orders"},
+  "properties": {
+    "clusterStatus": "Ready",
+    "provisioningState": "Succeeded",
+    "serverVersion": "7.0",
+    "administratorLogin": "mongoroot",
+    "infrastructureVersion": "2.0",
+    "connectionString": "mongodb+srv://connuser9:s3cr3t%40pw@dc-orders.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000",
+    "earliestRestoreTime": "2026-10-02T04:15:33.5Z",
+    "nodeGroupSpecs": [
+      {"kind": "Shard", "sku": "M30", "diskSizeGB": 128, "enableHa": true, "nodeCount": 3, "name": ""},
+      {"kind": "Config", "sku": "M10", "diskSizeGB": 32, "enableHa": false, "nodeCount": 2, "name": ""}
+    ],
+    "privateEndpointConnections": [{"name": "pe-orders"}],
+    "publicNetworkAccess": "Disabled",
+    "replica": {"role": "Primary"}
+  }
+}
