@@ -19,6 +19,16 @@ func fmtState(v any) string { return stateText(fmtText(v)) }
 
 func fmtOnOff(v any) string { return switchText(onOff(v)) }
 
+// fmtOnOffOr is fmtOnOff, with def for a missing or non-bool value.
+func fmtOnOffOr(def bool) format {
+	return func(v any) string {
+		if _, ok := v.(bool); !ok {
+			v = def
+		}
+		return fmtOnOff(v)
+	}
+}
+
 // fmtEnabled draws the strings "enabled" and "disabled" and a bool like fmtOnOff; other text stays.
 func fmtEnabled(v any) string { return switchText(enabledState(v)) }
 
@@ -75,7 +85,7 @@ type boxDef struct {
 	split  bool
 }
 
-// lines draws the fields in a box width cells wide inside.
+// lines draws the fields in a box width cells wide inside, or "none" without any.
 func (b boxDef) lines(row map[string]any, width int) []string {
 	var pairs []pair
 	if b.extra != nil {
@@ -83,6 +93,9 @@ func (b boxDef) lines(row map[string]any, width int) []string {
 	}
 	for _, f := range b.fields {
 		pairs = append(pairs, pair{f.label, f.text(row)})
+	}
+	if len(pairs) == 0 {
+		return []string{"none"}
 	}
 	if !b.split {
 		return block(pairs)
