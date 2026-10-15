@@ -69,6 +69,12 @@ func (m *Model) leftPress(x, y int) tea.Cmd {
 	prev := m.last
 	m.last = nil
 	if i, ok := m.tabAt(x, y); ok {
+		if i == len(m.tabs) {
+			cmd := m.newTab(i)
+			m.resizeViews()
+			m.startInput(modeRename, "")
+			return cmd
+		}
 		m.active = i
 		m.resizeViews()
 		return nil
@@ -194,14 +200,18 @@ func (m Model) hit(x, y int) (target, layout.Rect, bool) {
 
 func drawn(r layout.Rect) bool { return r.W >= 2 && r.H >= 2 }
 
-// tabAt returns the tab whose label is drawn at (x, y).
+// tabAt returns the tab whose label is drawn at (x, y); len(m.tabs) is the plus button.
 func (m Model) tabAt(x, y int) (int, bool) {
 	if y != 0 {
 		return 0, false
 	}
 	start := m.paneArea().X
-	for i := range m.tabs {
-		end := start + lipgloss.Width(m.tabLabel(i))
+	for i := range len(m.tabs) + 1 {
+		label := plusLabel
+		if i < len(m.tabs) {
+			label = m.tabLabel(i)
+		}
+		end := start + lipgloss.Width(label)
 		if x >= start && x < end {
 			return i, true
 		}
