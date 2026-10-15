@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
+
 	"github.com/ingvarch/azt/internal/ui/views"
 )
 
@@ -29,6 +31,14 @@ func TestHelpListsEveryTypeCommand(t *testing.T) {
 	for _, c := range views.TypeCommands() {
 		if !slices.Contains(commands, c.Name) {
 			t.Errorf("help lacks the command %q", c.Name)
+		}
+	}
+}
+
+func TestHelpLinesFitTheBox(t *testing.T) {
+	for _, line := range helpLines() {
+		if w := lipgloss.Width(line); w > helpMaxWidth-2 {
+			t.Errorf("%d cells, want at most %d: %q", w, helpMaxWidth-2, line)
 		}
 	}
 }

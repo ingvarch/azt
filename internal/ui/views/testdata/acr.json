@@ -1,0 +1,37 @@
+{
+  "id": "/subscriptions/s4/resourceGroups/rg-reg/providers/Microsoft.ContainerRegistry/registries/acrdemo",
+  "name": "acrdemo",
+  "type": "microsoft.containerregistry/registries",
+  "location": "swedencentral",
+  "resourceGroup": "rg-reg",
+  "subscriptionId": "s4",
+  "subscription": "Dev",
+  "sku": {"name": "Premium", "tier": "Premium"},
+  "tags": {"team": "platform"},
+  "properties": {
+    "adminUserEnabled": true,
+    "anonymousPullEnabled": false,
+    "creationDate": "2024-03-05T23:30:00-02:00",
+    "dataEndpointEnabled": true,
+    "encryption": {"status": "enabled"},
+    "loginServer": "acrdemo.azurecr.io",
+    "networkRuleBypassOptions": "AzureServices",
+    "networkRuleSet": {
+      "defaultAction": "Deny",
+      "ipRules": [{"value": "10.0.0.0/24"}, {"value": "10.0.1.0/24"}]
+    },
+    "policies": {
+      "azureADAuthenticationAsArmPolicy": {"status": "enabled"},
+      "exportPolicy": {"status": "disabled"},
+      "quarantinePolicy": {"status": "enabled"},
+      "retentionPolicy": {"status": "enabled", "days": 7},
+      "softDeletePolicy": {"status": "enabled", "retentionDays": 14},
+      "trustPolicy": {"status": "disabled", "type": "Notary"}
+    },
+    "privateEndpointConnections": [{"name": "pe-1"}, {"name": "pe-2"}, {"name": "pe-3"}],
+    "provisioningState": "Succeeded",
+    "publicNetworkAccess": "Enabled",
+    "roleAssignmentMode": "AbacRepositoryPermissions",
+    "zoneRedundancy": "Disabled"
+  }
+}

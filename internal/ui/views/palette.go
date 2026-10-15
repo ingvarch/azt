@@ -80,3 +80,11 @@ func switchText(s string) string {
 	}
 	return s
 }
+
+// withDays is state drawn with the retention in days after "on"; days may be empty.
+func withDays(state, days string) string {
+	if state != "on" || days == "" {
+		return switchText(state)
+	}
+	return join(stateSeparator, switchText(state), days+" days")
+}

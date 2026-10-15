@@ -71,6 +71,22 @@ func choose(cond bool, a, b string) string {
 	return b
 }
 
+// enabledState is "on" or "off" for a bool and the strings "enabled" and
+// "disabled" in any case; any other text as it is, dash when there is none.
+func enabledState(v any) string {
+	if on, ok := v.(bool); ok {
+		return choose(on, "on", "off")
+	}
+	switch s := text(v); strings.ToLower(s) {
+	case "enabled":
+		return "on"
+	case "disabled":
+		return "off"
+	default:
+		return orDash(s)
+	}
+}
+
 // items returns the non-empty strings and numbers of a list.
 func items(v any, path ...string) []string {
 	var out []string

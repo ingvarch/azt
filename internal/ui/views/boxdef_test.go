@@ -25,6 +25,21 @@ func TestFormats(t *testing.T) {
 		{"off", fmtOnOff, false, "off"},
 		{"on/off missing", fmtOnOff, nil, dash},
 		{"on/off of a string", fmtOnOff, "true", dash},
+		{"enabled", fmtEnabled, "enabled", "on"},
+		{"disabled", fmtEnabled, "disabled", "off"},
+		{"enabled in upper case", fmtEnabled, "ENABLED", "on"},
+		{"disabled in mixed case", fmtEnabled, "Disabled", "off"},
+		{"enabled bool", fmtEnabled, true, "on"},
+		{"disabled bool", fmtEnabled, false, "off"},
+		{"enabled other text", fmtEnabled, "auto", "auto"},
+		{"enabled missing", fmtEnabled, nil, dash},
+		{"enabled empty", fmtEnabled, "", dash},
+		{"date", fmtDate, "2024-03-05T10:20:30Z", "2024-03-05"},
+		{"date with fraction", fmtDate, "2024-03-05T10:20:30.1234567Z", "2024-03-05"},
+		{"date in UTC", fmtDate, "2024-03-05T23:30:00-02:00", "2024-03-06"},
+		{"date of other text", fmtDate, "last week", "last week"},
+		{"date missing", fmtDate, nil, dash},
+		{"date empty", fmtDate, "", dash},
 		{"count of a list", fmtCount, list, "2"},
 		{"count of a map", fmtCount, map[string]any{"x": 1.0, "y": 2.0, "z": 3.0}, "3"},
 		{"count of an empty list", fmtCount, []any{}, "0"},
@@ -53,6 +68,9 @@ func TestFormatColors(t *testing.T) {
 	wantFg(t, fmtOnOff(true), "on", fgGood)
 	wantFg(t, fmtOnOff(false), "off", fgMuted)
 	wantFg(t, fmtOnOff(nil), dash, "")
+	wantFg(t, fmtEnabled("enabled"), "on", fgGood)
+	wantFg(t, fmtEnabled("disabled"), "off", fgMuted)
+	wantFg(t, fmtEnabled(nil), dash, "")
 }
 
 func TestFieldDef(t *testing.T) {

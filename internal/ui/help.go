@@ -48,10 +48,11 @@ var helpSections = []struct {
 		{"ctrl+w l", "back to the panes"},
 	}},
 	{"Commands", []helpEntry{
-		{":", "command dialog: ↑ ↓ choose, tab completes, enter runs, esc closes"},
+		{":", "command dialog (↑ ↓ choose, tab completes)"},
 		{"subs  rg", "all subscriptions, all resource groups"},
 		{"vm aks kv sql", "all resources of that type, in every subscription"},
-		{"storage app vnet mi", "storage accounts, web apps, virtual networks, managed identities"},
+		{"storage app vnet", "storage accounts, web apps, virtual networks"},
+		{"mi acr", "managed identities, container registries"},
 		{"type <type>", "all resources of a resource type"},
 		{"help  q", "this help, quit"},
 	}},

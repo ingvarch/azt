@@ -66,7 +66,10 @@ func tagLines(row map[string]any) []string {
 var (
 	resourceGroupField = fieldDef{label: "Resource group", path: []string{"resourceGroup"}}
 	locationField      = fieldDef{label: "Location", path: []string{"location"}}
-	subscriptionField  = fieldDef{label: "Subscription", value: subscription}
+	// publicAccessField and privateEndpointsField are the network lines most kinds share.
+	publicAccessField     = fieldDef{label: "Public network access", path: []string{"properties", "publicNetworkAccess"}}
+	privateEndpointsField = fieldDef{label: "Private endpoints", path: []string{"properties", "privateEndpointConnections"}, format: fmtCount}
+	subscriptionField     = fieldDef{label: "Subscription", value: subscription}
 )
 
 var genericEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{
@@ -84,3 +87,9 @@ var genericEssentials = boxDef{title: "Essentials", split: true, fields: []field
 
 // jsonTab shows the row as JSON; Update has checked that it encodes.
 func jsonTab(row map[string]any, _ int) []string { return jsonLines(row) }
+
+// publicAccess reports whether a resource takes connections from public
+// networks: anything but publicNetworkAccess "Disabled".
+func publicAccess(row map[string]any) bool {
+	return !strings.EqualFold(str(row, "properties", "publicNetworkAccess"), "Disabled")
+}

@@ -33,11 +33,11 @@ var kvProtection = boxDef{title: "Protection", fields: []fieldDef{
 }}
 
 var kvNetwork = boxDef{title: "Network", fields: []fieldDef{
-	{label: "Public network access", path: []string{"properties", "publicNetworkAccess"}},
+	publicAccessField,
 	{label: "Default action", value: defaultAction},
 	{label: "IP rules", path: []string{"properties", "networkAcls", "ipRules"}, format: fmtCount},
 	{label: "Virtual network rules", path: []string{"properties", "networkAcls", "virtualNetworkRules"}, format: fmtCount},
-	{label: "Private endpoints", path: []string{"properties", "privateEndpointConnections"}, format: fmtCount},
+	privateEndpointsField,
 }}
 
 func permissionModel(row map[string]any) string {
@@ -50,15 +50,7 @@ func permissionModel(row map[string]any) string {
 // softDelete is "on" with the retention in days, "off", or dash.
 func softDelete(row map[string]any) string {
 	p := dig(row, "properties")
-	state := onOff(p, "enableSoftDelete")
-	if state != "on" {
-		return switchText(state)
-	}
-	days := ""
-	if d := str(p, "softDeleteRetentionInDays"); d != "" {
-		days = d + " days"
-	}
-	return join(stateSeparator, switchText(state), days)
+	return withDays(onOff(p, "enableSoftDelete"), str(p, "softDeleteRetentionInDays"))
 }
 
 // purgeProtected reports purge protection; a vault without the setting has it off.
@@ -78,7 +70,7 @@ func kvAttention(row map[string]any) []alert {
 	if !purgeProtected(row) {
 		out = append(out, alert{text: "purge protection is off"})
 	}
-	if !strings.EqualFold(str(row, "properties", "publicNetworkAccess"), "Disabled") && strings.EqualFold(defaultAction(row), "Allow") {
+	if publicAccess(row) && strings.EqualFold(defaultAction(row), "Allow") {
 		out = append(out, alert{text: "the vault accepts connections from any network"})
 	}
 	return out
