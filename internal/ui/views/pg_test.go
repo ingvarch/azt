@@ -1,24 +1,12 @@
 package views
 
 import (
-	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
 )
 
 const pgType = "microsoft.dbforpostgresql/flexibleservers"
-
-// pgRow is a server row from JSON; its type is the server type.
-func pgRow(t *testing.T, body string) map[string]any {
-	t.Helper()
-	var row map[string]any
-	if err := json.Unmarshal([]byte(body), &row); err != nil {
-		t.Fatal(err)
-	}
-	row["type"] = pgType
-	return row
-}
 
 func TestPostgresOverview(t *testing.T) {
 	// Inner width 104: two columns of 50 and a gap of 4.
@@ -131,7 +119,7 @@ func TestPostgresOverviewOneColumn(t *testing.T) {
 		"env = test",
 		"",
 	}
-	wantLines(t, overviewBody(t, pgRow(t, pgProbed), 80), want)
+	wantLines(t, overviewBody(t, bodyRow(t, pgType, pgProbed), 80), want)
 }
 
 func TestPostgresMissingFields(t *testing.T) {
@@ -211,7 +199,7 @@ func TestPostgresValues(t *testing.T) {
 		{`{"properties":{"dataEncryption":{"type":"Other"}}}`, "Data encryption", "Other"},
 		{`{"properties":{"highAvailability":{"mode":"disabled"}}}`, "Mode", "off"},
 	} {
-		got := valueOf(overviewBody(t, pgRow(t, c.body), 80), c.label)
+		got := valueOf(overviewBody(t, bodyRow(t, pgType, c.body), 80), c.label)
 		if got != c.want {
 			t.Errorf("%s: %s = %q, want %q", c.body, c.label, got, c.want)
 		}
@@ -228,7 +216,7 @@ func TestPostgresFlagsReadTheirOwnProperty(t *testing.T) {
 	}
 	for _, f := range flags {
 		body := `{"properties":{` + f.path + ":" + f.on + "}}"
-		lines := overviewBody(t, pgRow(t, body), 80)
+		lines := overviewBody(t, bodyRow(t, pgType, body), 80)
 		for _, other := range flags {
 			want := "—"
 			if other.label == f.label {
@@ -242,7 +230,7 @@ func TestPostgresFlagsReadTheirOwnProperty(t *testing.T) {
 }
 
 func TestPostgresNumbersReadTheirOwnProperty(t *testing.T) {
-	lines := overviewBody(t, pgRow(t, `{"properties":{
+	lines := overviewBody(t, bodyRow(t, pgType, `{"properties":{
 		"storage":{"iops":300,"storageSizeGB":64},
 		"backup":{"backupRetentionDays":21},
 		"replica":{"capacity":4}}}`), 80)
@@ -264,13 +252,13 @@ func TestPostgresColors(t *testing.T) {
 	wantFg(t, styledLine(t, v, "Mode"), "ZoneRedundant", "")
 	wantFg(t, styledLine(t, v, "Public network access"), "on", fgGood)
 
-	off := deliver(t, openedAtRow(t, "").Resize(110, 80), pgRow(t, pgProbed), nil)
+	off := deliver(t, openedAtRow(t, "").Resize(110, 80), bodyRow(t, pgType, pgProbed), nil)
 	wantFg(t, styledLine(t, off, "Mode"), "off", fgMuted)
 }
 
 func TestPostgresStateColors(t *testing.T) {
 	for state, fg := range map[string]string{"Ready": fgGood, "Stopped": fgBad, "Dropping": fgBad, "Starting": fgWarn} {
-		v := deliver(t, openedAtRow(t, "").Resize(110, 80), pgRow(t, `{"properties":{"state":"`+state+`"}}`), nil)
+		v := deliver(t, openedAtRow(t, "").Resize(110, 80), bodyRow(t, pgType, `{"properties":{"state":"`+state+`"}}`), nil)
 		wantFg(t, styledLine(t, v, "Status"), state, fg)
 	}
 }
@@ -302,7 +290,7 @@ func TestPostgresAttention(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := alertLines(pgAttention(pgRow(t, tt.body)))
+			got := alertLines(pgAttention(bodyRow(t, pgType, tt.body)))
 			if len(got) == 0 && len(tt.want) == 0 {
 				return
 			}
@@ -316,7 +304,7 @@ func TestPostgresAttention(t *testing.T) {
 func TestPostgresAttentionSeverity(t *testing.T) {
 	severe := func(body string) []bool {
 		var out []bool
-		for _, a := range pgAttention(pgRow(t, body)) {
+		for _, a := range pgAttention(bodyRow(t, pgType, body)) {
 			out = append(out, a.severe)
 		}
 		return out
@@ -334,7 +322,7 @@ func TestPostgresAttentionSeverity(t *testing.T) {
 }
 
 func TestPostgresAttentionBox(t *testing.T) {
-	body := overviewBody(t, pgRow(t, `{"properties":{"state":"Dropping"}}`), 80)
+	body := overviewBody(t, bodyRow(t, pgType, `{"properties":{"state":"Dropping"}}`), 80)
 	if !strings.Contains(strings.Join(body, "\n"), "Attention\n✗ the server is Dropping\n") {
 		t.Errorf("no error in the Attention box:\n%s", strings.Join(body, "\n"))
 	}

@@ -350,10 +350,10 @@ func TestDialogBoxGeometry(t *testing.T) {
 		bw   int
 		bh   int
 	}{
-		{100, 40, "", 64, 21},
+		{100, 40, "", 64, 22},
 		{100, 40, "st", 64, 5},
 		{100, 40, "zzz", 64, 5},
-		{50, 40, "", 46, 21},
+		{50, 40, "", 46, 22},
 		{100, 12, "", 64, 8},
 		{100, 20, "", 64, 16},
 	}
@@ -385,12 +385,12 @@ func TestDialogContent(t *testing.T) {
 	wantIn(t, "input line", lines[1], "│:", " │")
 	wantIn(t, "rule", lines[2], strings.Repeat("─", 62))
 	wantIn(t, "first row", lines[3], "  subs     subscriptions")
-	wantIn(t, "storage row", lines[10], "  storage  storage accounts in every subscription")
-	wantIn(t, "managed identities row", lines[13], "  mi       managed identities in every subscription")
-	wantIn(t, "registries row", lines[14], "  acr      container registries in every subscription")
-	wantIn(t, "groups row", lines[15], "  nsg      network security groups in every subscription")
-	wantIn(t, "dns row", lines[16], "  dns      public and private DNS zones in every subscription")
-	wantIn(t, "last row", lines[19], "  q        quit")
+	wantIn(t, "storage row", lines[11], "  storage  storage accounts in every subscription")
+	wantIn(t, "managed identities row", lines[14], "  mi       managed identities in every subscription")
+	wantIn(t, "registries row", lines[15], "  acr      container registries in every subscription")
+	wantIn(t, "groups row", lines[16], "  nsg      network security groups in every subscription")
+	wantIn(t, "dns row", lines[17], "  dns      public and private DNS zones in every subscription")
+	wantIn(t, "last row", lines[20], "  q        quit")
 	if strings.Contains(strings.Join(lines, ""), "pdns") {
 		t.Error("the dialog offers pdns")
 	}
@@ -460,7 +460,7 @@ func TestDialogRowsScrollToKeepTheOfferVisible(t *testing.T) {
 	if strings.Contains(got, "subs") {
 		t.Errorf("the window did not scroll:\n%s", got)
 	}
-	for range 16 {
+	for range 17 {
 		h.send(key("up"))
 	}
 	wantIn(t, "dialog", strings.Join(dialogLines(t, h), "\n"), "▌ subs")

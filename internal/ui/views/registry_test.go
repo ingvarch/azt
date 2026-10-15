@@ -81,6 +81,7 @@ func TestTypeCommands(t *testing.T) {
 		{"kv", "key vaults in every subscription", []string{"microsoft.keyvault/vaults"}},
 		{"sql", "SQL servers in every subscription", []string{"microsoft.sql/servers"}},
 		{"pg", "PostgreSQL servers in every subscription", []string{"microsoft.dbforpostgresql/flexibleservers"}},
+		{"docdb", "DocumentDB clusters in every subscription", []string{"microsoft.documentdb/mongoclusters"}},
 		{"storage", "storage accounts in every subscription", []string{"microsoft.storage/storageaccounts"}},
 		{"app", "web apps in every subscription", []string{"microsoft.web/sites"}},
 		{"vnet", "virtual networks in every subscription", []string{"microsoft.network/virtualnetworks"}},
