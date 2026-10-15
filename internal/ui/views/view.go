@@ -16,3 +16,11 @@ type View interface {
 	// Open returns the view for the selected item; false if nothing opens.
 	Open() (View, bool)
 }
+
+// Filterer is a View whose rows can be filtered.
+type Filterer interface {
+	View
+	Filter() string
+	// SetFilter keeps the rows with a cell that contains query, ignoring case.
+	SetFilter(query string) View
+}

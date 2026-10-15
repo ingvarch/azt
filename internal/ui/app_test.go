@@ -131,6 +131,10 @@ func key(s string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyEscape}
 	case "enter":
 		return tea.KeyPressMsg{Code: tea.KeyEnter}
+	case "tab":
+		return tea.KeyPressMsg{Code: tea.KeyTab}
+	case "backspace":
+		return tea.KeyPressMsg{Code: tea.KeyBackspace}
 	case "left":
 		return tea.KeyPressMsg{Code: tea.KeyLeft}
 	case "down":
@@ -528,7 +532,7 @@ func TestNewTabInsertsAfterActive(t *testing.T) {
 }
 
 func TestTabBarAndStatusBar(t *testing.T) {
-	h := newHarness(120, 30)
+	h := newHarness(200, 30)
 	h.prefix("v")
 	lines := strings.Split(h.frame(), "\n")
 	if !strings.Contains(lines[0], " 1 Fake1 ") {

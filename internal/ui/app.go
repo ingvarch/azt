@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -21,24 +22,39 @@ const (
 	resizeStep    = 0.05
 	sidebarWidth  = 32
 
-	sidebarHints       = "j/k move  l expand  h collapse  r refresh  enter open  ^w l panes  ^w e hide  q quit"
-	sidebarPrefixHints = "l/→ panes  e hide  t tab  n/p/1-9 switch  esc cancel"
-	normalHints        = "enter open  esc back  r refresh  ^w v/s split  ^w hjkl/←↓↑→ focus  ^w q close  ^w t tab  q quit"
+	sidebarHints       = "j/k move  l expand  h collapse  r refresh  enter open  ^w l panes  ^w e hide  : command  ? help  q quit"
+	sidebarPrefixHints = "l/→ panes  e hide  t tab  n/p/1-9 switch  , rename  ? help  esc cancel"
+	normalHints        = "enter open  esc back  / filter  : command  r refresh  ? help  ^w v/s split  ^w hjkl/←↓↑→ focus  ^w t tab  q quit"
 	pathSep            = " › "
 	pathCut            = "… › "
-	prefixHints        = "v/s split  hjkl/←↓↑→ focus  q close  z zoom  = equal  <>+- resize  t tab  n/p/1-9 switch  e explorer  esc cancel"
+	prefixHints        = "v/s split  hjkl/←↓↑→ focus  q close  z zoom  = equal  <>+- resize  t tab  n/p/1-9 switch  e explorer  , rename  ? help  esc cancel"
+	filterHints        = "enter apply  esc clear"
+	renameHints        = "enter save  esc cancel"
+	renamePrompt       = "rename tab: "
+)
+
+type mode int
+
+const (
+	modeNormal mode = iota
+	modePrefix
+	modeFilter
+	modePalette
+	modeRename
+	modeHelp
 )
 
 var (
 	// arrows after the prefix work like h, j, k, l.
 	arrows = map[string]string{"left": "h", "down": "j", "up": "k", "right": "l"}
 
-	sidebarPrefixKeys = []string{"l", "e", "t", "n", "p", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
+	sidebarPrefixKeys = []string{"l", "e", "t", ",", "?", "n", "p", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
 
 	focusColor   = lipgloss.Color("12")
 	borderColor  = lipgloss.Color("8")
 	reverseStyle = lipgloss.NewStyle().Reverse(true)
 	hintStyle    = lipgloss.NewStyle().Faint(true)
+	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Red)
 	border       = lipgloss.NormalBorder()
 )
 
@@ -46,6 +62,7 @@ type tab struct {
 	root   *layout.Node
 	focus  layout.PaneID
 	zoomed bool
+	name   string // custom label; empty for the title of the focused view
 }
 
 // Model is the root model: tabs of split panes, each pane holding a stack of
@@ -58,7 +75,9 @@ type Model struct {
 	stacks        map[layout.PaneID][]views.View
 	nextID        layout.PaneID
 	width, height int
-	prefix        bool
+	mode          mode
+	input         textinput.Model // serves the filter, the palette and the rename
+	notice        string          // command error shown until the next key
 
 	sidebar        sidebar.Model
 	sidebarVisible bool
@@ -66,7 +85,16 @@ type Model struct {
 }
 
 func New(newView func() views.View, fetch data.Fetcher) Model {
+	input := textinput.New()
+	input.Prompt = ""
+	styles := textinput.DefaultStyles(true)
+	styles.Cursor.Blink = false
+	input.SetStyles(styles)
+	// Terminal paste arrives as tea.PasteMsg; ctrl+v would read the clipboard
+	// into a message that never reaches the input.
+	input.KeyMap.Paste.SetEnabled(false)
 	return Model{
+		input:   input,
 		newView: newView,
 		cache:   data.NewCache(fetch),
 		tabs:    []tab{{root: layout.Leaf(0), focus: 0}},
@@ -99,6 +127,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.cache.Request(msg)
 	case data.ResultMsg:
 		m.cache.Store(msg)
+	case tea.PasteMsg:
+		if m.typing() {
+			cmd := m.editInput(msg)
+			return m, cmd
+		}
 	}
 	cmd := m.broadcast(msg)
 	return m, cmd
@@ -109,9 +142,27 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if k == "ctrl+c" {
 		return m, tea.Quit
 	}
-	if m.prefix {
-		m.prefix = false
+	m.notice = ""
+	switch {
+	case m.mode == modePrefix:
+		m.mode = modeNormal
 		return m.runPrefix(k)
+	case m.mode == modeHelp:
+		m.mode = modeNormal
+		return m, nil
+	case m.typing():
+		return m.inputKey(msg)
+	}
+	switch k {
+	case "/":
+		m.startFilter()
+		return m, nil
+	case ":":
+		m.startInput(modePalette, "")
+		return m, nil
+	case "?":
+		m.mode = modeHelp
+		return m, nil
 	}
 	if m.sidebarFocused && k != "q" && k != "ctrl+w" {
 		return m.sidebarKey(msg)
@@ -120,7 +171,7 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		return m, tea.Quit
 	case "ctrl+w":
-		m.prefix = true
+		m.mode = modePrefix
 		return m, nil
 	case "enter":
 		cmd := m.open(m.tabs[m.active].focus)
@@ -129,7 +180,101 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.back(m.tabs[m.active].focus)
 		return m, nil
 	}
-	return m, m.sendTop(m.tabs[m.active].focus, msg)
+	cmd := m.sendTop(m.tabs[m.active].focus, msg)
+	return m, cmd
+}
+
+// startInput enters input mode md with the input set to text, cursor at the end.
+func (m *Model) startInput(md mode, text string) {
+	m.mode = md
+	m.input.SetValue(text)
+	m.input.CursorEnd()
+	m.input.Focus()
+}
+
+// startFilter enters filter mode if the focused pane shows a filterable view.
+func (m *Model) startFilter() {
+	if m.sidebarFocused {
+		return
+	}
+	if f, ok := m.top(m.tabs[m.active].focus).(views.Filterer); ok {
+		m.startInput(modeFilter, f.Filter())
+	}
+}
+
+// typing reports whether keys and pastes go to the input.
+func (m Model) typing() bool {
+	return m.mode == modeFilter || m.mode == modePalette || m.mode == modeRename
+}
+
+// inputKey handles a key in filter, palette and rename mode.
+func (m Model) inputKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		cmd := m.finishInput()
+		return m, cmd
+	case "esc":
+		if m.mode == modeFilter {
+			m.setFilter(m.tabs[m.active].focus, "")
+		}
+		m.mode = modeNormal
+		return m, nil
+	case "tab":
+		if m.mode == modePalette {
+			m.input.SetValue(complete(m.input.Value()))
+			m.input.CursorEnd()
+			return m, nil
+		}
+	}
+	cmd := m.editInput(msg)
+	return m, cmd
+}
+
+// editInput passes msg to the input; in filter mode the focused view follows it.
+func (m *Model) editInput(msg tea.Msg) tea.Cmd {
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	if m.mode == modeFilter {
+		m.setFilter(m.tabs[m.active].focus, m.input.Value())
+	}
+	return cmd
+}
+
+// finishInput applies the input on enter and returns to normal mode.
+func (m *Model) finishInput() tea.Cmd {
+	md := m.mode
+	m.mode = modeNormal
+	switch md {
+	case modeRename:
+		m.tabs[m.active].name = strings.TrimSpace(m.input.Value())
+	case modePalette:
+		return m.runCommand(m.input.Value())
+	}
+	return nil
+}
+
+// runCommand runs a palette command; an error becomes the notice.
+func (m *Model) runCommand(input string) tea.Cmd {
+	c, err := parseCommand(input)
+	if err != nil {
+		m.notice = err.Error()
+		return nil
+	}
+	switch c.kind {
+	case cmdView:
+		return m.push(m.tabs[m.active].focus, c.view)
+	case cmdHelp:
+		m.mode = modeHelp
+	case cmdQuit:
+		return tea.Quit
+	}
+	return nil
+}
+
+// setFilter sets the filter of the view shown in pane id.
+func (m *Model) setFilter(id layout.PaneID, query string) {
+	s := m.stacks[id]
+	s[len(s)-1] = s[len(s)-1].(views.Filterer).SetFilter(query)
 }
 
 // sidebarKey handles a key while the sidebar has focus.
@@ -177,9 +322,15 @@ func (m *Model) open(id layout.PaneID) tea.Cmd {
 	if !ok {
 		return nil
 	}
-	m.stacks[id] = append(m.stacks[id], next)
+	return m.push(id, next)
+}
+
+// push shows v on top of the stack of pane id, moves focus from the sidebar to the panes and starts v.
+func (m *Model) push(id layout.PaneID, v views.View) tea.Cmd {
+	m.stacks[id] = append(m.stacks[id], v)
+	m.focusSidebar(false)
 	m.resizeViews()
-	return next.Init()
+	return v.Init()
 }
 
 // back pops the top view of pane id; the last view stays.
@@ -259,6 +410,10 @@ func (m Model) runPrefix(k string) (tea.Model, tea.Cmd) {
 		t.root = t.root.Resize(t.focus, layout.Vertical, -resizeStep)
 	case "t":
 		cmd = m.newTab()
+	case ",":
+		m.startInput(modeRename, t.name)
+	case "?":
+		m.mode = modeHelp
 	case "n":
 		m.active = (m.active + 1) % len(m.tabs)
 	case "p":
@@ -393,13 +548,30 @@ func (m Model) frame() string {
 		pane := renderPane([]views.View{m.sidebar}, r, m.sidebarFocused)
 		comp.AddLayers(lipgloss.NewLayer(pane).X(r.X).Y(r.Y))
 	}
+	if m.mode == modeHelp {
+		if r := m.helpRect(); r.W >= 2 && r.H >= 2 {
+			box := renderBox([]string{"Help"}, strings.Join(helpLines(), "\n"), r, true)
+			comp.AddLayers(lipgloss.NewLayer(box).X(r.X).Y(r.Y))
+		}
+	}
 	return lipgloss.NewCanvas(m.width, m.height).Compose(comp).Render()
+}
+
+// helpRect is the help box, centered in the window.
+func (m Model) helpRect() layout.Rect {
+	w := min(m.width-helpMargin, helpMaxWidth)
+	h := min(m.height-helpMargin, len(helpLines())+2)
+	return layout.Rect{X: (m.width - w) / 2, Y: (m.height - h) / 2, W: w, H: h}
 }
 
 func (m Model) tabBar() string {
 	var b strings.Builder
 	for i, t := range m.tabs {
-		label := " " + strconv.Itoa(i+1) + " " + m.top(t.focus).Title() + " "
+		name := t.name
+		if name == "" {
+			name = m.top(t.focus).Title()
+		}
+		label := " " + strconv.Itoa(i+1) + " " + name + " "
 		if i == m.active {
 			label = reverseStyle.Render(label)
 		}
@@ -409,19 +581,51 @@ func (m Model) tabBar() string {
 }
 
 func (m Model) statusBar() string {
+	var bar string
+	switch m.mode {
+	case modeFilter:
+		bar = m.inputLine("/") + "  " + hintStyle.Render(filterHints)
+	case modePalette:
+		bar = m.inputLine(":") + "  " + hintStyle.Render(strings.Join(matchingCommands(m.input.Value()), "  "))
+	case modeRename:
+		bar = m.inputLine(renamePrompt) + "  " + hintStyle.Render(renameHints)
+	default:
+		bar = m.modeBar()
+	}
+	return lipgloss.NewStyle().MaxWidth(m.width).Render(bar)
+}
+
+// inputLine draws prompt and the input, as wide as its text, up to the window.
+// A long text scrolls and keeps the cursor in view.
+func (m Model) inputLine(prompt string) string {
+	in := m.input
+	// One cell stays free for the cursor at the end of the text.
+	in.SetWidth(min(lipgloss.Width(in.Value())+1, max(m.width-lipgloss.Width(prompt)-1, 1)))
+	// The stored input has no width, so it never scrolled: rebuild the
+	// window from the end, then move it back to the cursor.
+	pos := in.Position()
+	in.CursorEnd()
+	in.SetCursor(pos)
+	return prompt + in.View()
+}
+
+// modeBar is the status bar outside the input modes: badge, path or notice, hints.
+func (m Model) modeBar() string {
 	badge, hints := " NORMAL ", normalHints
 	path := strings.Join(titles(m.stacks[m.tabs[m.active].focus]), pathSep)
 	if m.sidebarFocused {
 		hints, path = sidebarHints, m.sidebar.Title()
 	}
+	if m.notice != "" {
+		path = errorStyle.Render(m.notice)
+	}
 	switch {
-	case m.prefix && m.sidebarFocused:
+	case m.mode == modePrefix && m.sidebarFocused:
 		badge, hints = " CTRL-W ", sidebarPrefixHints
-	case m.prefix:
+	case m.mode == modePrefix:
 		badge, hints = " CTRL-W ", prefixHints
 	}
-	bar := reverseStyle.Render(badge) + " " + path + "  " + hintStyle.Render(hints)
-	return lipgloss.NewStyle().MaxWidth(m.width).Render(bar)
+	return reverseStyle.Render(badge) + " " + path + "  " + hintStyle.Render(hints)
 }
 
 func titles(stack []views.View) []string {
@@ -453,7 +657,11 @@ func fitPath(path []string, width int) string {
 // the stack in the top border. The result is exactly r.W x r.H cells; r must
 // be at least 2x2.
 func renderPane(stack []views.View, r layout.Rect, focused bool) string {
-	v := stack[len(stack)-1]
+	return renderBox(titles(stack), stack[len(stack)-1].Render(), r, focused)
+}
+
+// renderBox draws body inside a border, with path in the top border.
+func renderBox(path []string, body string, r layout.Rect, focused bool) string {
 	color := borderColor
 	title := lipgloss.NewStyle()
 	if focused {
@@ -465,20 +673,20 @@ func renderPane(stack []views.View, r layout.Rect, focused bool) string {
 	inner := r.W - 2
 	label := ""
 	if inner > 0 {
-		label = title.MaxWidth(inner).Render(" " + fitPath(titles(stack), inner-2) + " ")
+		label = title.MaxWidth(inner).Render(" " + fitPath(path, inner-2) + " ")
 	}
 	top := edge.Render(border.TopLeft) + label +
 		edge.Render(strings.Repeat(border.Top, inner-lipgloss.Width(label))+border.TopRight)
 	bottom := edge.Render(border.BottomLeft + strings.Repeat(border.Bottom, inner) + border.BottomRight)
 
-	body := strings.Split(v.Render(), "\n")
+	rows := strings.Split(body, "\n")
 	fit := lipgloss.NewStyle().MaxWidth(inner)
 	side := edge.Render(border.Left)
 	lines := []string{top}
 	for i := range r.H - 2 {
 		line := ""
-		if i < len(body) && inner > 0 {
-			line = fit.Render(body[i])
+		if i < len(rows) && inner > 0 {
+			line = fit.Render(rows[i])
 		}
 		line += strings.Repeat(" ", inner-lipgloss.Width(line))
 		lines = append(lines, side+line+edge.Render(border.Right))

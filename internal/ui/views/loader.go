@@ -10,15 +10,22 @@ import (
 	"github.com/ingvarch/azt/internal/ui/data"
 )
 
-var errorStyle = lipgloss.NewStyle().Foreground(lipgloss.Red)
+var (
+	errorStyle = lipgloss.NewStyle().Foreground(lipgloss.Red)
+	faintStyle = lipgloss.NewStyle().Faint(true)
+)
+
+const refreshingText = "refreshing…"
 
 // loader tracks the load state of the data behind one view.
 type loader struct {
 	key     data.Key
 	noun    string
 	loading bool
-	err     error
-	spinner spinner.Model
+	// refreshing is set from "r" until the next result for key.
+	refreshing bool
+	err        error
+	spinner    spinner.Model
 }
 
 func newLoader(key data.Key, noun string) loader {
@@ -32,8 +39,14 @@ func (l *loader) result(msg data.ResultMsg) (any, bool) {
 	if msg.Key != l.key {
 		return nil, false
 	}
-	l.loading, l.err = false, msg.Err
+	l.loading, l.refreshing, l.err = false, false, msg.Err
 	return msg.Data, true
+}
+
+// refresh marks the loader as refreshing and asks for fresh data.
+func (l *loader) refresh() tea.Cmd {
+	l.refreshing = true
+	return data.Refresh(l.key)
 }
 
 // tick advances the spinner while loading.
@@ -60,3 +73,19 @@ func (l loader) status(width, height int) (string, bool) {
 	}
 	return "", false
 }
+
+// lines is the height of an optional one-line part of a view.
+func lines(present bool) int {
+	if present {
+		return 1
+	}
+	return 0
+}
+
+// clip cuts s to at most width columns and height lines.
+func clip(s string, width, height int) string {
+	return lipgloss.NewStyle().MaxWidth(width).MaxHeight(height).Render(s)
+}
+
+// wrap breaks s into lines of at most width columns.
+func wrap(s string, width int) string { return lipgloss.NewStyle().Width(width).Render(s) }

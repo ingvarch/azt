@@ -93,7 +93,7 @@ func TestResourceGroups(t *testing.T) {
 	}
 	wantQuery := `resourcecontainers
 | where type =~ 'microsoft.resources/subscriptions/resourcegroups'
-| project name, location, state = tostring(properties.provisioningState)
+| project name, location, state = tostring(properties.provisioningState), subscriptionId
 | order by name asc`
 	if *req.Query != wantQuery {
 		t.Errorf("query = %q, want %q", *req.Query, wantQuery)
@@ -120,7 +120,7 @@ func TestResources(t *testing.T) {
 	}
 	wantQuery := `resources
 | where resourceGroup =~ 'rg\'s'
-| project id, name, type, location
+| project id, name, type, location, resourceGroup, subscriptionId
 | order by name asc`
 	if *req.Query != wantQuery {
 		t.Errorf("query = %q, want %q", *req.Query, wantQuery)
@@ -161,5 +161,69 @@ func TestResourceDetailsNotFound(t *testing.T) {
 	}
 	if got := err.Error(); !strings.Contains(got, "/missing") {
 		t.Errorf("err = %q, want it to name the ID", got)
+	}
+}
+
+const wantJoin = "| join kind=leftouter (resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project subscriptionId, subscription = name) on subscriptionId"
+
+func TestAllResourceGroups(t *testing.T) {
+	graph := &fakeGraph{pages: []armresourcegraph.ClientResourcesResponse{
+		page(nil, map[string]any{"name": "rg-a", "location": "westeurope", "state": "Succeeded", "subscriptionId": "s1", "subscription": "Dev"}),
+	}}
+
+	got, err := AllResourceGroups(context.Background(), graph)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []ResourceGroup{{Name: "rg-a", Location: "westeurope", State: "Succeeded", SubscriptionID: "s1", Subscription: "Dev"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("AllResourceGroups() = %+v, want %+v", got, want)
+	}
+	req := graph.requests[0]
+	if got := scope(req); len(got) != 0 {
+		t.Errorf("scope = %v, want empty", got)
+	}
+	wantQuery := `resourcecontainers
+| where type =~ 'microsoft.resources/subscriptions/resourcegroups'
+` + wantJoin + `
+| project name, location, state = tostring(properties.provisioningState), subscriptionId, subscription
+| order by subscription asc, name asc`
+	if *req.Query != wantQuery {
+		t.Errorf("query = %q, want %q", *req.Query, wantQuery)
+	}
+}
+
+func TestResourcesOfType(t *testing.T) {
+	graph := &fakeGraph{pages: []armresourcegraph.ClientResourcesResponse{
+		page(nil, map[string]any{
+			"id": "/subscriptions/s1/vm1", "name": "vm1", "type": "microsoft.compute/virtualmachines", "location": "northeurope",
+			"resourceGroup": "rg-a", "subscriptionId": "s1", "subscription": "Dev",
+		}),
+	}}
+
+	got, err := ResourcesOfType(context.Background(), graph, "microsoft.x/it's")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []Resource{{
+		ID: "/subscriptions/s1/vm1", Name: "vm1", Type: "microsoft.compute/virtualmachines", Location: "northeurope",
+		ResourceGroup: "rg-a", SubscriptionID: "s1", Subscription: "Dev",
+	}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ResourcesOfType() = %+v, want %+v", got, want)
+	}
+	req := graph.requests[0]
+	if got := scope(req); len(got) != 0 {
+		t.Errorf("scope = %v, want empty", got)
+	}
+	wantQuery := `resources
+| where type =~ 'microsoft.x/it\'s'
+` + wantJoin + `
+| project id, name, type, location, resourceGroup, subscriptionId, subscription
+| order by name asc`
+	if *req.Query != wantQuery {
+		t.Errorf("query = %q, want %q", *req.Query, wantQuery)
 	}
 }

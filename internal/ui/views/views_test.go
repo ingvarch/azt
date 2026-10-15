@@ -75,7 +75,18 @@ var (
 	}
 )
 
-// lists are the three table views with the data that fills them.
+var (
+	allGroups = []azure.ResourceGroup{
+		{Name: "rg-a", Location: "westeurope", State: "Succeeded", SubscriptionID: "id-1", Subscription: "Dev"},
+		{Name: "rg-b", Location: "northeurope", State: "Deleting", SubscriptionID: "id-2", Subscription: "Prod"},
+	}
+	tenantResources = []azure.Resource{
+		{ID: "/r/web", Name: "web-app", Type: "microsoft.web/sites", Location: "westeurope", ResourceGroup: "rg-a", SubscriptionID: "id-1", Subscription: "Dev"},
+		{ID: "/r/api", Name: "api-app", Type: "microsoft.web/sites", Location: "northeurope", ResourceGroup: "rg-b", SubscriptionID: "id-2", Subscription: "Prod"},
+	}
+)
+
+// lists are the table views with the data that fills them.
 var lists = []struct {
 	name  string
 	new   func() View
@@ -103,6 +114,18 @@ var lists = []struct {
 		data.Key{Kind: data.Resources, Subscription: "id-1", Group: "rg-b"}, "rg-b", "resources",
 		"No resources in this resource group.",
 		resources, []string{"Type", "web-app", "microsoft.web/sites", "kv-prod", "northeurope"},
+	},
+	{
+		"all resource groups", NewAllResourceGroups,
+		data.Key{Kind: data.AllResourceGroups}, "Resource groups", "resource groups",
+		"No resource groups found.",
+		allGroups, []string{"Subscription", "rg-a", "Dev", "westeurope", "rg-b", "Prod", "Deleting"},
+	},
+	{
+		"resources by type", func() View { return NewResourcesByType("microsoft.web/sites") },
+		data.Key{Kind: data.ResourcesOfType, Type: "microsoft.web/sites"}, "web/sites", "resources",
+		"No resources of this type.",
+		tenantResources, []string{"Resource group", "Subscription", "web-app", "rg-a", "Dev", "api-app", "Prod"},
 	},
 }
 
@@ -399,6 +422,23 @@ func TestRenderFitsSize(t *testing.T) {
 		{"details loading", func(w, h int) View { return newDetails().Resize(w, h) }},
 		{"details", func(w, h int) View { return deliver(t, newDetails().Resize(w, h), bigDetail, nil) }},
 		{"details error", func(w, h int) View { return deliver(t, newDetails().Resize(w, h), nil, long) }},
+		{"filtered table", func(w, h int) View {
+			return filtered(deliver(t, NewSubscriptions().Resize(w, h), manySubs, nil), "sub-1")
+		}},
+		{"filtered long query", func(w, h int) View {
+			return filtered(deliver(t, NewSubscriptions().Resize(w, h), manySubs, nil), strings.Repeat("q", 300))
+		}},
+		{"filtered empty", func(w, h int) View {
+			return filtered(deliver(t, NewSubscriptions().Resize(w, h), nil, nil), "x")
+		}},
+		{"refreshing table", func(w, h int) View {
+			v, _ := press(deliver(t, NewSubscriptions().Resize(w, h), manySubs, nil), keyR)
+			return v
+		}},
+		{"refreshing details", func(w, h int) View {
+			v, _ := press(deliver(t, newDetails().Resize(w, h), bigDetail, nil), keyR)
+			return v
+		}},
 	}
 	sizes := [][2]int{{40, 10}, {120, 20}, {20, 4}, {0, 0}, {1, 1}, {0, 10}, {40, 0}}
 	for _, tt := range tests {

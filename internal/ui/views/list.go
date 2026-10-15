@@ -1,6 +1,7 @@
 package views
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -29,7 +30,9 @@ type listConfig[T any] struct {
 type list[T any] struct {
 	loader
 	cfg           listConfig[T]
-	items         []T
+	items         []T // after cfg.keep
+	shown         []T // items that match filter
+	filter        string
 	table         table.Model
 	width, height int
 }
@@ -50,22 +53,25 @@ func (l list[T]) Update(msg tea.Msg) (View, tea.Cmd) {
 	switch msg := msg.(type) {
 	case data.ResultMsg:
 		d, ok := l.result(msg)
-		if ok {
-			l.items, _ = d.([]T)
-			if l.cfg.keep != nil {
-				l.items = slices.DeleteFunc(slices.Clone(l.items), func(it T) bool { return !l.cfg.keep(it) })
-			}
-			l.table.SetRows(mapRows(l.items, l.cfg.row))
-			if l.table.Cursor() < 0 {
-				l.table.SetCursor(0)
-			}
+		if !ok {
+			return l, nil
 		}
-		return l, nil
+		l.items, _ = d.([]T)
+		if l.cfg.keep != nil {
+			l.items = slices.DeleteFunc(slices.Clone(l.items), func(it T) bool { return !l.cfg.keep(it) })
+		}
+		l.applyFilter()
+		if l.table.Cursor() < 0 {
+			l.table.SetCursor(0)
+		}
+		return l.fit(), nil
 	case spinner.TickMsg:
-		return l, l.tick(msg)
+		cmd := l.tick(msg)
+		return l, cmd
 	case tea.KeyPressMsg:
 		if msg.String() == "r" {
-			return l, data.Refresh(l.key)
+			cmd := l.refresh()
+			return l.fit(), cmd
 		}
 	}
 	var cmd tea.Cmd
@@ -75,9 +81,50 @@ func (l list[T]) Update(msg tea.Msg) (View, tea.Cmd) {
 
 func (l list[T]) Resize(width, height int) View {
 	l.width, l.height = width, height
-	l.table.SetWidth(width)
-	l.table.SetHeight(height)
+	return l.fit()
+}
+
+// fit sizes the table, leaving a line for the info line.
+func (l list[T]) fit() list[T] {
+	l.table.SetWidth(l.width)
+	l.table.SetHeight(l.height - lines(l.hasInfo()))
 	return l
+}
+
+func (l list[T]) hasInfo() bool { return l.filter != "" || l.refreshing }
+
+func (l list[T]) Filter() string { return l.filter }
+
+func (l list[T]) SetFilter(query string) View {
+	if query == l.filter {
+		return l
+	}
+	l.filter = query
+	l.applyFilter()
+	l.table.SetCursor(0)
+	return l.fit()
+}
+
+// applyFilter recomputes the shown items and the table rows from items and filter.
+func (l *list[T]) applyFilter() {
+	query := strings.ToLower(l.filter)
+	l.shown = slices.DeleteFunc(slices.Clone(l.items), func(it T) bool {
+		return !slices.ContainsFunc(l.cfg.row(it), func(cell string) bool {
+			return strings.Contains(strings.ToLower(cell), query)
+		})
+	})
+	l.table.SetRows(mapRows(l.shown, l.cfg.row))
+}
+
+func (l list[T]) info() string {
+	var parts []string
+	if l.filter != "" {
+		parts = append(parts, "/"+l.filter, fmt.Sprintf("%d of %d", len(l.shown), len(l.items)))
+	}
+	if l.refreshing {
+		parts = append(parts, refreshingText)
+	}
+	return clip(faintStyle.Render(strings.Join(parts, "  ")), l.width, 1)
 }
 
 func (l list[T]) Render() string {
@@ -87,17 +134,26 @@ func (l list[T]) Render() string {
 	if s, ok := l.status(l.width, l.height); ok {
 		return s
 	}
-	if len(l.items) == 0 {
-		return lipgloss.NewStyle().MaxHeight(l.height).Width(l.width).Render(l.cfg.empty)
+	var body string
+	switch {
+	case len(l.items) == 0:
+		body = wrap(l.cfg.empty, l.width)
+	case len(l.shown) == 0:
+		body = wrap("No matches.", l.width)
+	default:
+		body = l.table.View()
 	}
-	return lipgloss.NewStyle().MaxHeight(l.height).MaxWidth(l.width).Render(l.table.View())
+	if l.hasInfo() {
+		body = lipgloss.JoinVertical(lipgloss.Left, l.info(), body)
+	}
+	return clip(body, l.width, l.height)
 }
 
 func (l list[T]) Open() (View, bool) {
-	if !l.ready() || len(l.items) == 0 {
+	if !l.ready() || len(l.shown) == 0 {
 		return nil, false
 	}
-	return l.cfg.open(l.items[l.table.Cursor()]), true
+	return l.cfg.open(l.shown[l.table.Cursor()]), true
 }
 
 func NewSubscriptions() View {
@@ -169,6 +225,43 @@ func resourcesConfig(subscriptionID string, group azure.ResourceGroup) listConfi
 		row:  func(r azure.Resource) table.Row { return table.Row{r.Name, r.Type, r.Location} },
 		open: func(r azure.Resource) View { return NewDetails(subscriptionID, r) },
 	}
+}
+
+func NewAllResourceGroups() View {
+	return newList(listConfig[azure.ResourceGroup]{
+		key:   data.Key{Kind: data.AllResourceGroups},
+		title: "Resource groups",
+		noun:  "resource groups",
+		empty: "No resource groups found.",
+		columns: []table.Column{
+			{Title: "Name", Width: 36},
+			{Title: "Subscription", Width: 28},
+			{Title: "Location", Width: 16},
+			{Title: "State", Width: 12},
+		},
+		row:  func(g azure.ResourceGroup) table.Row { return table.Row{g.Name, g.Subscription, g.Location, g.State} },
+		open: func(g azure.ResourceGroup) View { return NewResources(g.SubscriptionID, g) },
+	})
+}
+
+// NewResourcesByType lists the resources of one type in every subscription.
+func NewResourcesByType(resourceType string) View {
+	return newList(listConfig[azure.Resource]{
+		key:   data.Key{Kind: data.ResourcesOfType, Type: resourceType},
+		title: ShortType(resourceType),
+		noun:  "resources",
+		empty: "No resources of this type.",
+		columns: []table.Column{
+			{Title: "Name", Width: 32},
+			{Title: "Resource group", Width: 28},
+			{Title: "Subscription", Width: 24},
+			{Title: "Location", Width: 16},
+		},
+		row: func(r azure.Resource) table.Row {
+			return table.Row{r.Name, r.ResourceGroup, r.Subscription, r.Location}
+		},
+		open: func(r azure.Resource) View { return NewDetails(r.SubscriptionID, r) },
+	})
 }
 
 func mapRows[T any](items []T, row func(T) table.Row) []table.Row {

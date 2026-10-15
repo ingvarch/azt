@@ -180,7 +180,7 @@ func TestSidebarKeepsQuitAndPrefix(t *testing.T) {
 		t.Error("q or ctrl+c lost its meaning in the sidebar")
 	}
 	h.send(key("ctrl+w"))
-	if !h.m.prefix {
+	if h.m.mode != modePrefix {
 		t.Error("ctrl+w did not start the prefix")
 	}
 }
@@ -257,7 +257,7 @@ func TestPrefixKeysLimitedInSidebar(t *testing.T) {
 	}
 	h.send(key("ctrl+w"))
 	h.send(key("esc"))
-	if h.m.prefix {
+	if h.m.mode == modePrefix {
 		t.Error("esc did not cancel the prefix")
 	}
 }
@@ -333,7 +333,7 @@ func TestSidebarStatusBar(t *testing.T) {
 	h.prefix("h")
 	lines := strings.Split(h.frame(), "\n")
 	status := lines[len(lines)-1]
-	for _, want := range []string{"NORMAL", "Explorer", "j/k move  l expand  h collapse  r refresh  enter open  ^w l panes  ^w e hide  q quit"} {
+	for _, want := range []string{"NORMAL", "Explorer", "j/k move  l expand  h collapse  r refresh  enter open  ^w l panes  ^w e hide  : command  ? help  q quit"} {
 		if !strings.Contains(status, want) {
 			t.Errorf("status %q lacks %q", status, want)
 		}
@@ -341,7 +341,7 @@ func TestSidebarStatusBar(t *testing.T) {
 	h.send(key("ctrl+w"))
 	lines = strings.Split(h.frame(), "\n")
 	status = lines[len(lines)-1]
-	if !strings.Contains(status, "CTRL-W") || !strings.Contains(status, "l/→ panes  e hide  t tab  n/p/1-9 switch  esc cancel") {
+	if !strings.Contains(status, "CTRL-W") || !strings.Contains(status, "l/→ panes  e hide  t tab  n/p/1-9 switch  , rename  ? help  esc cancel") {
 		t.Errorf("prefix status = %q", status)
 	}
 	if strings.Contains(status, "v/s split") {

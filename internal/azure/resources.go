@@ -10,22 +10,41 @@ import (
 var ErrNotFound = errors.New("resource not found")
 
 type ResourceGroup struct {
-	Name     string `json:"name"`
-	Location string `json:"location"`
-	State    string `json:"state"`
+	Name           string `json:"name"`
+	Location       string `json:"location"`
+	State          string `json:"state"`
+	SubscriptionID string `json:"subscriptionId"`
+	Subscription   string `json:"subscription"` // name; only tenant-wide queries fill it
 }
 
 type Resource struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Location string `json:"location"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Type           string `json:"type"`
+	Location       string `json:"location"`
+	ResourceGroup  string `json:"resourceGroup"`
+	SubscriptionID string `json:"subscriptionId"`
+	Subscription   string `json:"subscription"` // name; only tenant-wide queries fill it
 }
 
 const resourceGroupsQuery = `resourcecontainers
 | where type =~ 'microsoft.resources/subscriptions/resourcegroups'
-| project name, location, state = tostring(properties.provisioningState)
+| project name, location, state = tostring(properties.provisioningState), subscriptionId
 | order by name asc`
+
+// withSubscriptionName adds the subscription name to rows that carry subscriptionId.
+const withSubscriptionName = `| join kind=leftouter (resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project subscriptionId, subscription = name) on subscriptionId`
+
+const allResourceGroupsQuery = `resourcecontainers
+| where type =~ 'microsoft.resources/subscriptions/resourcegroups'
+` + withSubscriptionName + `
+| project name, location, state = tostring(properties.provisioningState), subscriptionId, subscription
+| order by subscription asc, name asc`
+
+// AllResourceGroups returns the resource groups of every subscription.
+func AllResourceGroups(ctx context.Context, graph ResourceGraph) ([]ResourceGroup, error) {
+	return query[ResourceGroup](ctx, graph, allResourceGroupsQuery)
+}
 
 // ResourceGroups returns the resource groups of one subscription.
 func ResourceGroups(ctx context.Context, graph ResourceGraph, subscriptionID string) ([]ResourceGroup, error) {
@@ -36,9 +55,19 @@ func ResourceGroups(ctx context.Context, graph ResourceGraph, subscriptionID str
 func Resources(ctx context.Context, graph ResourceGraph, subscriptionID, resourceGroup string) ([]Resource, error) {
 	kql := `resources
 | where resourceGroup =~ ` + kqlString(resourceGroup) + `
-| project id, name, type, location
+| project id, name, type, location, resourceGroup, subscriptionId
 | order by name asc`
 	return query[Resource](ctx, graph, kql, subscriptionID)
+}
+
+// ResourcesOfType returns the resources of one type in every subscription.
+func ResourcesOfType(ctx context.Context, graph ResourceGraph, resourceType string) ([]Resource, error) {
+	kql := `resources
+| where type =~ ` + kqlString(resourceType) + `
+` + withSubscriptionName + `
+| project id, name, type, location, resourceGroup, subscriptionId, subscription
+| order by name asc`
+	return query[Resource](ctx, graph, kql)
 }
 
 // ResourceDetails returns every property of one resource.

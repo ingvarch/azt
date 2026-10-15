@@ -212,6 +212,20 @@ func TestNewFetcherRoutesKinds(t *testing.T) {
 			wantQuery: "resourceGroup =~ 'rg'",
 		},
 		{
+			name:      "all groups",
+			key:       Key{Kind: AllResourceGroups},
+			row:       map[string]any{"name": "rg", "subscriptionId": "s1", "subscription": "Dev"},
+			want:      []azure.ResourceGroup{{Name: "rg", SubscriptionID: "s1", Subscription: "Dev"}},
+			wantQuery: "order by subscription asc, name asc",
+		},
+		{
+			name:      "resources of type",
+			key:       Key{Kind: ResourcesOfType, Type: "microsoft.web/sites"},
+			row:       map[string]any{"id": "/a", "name": "a", "resourceGroup": "rg", "subscription": "Dev"},
+			want:      []azure.Resource{{ID: "/a", Name: "a", ResourceGroup: "rg", Subscription: "Dev"}},
+			wantQuery: "type =~ 'microsoft.web/sites'",
+		},
+		{
 			name:      "details",
 			key:       Key{Kind: Details, Subscription: "s1", ID: "/a"},
 			row:       map[string]any{"id": "/a"},

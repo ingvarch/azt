@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/ingvarch/azt/internal/azure"
 	"github.com/ingvarch/azt/internal/ui/data"
@@ -36,17 +37,23 @@ func (d details) Init() tea.Cmd { return d.init() }
 func (d details) Update(msg tea.Msg) (View, tea.Cmd) {
 	switch msg := msg.(type) {
 	case data.ResultMsg:
-		if res, ok := d.result(msg); ok && d.err == nil {
+		res, ok := d.result(msg)
+		if !ok {
+			return d, nil
+		}
+		if d.err == nil {
 			var text string
 			text, d.err = indentJSON(res)
 			d.viewport.SetContent(text)
 		}
-		return d, nil
+		return d.fit(), nil
 	case spinner.TickMsg:
-		return d, d.tick(msg)
+		cmd := d.tick(msg)
+		return d, cmd
 	case tea.KeyPressMsg:
 		if msg.String() == "r" {
-			return d, data.Refresh(d.key)
+			cmd := d.refresh()
+			return d.fit(), cmd
 		}
 	}
 	var cmd tea.Cmd
@@ -56,8 +63,13 @@ func (d details) Update(msg tea.Msg) (View, tea.Cmd) {
 
 func (d details) Resize(width, height int) View {
 	d.width, d.height = width, height
-	d.viewport.SetWidth(width)
-	d.viewport.SetHeight(height)
+	return d.fit()
+}
+
+// fit sizes the viewport, leaving a line for the refresh indicator.
+func (d details) fit() details {
+	d.viewport.SetWidth(d.width)
+	d.viewport.SetHeight(d.height - lines(d.refreshing))
 	return d
 }
 
@@ -67,6 +79,9 @@ func (d details) Render() string {
 	}
 	if s, ok := d.status(d.width, d.height); ok {
 		return s
+	}
+	if d.refreshing {
+		return clip(lipgloss.JoinVertical(lipgloss.Left, faintStyle.Render(refreshingText), d.viewport.View()), d.width, d.height)
 	}
 	return d.viewport.View()
 }

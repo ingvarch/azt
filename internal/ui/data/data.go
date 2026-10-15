@@ -17,6 +17,8 @@ const (
 	ResourceGroups
 	Resources
 	Details
+	AllResourceGroups
+	ResourcesOfType
 )
 
 // Key identifies one piece of data; unused fields stay empty.
@@ -24,6 +26,7 @@ type Key struct {
 	Kind         Kind
 	Subscription string
 	Group, ID    string
+	Type         string
 }
 
 // FetchMsg is sent by a view that needs data.
@@ -99,6 +102,10 @@ func NewFetcher(ctx context.Context, graph azure.ResourceGraph) Fetcher {
 			return azure.ResourceGroups(ctx, graph, k.Subscription)
 		case Resources:
 			return azure.Resources(ctx, graph, k.Subscription, k.Group)
+		case AllResourceGroups:
+			return azure.AllResourceGroups(ctx, graph)
+		case ResourcesOfType:
+			return azure.ResourcesOfType(ctx, graph, k.Type)
 		case Details:
 			return azure.ResourceDetails(ctx, graph, k.Subscription, k.ID)
 		}
