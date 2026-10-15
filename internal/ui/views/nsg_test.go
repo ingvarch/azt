@@ -476,3 +476,19 @@ func TestNSGTabs(t *testing.T) {
 		t.Errorf("kind = %+v", k)
 	}
 }
+
+func TestNSGRulesTabKeepsActionVisibleWithALongName(t *testing.T) {
+	const name = "k8s-azure-lb_allow_IPv4_556f7044ec033071ec0dfcf7cd85bc93"
+	rule := `{"name":"` + name + `","properties":{"direction":"Inbound","priority":100,"protocol":"Tcp","access":"Allow",` +
+		`"sourceAddressPrefixes":["10.1.0.0/16","10.3.0.0/16"],"destinationAddressPrefixes":["10.2.0.0/24","10.2.1.0/24"],"destinationPortRange":"443"}}`
+	row := typedRow(t, nsgType, `{"securityRules":[`+rule+`]}`)
+	line := bodyOfRow(t, row, "Rules", 120)[2]
+	for _, sub := range []string{"k8s-azure-lb_allow_IPv4_55…", "10.1.0.0/16, 10.3.0.0/16", "10.2.0.0/24, 10.2.1.0/24"} {
+		if !strings.Contains(line, sub) {
+			t.Errorf("line %q lacks %q", line, sub)
+		}
+	}
+	if !strings.HasSuffix(line, "Allow") {
+		t.Errorf("line %q does not end with Action", line)
+	}
+}

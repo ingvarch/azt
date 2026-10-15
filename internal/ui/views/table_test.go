@@ -324,7 +324,7 @@ func TestTableCutsAColoredStateCell(t *testing.T) {
 
 func TestSummaryTable(t *testing.T) {
 	cols := []column{{title: "Name"}, {title: "State"}}
-	lines := summaryTable(cols, [][]string{{"a", stateText("Running")}, {"bb", stateText("Stopped · Updating")}})
+	lines := summaryTable(cols, [][]string{{"a", stateText("Running")}, {"bb", stateText("Stopped · Updating")}}, 200)
 	want := []string{
 		"Name  State",
 		"a     ● Running",
@@ -350,7 +350,7 @@ func TestSummaryTable(t *testing.T) {
 }
 
 func TestSummaryTableWithoutRows(t *testing.T) {
-	lines := summaryTable([]column{{title: "Name"}}, nil)
+	lines := summaryTable([]column{{title: "Name"}}, nil, 200)
 	if len(lines) != 1 || strings.TrimRight(plain(lines[0]), " ") != "Name" {
 		t.Errorf("lines = %q", lines)
 	}
@@ -369,8 +369,59 @@ func TestTableSelectedRowIsReversedAfterAState(t *testing.T) {
 }
 
 func TestSummaryTableShortRow(t *testing.T) {
-	lines := summaryTable([]column{{title: "A"}, {title: "B"}}, [][]string{{"x"}})
+	lines := summaryTable([]column{{title: "A"}, {title: "B"}}, [][]string{{"x"}}, 200)
 	if got := plain(lines[1]); got != "x" {
 		t.Errorf("row = %q", got)
+	}
+}
+
+// summaryCols are columns named by their titles.
+func summaryCols(titles ...string) []column {
+	cols := make([]column, len(titles))
+	for i, t := range titles {
+		cols[i] = column{title: t}
+	}
+	return cols
+}
+
+func TestSummaryTableThatFitsIsUnchanged(t *testing.T) {
+	cols := summaryCols("Name", "Note", "End")
+	rows := [][]string{{"alpha", "bravo-charlie", "x"}}
+	want := wantTable([]int{5, 13}, []string{"Name", "Note", "End"}, []string{"alpha", "bravo-charlie", "x"})
+	for _, width := range []int{25, 26, 80} {
+		wantLines(t, plainAll(summaryTable(cols, rows, width)), want)
+	}
+}
+
+func TestSummaryTableCapsOnlyTheLongestColumn(t *testing.T) {
+	cols := summaryCols("Name", "Note", "End")
+	rows := [][]string{{"alpha", "bravo-charlie", "x"}}
+	got := plainAll(summaryTable(cols, rows, 21))
+	wantLines(t, got, wantTable([]int{5, 9}, []string{"Name", "Note", "End"}, []string{"alpha", "bravo-ch…", "x"}))
+	wantMaxWidth(t, got, 21)
+}
+
+func TestSummaryTableCapsLongColumnsAtOneWidth(t *testing.T) {
+	cols := summaryCols("Big", "Tag", "Huge", "Last")
+	rows := [][]string{{"abcdefghijkl", "t1", "0123456789abcdefghij", "e"}}
+	got := plainAll(summaryTable(cols, rows, 35))
+	wantLines(t, got, wantTable([]int{11, 3, 11}, []string{"Big", "Tag", "Huge", "Last"}, []string{"abcdefghij…", "t1", "0123456789…", "e"}))
+	wantMaxWidth(t, got, 35)
+}
+
+func TestSummaryTableStopsAtTheFloor(t *testing.T) {
+	cols := summaryCols("Big", "Tag", "Huge", "Last")
+	rows := [][]string{{"abcdefghijkl", "t1", "0123456789abcdefghij", "e"}}
+	got := plainAll(summaryTable(cols, rows, 10))
+	wantLines(t, got, wantTable([]int{8, 3, 8}, []string{"Big", "Tag", "Huge", "Last"}, []string{"abcdefg…", "t1", "0123456…", "e"}))
+}
+
+// wantMaxWidth fails for a line wider than width cells.
+func wantMaxWidth(t *testing.T, lines []string, width int) {
+	t.Helper()
+	for _, l := range lines {
+		if w := lipgloss.Width(l); w > width {
+			t.Errorf("line %q is %d cells, want at most %d", l, w, width)
+		}
 	}
 }

@@ -146,8 +146,9 @@ var headerStyle = lipgloss.NewStyle().Bold(true).Foreground(muted)
 
 // summaryTable draws rows under their titles, each column as wide as its
 // widest cell: no rule, no selection, two spaces between the columns, and no
-// padding after the last one.
-func summaryTable(cols []column, rows [][]string) []string {
+// padding after the last one. A table wider than width cells gets its widest
+// columns cut to one common width, see capWidths.
+func summaryTable(cols []column, rows [][]string, width int) []string {
 	cols = slices.Clone(cols)
 	titles := make([]string, len(cols))
 	for i := range cols {
@@ -157,11 +158,40 @@ func summaryTable(cols []column, rows [][]string) []string {
 			cols[i].width = max(cols[i].width, lipgloss.Width(cellAt(r, i)))
 		}
 	}
+	capWidths(cols, width)
 	lines := []string{headerStyle.Render(strings.TrimRight(rowLine(cols, titles, summaryGap, false), " "))}
 	for _, r := range rows {
 		lines = append(lines, strings.TrimRight(rowLine(cols, r, summaryGap, false), " "))
 	}
 	return lines
+}
+
+// summaryFloor is the narrowest width capWidths cuts a column to.
+const summaryFloor = 8
+
+// capWidths cuts the columns to the largest common width, at least
+// summaryFloor, at which they and the gaps between them fit in width cells.
+// Narrower columns keep their width.
+func capWidths(cols []column, width int) {
+	limit := 0
+	for _, c := range cols {
+		limit = max(limit, c.width)
+	}
+	for limit > summaryFloor && tableWidth(cols, limit) > width {
+		limit--
+	}
+	for i := range cols {
+		cols[i].width = min(cols[i].width, limit)
+	}
+}
+
+// tableWidth is the width of the columns, each at most limit wide, and the gaps.
+func tableWidth(cols []column, limit int) int {
+	total := len(summaryGap) * max(len(cols)-1, 0)
+	for _, c := range cols {
+		total += min(c.width, limit)
+	}
+	return total
 }
 
 const summaryGap = "  "
