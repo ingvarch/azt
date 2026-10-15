@@ -635,7 +635,8 @@ func TestListsColorTheState(t *testing.T) {
 func TestListStateColumnKeepsItsPlace(t *testing.T) {
 	v := deliver(t, NewSubscriptions().Resize(120, 10), subs, nil)
 	header := plain(strings.Split(v.Render(), "\n")[0])
-	if i := strings.Index(header, "State"); i != 32+1+36+1 {
+	// natural widths 4, 15 and 10 with the gaps: 87 spare cells, 29 for each column.
+	if i := strings.Index(header, "State"); i != 33+2+44+2 {
 		t.Errorf("State starts at %d in %q", i, header)
 	}
 }

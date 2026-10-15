@@ -1,6 +1,7 @@
 package views
 
 import (
+	"math"
 	"slices"
 	"strings"
 
@@ -14,6 +15,7 @@ const headerLines = 2
 
 type column struct {
 	title string
+	// width is the content width, see sizeColumns; a table spreads the spare room over it.
 	width int
 	// state draws the cells of the column as states.
 	state bool
@@ -88,19 +90,13 @@ func (t table) view() string {
 	if t.width <= 0 || t.height <= 0 {
 		return ""
 	}
-	titles := make([]string, len(t.cols))
-	widths := 0
-	for i, c := range t.cols {
-		titles[i] = c.title
-		widths += c.width
-	}
-	rule := strings.Repeat("─", widths+max(len(t.cols)-1, 0))
+	cols := t.layout()
 	lines := []string{
-		lipgloss.NewStyle().Bold(true).Render(t.line(titles, false)),
-		cut(rule, t.width),
+		lipgloss.NewStyle().Bold(true).Render(t.line(cols, titles(cols), false)),
+		cut(strings.Repeat("─", tableWidth(cols, math.MaxInt)), t.width),
 	}
 	for i := t.top; i < min(t.top+t.visible(), len(t.rows)); i++ {
-		text := t.line(t.rows[i], true)
+		text := t.line(cols, t.rows[i], true)
 		if i == t.cursor {
 			text = selectedStyle.Render(ansi.Strip(text))
 		}
@@ -109,9 +105,40 @@ func (t table) view() string {
 	return strings.Join(lines[:min(len(lines), t.height)], "\n")
 }
 
-// line is rowLine with a single space between the columns, cut to the width.
-func (t table) line(cells []string, states bool) string {
-	return cut(rowLine(t.cols, cells, " ", states), t.width)
+// line is one row of cols cut at the table width.
+func (t table) line(cols []column, cells []string, states bool) string {
+	return cut(rowLine(cols, cells, summaryGap, states), t.width)
+}
+
+// titles are the column titles of cols.
+func titles(cols []column) []string {
+	out := make([]string, len(cols))
+	for i, c := range cols {
+		out[i] = c.title
+	}
+	return out
+}
+
+// layout is the columns at the widths they are drawn: the spare room of the
+// table shared evenly, the first columns taking the remainder; a table that
+// does not fit gets its widest columns cut, see capWidths.
+func (t table) layout() []column {
+	cols := slices.Clone(t.cols)
+	if len(cols) == 0 {
+		return cols
+	}
+	spare := t.width - tableWidth(cols, math.MaxInt)
+	if spare < 0 {
+		capWidths(cols, t.width)
+		return cols
+	}
+	for i := range cols {
+		cols[i].width += spare / len(cols)
+		if i < spare%len(cols) {
+			cols[i].width++
+		}
+	}
+	return cols
 }
 
 // rowLine joins the cells of one row, each fitted to its column; with states
@@ -119,13 +146,29 @@ func (t table) line(cells []string, states bool) string {
 func rowLine(cols []column, cells []string, sep string, states bool) string {
 	fitted := make([]string, len(cols))
 	for i, c := range cols {
-		cell := cellAt(cells, i)
-		if states && c.state {
-			cell = stateText(cell)
-		}
-		fitted[i] = fitCell(cell, c.width)
+		fitted[i] = fitCell(c.draw(cellAt(cells, i), states), c.width)
 	}
 	return strings.Join(fitted, sep)
+}
+
+// draw is cell as the column shows it: a state column draws states when asked.
+func (c column) draw(cell string, states bool) string {
+	if states && c.state {
+		return stateText(cell)
+	}
+	return cell
+}
+
+// sizeColumns is cols, each as wide as its title and its widest cell as drawn.
+func sizeColumns(cols []column, rows [][]string, states bool) []column {
+	cols = slices.Clone(cols)
+	for i := range cols {
+		cols[i].width = lipgloss.Width(cols[i].title)
+		for _, r := range rows {
+			cols[i].width = max(cols[i].width, lipgloss.Width(cols[i].draw(cellAt(r, i), states)))
+		}
+	}
+	return cols
 }
 
 // cellAt is cell i of a row, empty past the last one.
@@ -147,17 +190,9 @@ var headerStyle = lipgloss.NewStyle().Bold(true).Foreground(muted)
 // padding after the last one. A table wider than width cells gets its widest
 // columns cut to one common width, see capWidths.
 func summaryTable(cols []column, rows [][]string, width int) []string {
-	cols = slices.Clone(cols)
-	titles := make([]string, len(cols))
-	for i := range cols {
-		titles[i] = cols[i].title
-		cols[i].width = lipgloss.Width(cols[i].title)
-		for _, r := range rows {
-			cols[i].width = max(cols[i].width, lipgloss.Width(cellAt(r, i)))
-		}
-	}
+	cols = sizeColumns(cols, rows, false)
 	capWidths(cols, width)
-	lines := []string{headerStyle.Render(strings.TrimRight(rowLine(cols, titles, summaryGap, false), " "))}
+	lines := []string{headerStyle.Render(strings.TrimRight(rowLine(cols, titles(cols), summaryGap, false), " "))}
 	for _, r := range rows {
 		lines = append(lines, strings.TrimRight(rowLine(cols, r, summaryGap, false), " "))
 	}
