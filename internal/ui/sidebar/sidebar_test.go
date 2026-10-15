@@ -23,12 +23,12 @@ var (
 	subs   = []azure.Subscription{{ID: "id-1", Name: "Dev"}, {ID: "id-2", Name: "Prod"}}
 	groups = []azure.ResourceGroup{{Name: "rg-a"}, {Name: "rg-b"}}
 	res    = []azure.Resource{
-		{ID: "/1", Type: "microsoft.web/sites"},
-		{ID: "/2", Type: "microsoft.sql/servers"},
-		{ID: "/3", Type: "Microsoft.Web/Sites"},
-		{ID: "/4", Type: "microsoft.keyvault/vaults"},
-		{ID: "/5", Type: "microsoft.sql/servers"},
-		{ID: "/6", Type: "microsoft.sql/servers"},
+		{ID: "/1", Name: "site-b", Type: "microsoft.web/sites"},
+		{ID: "/2", Name: "sql-b", Type: "microsoft.sql/servers"},
+		{ID: "/3", Name: "Site-a", Type: "Microsoft.Web/Sites"},
+		{ID: "/4", Name: "vault-1", Type: "microsoft.keyvault/vaults"},
+		{ID: "/5", Name: "sql-a", Type: "microsoft.sql/servers"},
+		{ID: "/6", Name: "sql-c", Type: "microsoft.sql/servers"},
 	}
 
 	keyDown  = tea.KeyPressMsg{Code: tea.KeyDown}
@@ -106,13 +106,16 @@ func lines(m Model) []string {
 
 // full is a tree with Dev and Prod, Dev expanded with its groups, rg-a
 // expanded with its types; the selection is on Dev.
-func full() Model {
+func full() Model { return explorer(res) }
+
+// explorer is full() with the given resources in rg-a.
+func explorer(resources []azure.Resource) Model {
 	m := sized(New(), 40, 20)
 	m = result(m, keySubs, subs, nil)
 	m = press(m, key('l'))
 	m = result(m, keyGroups, groups, nil)
 	m = press(m, keyDown, key('l'))
-	m = result(m, keyRes, res, nil)
+	m = result(m, keyRes, resources, nil)
 	return press(m, keyUp, keyUp)
 }
 
@@ -196,7 +199,7 @@ func TestTypesWithSameShortTypeKeepOrder(t *testing.T) {
 			{ID: "/2", Type: "microsoft.foo/bar"},
 			{ID: "/3", Type: "foo/bar"},
 		}, nil)
-		assertLines(t, m, "▾ Dev", "  ▾ rg-a", "      foo/bar 1", "      foo/bar 2", "  ▸ rg-b", "▸ Prod")
+		assertLines(t, m, "▾ Dev", "  ▾ rg-a", "    ▸ foo/bar 1", "    ▸ foo/bar 2", "  ▸ rg-b", "▸ Prod")
 		if t.Failed() {
 			break
 		}
@@ -207,9 +210,9 @@ func TestRows(t *testing.T) {
 	assertLines(t, full(),
 		"▾ Dev",
 		"  ▾ rg-a",
-		"      keyvault/vaults 1",
-		"      sql/servers 3",
-		"      web/sites 2",
+		"    ▸ keyvault/vaults 1",
+		"    ▸ sql/servers 3",
+		"    ▸ web/sites 2",
 		"  ▸ rg-b",
 		"▸ Prod",
 	)
@@ -239,9 +242,9 @@ func TestSubscriptionsKeepOrderAndState(t *testing.T) {
 		"▸ Prod",
 		"▾ Dev",
 		"  ▾ rg-a",
-		"      keyvault/vaults 1",
-		"      sql/servers 3",
-		"      web/sites 2",
+		"    ▸ keyvault/vaults 1",
+		"    ▸ sql/servers 3",
+		"    ▸ web/sites 2",
 		"  ▸ rg-b",
 		"▸ Test",
 	)
@@ -252,9 +255,9 @@ func TestSubscriptionRenameKeepsStateAndUpdatesStack(t *testing.T) {
 	assertLines(t, m,
 		"▾ Renamed",
 		"  ▾ rg-a",
-		"      keyvault/vaults 1",
-		"      sql/servers 3",
-		"      web/sites 2",
+		"    ▸ keyvault/vaults 1",
+		"    ▸ sql/servers 3",
+		"    ▸ web/sites 2",
 		"  ▸ rg-b",
 		"▸ Prod",
 	)
@@ -275,9 +278,9 @@ func TestGroupsKeepExpandedState(t *testing.T) {
 		"▾ Dev",
 		"  ▸ rg-c",
 		"  ▾ rg-a",
-		"      keyvault/vaults 1",
-		"      sql/servers 3",
-		"      web/sites 2",
+		"    ▸ keyvault/vaults 1",
+		"    ▸ sql/servers 3",
+		"    ▸ web/sites 2",
 		"▸ Prod",
 	)
 }
@@ -361,10 +364,16 @@ func TestRightOnExpandedMovesToFirstChild(t *testing.T) {
 	if got := selectedTitle(t, m); got != "keyvault/vaults" {
 		t.Errorf("selected %q, want keyvault/vaults", got)
 	}
-	before := lines(m)
 	m, cmd = send(m, keyRight)
-	if got := selectedTitle(t, m); got != "keyvault/vaults" || len(fetches(cmd)) != 0 || strings.Join(lines(m), "\n") != strings.Join(before, "\n") {
-		t.Errorf("l on a type changed something: selected %q", got)
+	if got := selectedTitle(t, m); got != "keyvault/vaults" || len(fetches(cmd)) != 0 {
+		t.Errorf("l on a collapsed type: selected %q, fetches %v", got, fetches(cmd))
+	}
+	if got := lines(m)[2]; got != "    ▾ keyvault/vaults 1" {
+		t.Errorf("l on a type left it as %q, want it expanded", got)
+	}
+	m = press(m, keyRight)
+	if got := selectedTitle(t, m); got != "vault-1" {
+		t.Errorf("l on an expanded type selected %q, want its first resource", got)
 	}
 }
 
@@ -463,9 +472,9 @@ func TestSelectionClampsWhenLastNodeDisappears(t *testing.T) {
 	assertLines(t, m,
 		"▾ Dev",
 		"  ▾ rg-a",
-		"      keyvault/vaults 1",
-		"      sql/servers 3",
-		"      web/sites 2",
+		"    ▸ keyvault/vaults 1",
+		"    ▸ sql/servers 3",
+		"    ▸ web/sites 2",
 		"  ▸ rg-b",
 	)
 	if got := selectedTitle(t, m); got != "rg-b" {
@@ -554,7 +563,7 @@ func TestScrollKeepsSelectionVisible(t *testing.T) {
 		}
 	}
 	check("start", "▾ Dev")
-	for _, want := range []string{"  ▾ rg-a", "      keyvault/vaults 1", "      sql/servers 3", "      web/sites 2"} {
+	for _, want := range []string{"  ▾ rg-a", "    ▸ keyvault/vaults 1", "    ▸ sql/servers 3", "    ▸ web/sites 2"} {
 		m = press(m, keyDown)
 		check("down", want)
 	}
@@ -577,7 +586,7 @@ func TestScrollKeepsSelectionVisible(t *testing.T) {
 func TestResizeKeepsSelectionVisible(t *testing.T) {
 	m := press(sized(full(), 40, 20), keyDown, keyDown, keyDown, keyDown)
 	m = sized(m, 40, 2)
-	if got := lines(m); !slices.Contains(got, "      sql/servers 3") {
+	if got := lines(m); !slices.Contains(got, "    ▸ sql/servers 3") {
 		t.Errorf("rows %q lack the selected row after a resize", got)
 	}
 }
@@ -683,7 +692,7 @@ func TestScrollBackWhenRowsDisappearBelow(t *testing.T) {
 	m := sized(full(), 40, 3)
 	m = press(m, keyDown, keyDown, keyDown, keyDown, keyDown, keyDown, keyUp, keyUp)
 	m = result(m, keyGroups, groups[:1], nil)
-	assertLines(t, m, "      sql/servers 3", "      web/sites 2", "▸ Prod")
+	assertLines(t, m, "    ▸ sql/servers 3", "    ▸ web/sites 2", "▸ Prod")
 }
 
 func TestUpdateLeavesEarlierModelUnchanged(t *testing.T) {
@@ -728,8 +737,8 @@ func TestTypesSortIgnoringCase(t *testing.T) {
 	assertLines(t, m,
 		"▾ Dev",
 		"  ▾ rg-a",
-		"      sql/servers 1",
-		"      Web/sites 1",
+		"    ▸ sql/servers 1",
+		"    ▸ Web/sites 1",
 		"  ▸ rg-b",
 		"▸ Prod",
 	)

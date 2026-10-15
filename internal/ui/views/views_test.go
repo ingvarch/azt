@@ -304,6 +304,10 @@ func newDetails() View {
 	return NewDetails("id-1", azure.Resource{ID: "/r/web", Name: "web-app"})
 }
 
+func newDetailsAt(tab string) View {
+	return NewDetailsAt("id-1", azure.Resource{ID: "/r/web", Name: "web-app"}, tab)
+}
+
 func TestDetailsKeyAndTitle(t *testing.T) {
 	v := newDetails()
 	if got := v.Title(); got != "web-app" {
@@ -329,9 +333,9 @@ func TestDetailsStates(t *testing.T) {
 	if got := sendForeign(newDetails().Resize(80, 10), other).Render(); !strings.Contains(got, "Loading details") {
 		t.Errorf("result of another key changed the loading view:\n%s", got)
 	}
-	loaded := deliver(t, newDetails().Resize(80, 10), detail, nil)
+	loaded := deliver(t, newDetails().Resize(80, 30), detail, nil)
 	got := sendForeign(loaded, other).Render()
-	if !strings.Contains(got, `"name": "web-app"`) {
+	if !strings.Contains(got, "Essentials") || !strings.Contains(got, "env = prod") {
 		t.Errorf("result of another key replaced the details:\n%s", got)
 	}
 	for _, bad := range []string{"other-app", "null", "Failed"} {
@@ -342,7 +346,7 @@ func TestDetailsStates(t *testing.T) {
 }
 
 func TestDetailsShowsIndentedJSON(t *testing.T) {
-	v := deliver(t, newDetails().Resize(80, 10), detail, nil)
+	v := deliver(t, newDetailsAt("JSON").Resize(80, 10), detail, nil)
 	lines := strings.Split(v.Render(), "\n")
 	for i, l := range lines {
 		lines[i] = strings.TrimRight(l, " ")
@@ -367,7 +371,7 @@ func TestDetailsScrolls(t *testing.T) {
 	for i := range 40 {
 		big[fmt.Sprintf("k%02d", i)] = i
 	}
-	v := deliver(t, newDetails().Resize(80, 6), big, nil)
+	v := deliver(t, newDetailsAt("JSON").Resize(80, 7), big, nil)
 	if got := v.Render(); !strings.Contains(got, "k00") || strings.Contains(got, "k20") {
 		t.Fatalf("initial render:\n%s", got)
 	}
@@ -395,7 +399,7 @@ func TestDetailsRefresh(t *testing.T) {
 	if len(msgs) != 1 || msgs[0] != want {
 		t.Errorf("r returned %v, want %v", msgs, want)
 	}
-	if got := v.Render(); !strings.Contains(got, "web-app") {
+	if got := v.Render(); !strings.Contains(got, "Essentials") {
 		t.Errorf("content vanished while refreshing:\n%s", got)
 	}
 }
@@ -424,6 +428,7 @@ func renderCases(t *testing.T) []renderCase {
 		{"details loading", func(w, h int) View { return newDetails().Resize(w, h) }},
 		{"details", func(w, h int) View { return deliver(t, newDetails().Resize(w, h), bigDetail, nil) }},
 		{"details error", func(w, h int) View { return deliver(t, newDetails().Resize(w, h), nil, long) }},
+		{"details json", func(w, h int) View { return deliver(t, newDetailsAt("JSON").Resize(w, h), bigDetail, nil) }},
 		{"filtered table", func(w, h int) View {
 			return filtered(deliver(t, NewSubscriptions().Resize(w, h), manySubs, nil), "sub-1")
 		}},
@@ -444,8 +449,31 @@ func renderCases(t *testing.T) []renderCase {
 	}
 }
 
+func aksCases(t *testing.T) []renderCase {
+	var cases []renderCase
+	for _, name := range []string{"aks", "aks_min", "aks_stopped"} {
+		row := fixture(t, name)
+		for _, tab := range Tabs("microsoft.containerservice/managedclusters") {
+			cases = append(cases, renderCase{name + " " + tab, func(w, h int) View {
+				return deliver(t, newDetailsAt(tab).Resize(w, h), row, nil)
+			}})
+		}
+	}
+	row := fixture(t, "aks")
+	return append(cases,
+		renderCase{"aks refreshing", func(w, h int) View {
+			v, _ := press(deliver(t, newDetailsAt("Node pools").Resize(w, h), row, nil), keyR)
+			return v
+		}},
+		renderCase{"aks scrolled", func(w, h int) View {
+			v, _ := press(deliver(t, newDetailsAt("JSON").Resize(w, h), row, nil), key("G"))
+			return v
+		}},
+	)
+}
+
 func TestRenderFitsSize(t *testing.T) {
-	tests := renderCases(t)
+	tests := append(renderCases(t), aksCases(t)...)
 	sizes := [][2]int{{40, 10}, {120, 20}, {20, 4}, {0, 0}, {1, 1}, {0, 10}, {40, 0}}
 	for _, tt := range tests {
 		for _, s := range sizes {
@@ -570,3 +598,5 @@ func TestResourcesOfType(t *testing.T) {
 		t.Errorf("opened %q, want %q", got, want)
 	}
 }
+
+var errTest = errors.New("boom")

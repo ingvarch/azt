@@ -16,6 +16,7 @@ type Spec struct {
 	ResourceID       string `json:"resourceId,omitempty"`
 	ResourceName     string `json:"resourceName,omitempty"`
 	Filter           string `json:"filter,omitempty"`
+	Tab              string `json:"tab,omitempty"`
 }
 
 // Build makes the view s describes and applies its filter.
@@ -53,7 +54,7 @@ func build(s Spec) (View, error) {
 		if err := require(s, "subscription", s.Subscription, "resourceId", s.ResourceID, "resourceName", s.ResourceName); err != nil {
 			return nil, err
 		}
-		return NewDetails(s.Subscription, azure.Resource{ID: s.ResourceID, Name: s.ResourceName}), nil
+		return NewDetailsAt(s.Subscription, azure.Resource{ID: s.ResourceID, Name: s.ResourceName}, s.Tab), nil
 	case "allResourceGroups":
 		return NewAllResourceGroups(), nil
 	case "resourcesByType":

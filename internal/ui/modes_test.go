@@ -385,7 +385,7 @@ func TestHelpOpensFromAllPlaces(t *testing.T) {
 		"sidebar prefix": func(h *harness) { h.prefix("h"); h.prefix("?") },
 	}
 	for name, open := range opens {
-		h := newSidebarHarness(140, 40)
+		h := newSidebarHarness(140, 42)
 		open(h)
 		if h.m.mode != modeHelp {
 			t.Errorf("%s: mode = %v", name, h.m.mode)

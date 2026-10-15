@@ -104,7 +104,7 @@ func (m *Model) pressIn(prev *lastPress, tg target, r layout.Rect, x, y int) tea
 		return nil
 	}
 	now := m.now()
-	if prev != nil && prev.target == tg && prev.row == iy && now.Sub(prev.at) <= doublePressWindow {
+	if prev != nil && prev.target == tg && prev.row == iy && now.Sub(prev.at) <= doublePressWindow && m.canOpen(tg) {
 		if tg.sidebar {
 			return m.openFromSidebar()
 		}
@@ -123,6 +123,17 @@ func (m *Model) pressIn(prev *lastPress, tg target, r layout.Rect, x, y int) tea
 		m.last = &lastPress{target: tg, at: now, row: iy}
 	}
 	return cmd
+}
+
+// canOpen reports whether enter would open something in tg; a double press
+// on a view with nothing to open is a second click.
+func (m Model) canOpen(tg target) bool {
+	if tg.sidebar {
+		_, ok := m.sidebar.Stack()
+		return ok
+	}
+	_, ok := m.top(tg.pane).Open()
+	return ok
 }
 
 // dragTo moves the dragged boundary to the pointer.

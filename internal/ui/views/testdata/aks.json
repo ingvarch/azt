@@ -1,0 +1,85 @@
+{
+  "id": "/subscriptions/s1/resourceGroups/rg-app/providers/Microsoft.ContainerService/managedClusters/aks-demo",
+  "name": "aks-demo",
+  "type": "microsoft.containerservice/managedclusters",
+  "location": "westeurope",
+  "resourceGroup": "rg-app",
+  "subscriptionId": "s1",
+  "subscription": "Dev",
+  "kind": "Base",
+  "managedBy": "",
+  "zones": null,
+  "sku": {"name": "Base", "tier": "Standard"},
+  "identity": {
+    "type": "UserAssigned",
+    "userAssignedIdentities": {
+      "/subscriptions/s1/resourceGroups/rg-app/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-zeta": {},
+      "/subscriptions/s1/resourceGroups/rg-app/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-alpha": {}
+    }
+  },
+  "tags": {"owner": "team-a", "env": "dev"},
+  "properties": {
+    "provisioningState": "Succeeded",
+    "powerState": {"code": "Running"},
+    "currentKubernetesVersion": "1.30.4",
+    "kubernetesVersion": "1.30",
+    "nodeResourceGroup": "MC_rg-app_aks-demo_westeurope",
+    "fqdn": "aks-demo-abc.hcp.westeurope.azmk8s.io",
+    "supportPlan": "KubernetesOfficial",
+    "disableLocalAccounts": false,
+    "enableRBAC": true,
+    "autoUpgradeProfile": {"upgradeChannel": "patch", "nodeOSUpgradeChannel": "NodeImage"},
+    "apiServerAccessProfile": {"enablePrivateCluster": false, "authorizedIPRanges": []},
+    "agentPoolProfiles": [
+      {
+        "name": "system", "mode": "System", "vmSize": "Standard_D4s_v5", "count": 3,
+        "enableAutoScaling": true, "minCount": 2, "maxCount": 5,
+        "currentOrchestratorVersion": "1.30.4", "orchestratorVersion": "1.30",
+        "osType": "Linux", "osSKU": "AzureLinux", "nodeImageVersion": "AKSAzureLinux-2024.09.01",
+        "availabilityZones": ["1", "2", "3"], "maxPods": 110,
+        "osDiskType": "Managed", "osDiskSizeGB": 128,
+        "vnetSubnetID": "/subscriptions/s1/resourceGroups/rg-net/providers/Microsoft.Network/virtualNetworks/vnet-hub/subnets/snet-aks",
+        "upgradeSettings": {"maxSurge": "33%"},
+        "powerState": {"code": "Running"}, "provisioningState": "Succeeded"
+      },
+      {
+        "name": "work", "mode": "User", "vmSize": "Standard_E8s_v5", "count": 4,
+        "enableAutoScaling": false,
+        "orchestratorVersion": "1.29.8",
+        "osType": "Linux", "osSKU": "Ubuntu", "scaleSetPriority": "Spot",
+        "osDiskType": "Ephemeral", "osDiskSizeGB": 64,
+        "powerState": {"code": "Stopped"}, "provisioningState": "Updating"
+      }
+    ],
+    "networkProfile": {
+      "networkPlugin": "azure", "networkPluginMode": "overlay", "networkPolicy": "cilium",
+      "networkDataplane": "cilium", "podCidr": "10.244.0.0/16", "serviceCidr": "10.0.0.0/16",
+      "dnsServiceIP": "10.0.0.10", "outboundType": "loadBalancer", "loadBalancerSku": "standard",
+      "ipFamilies": ["IPv4"]
+    },
+    "identityProfile": {
+      "kubeletidentity": {
+        "resourceId": "/subscriptions/s1/resourceGroups/MC_rg-app_aks-demo_westeurope/providers/Microsoft.ManagedIdentity/userAssignedIdentities/aks-demo-agentpool"
+      }
+    },
+    "aadProfile": {"managed": true, "enableAzureRBAC": true, "adminGroupObjectIDs": ["g1", "g2"]},
+    "oidcIssuerProfile": {"enabled": true, "issuerURL": "https://oidc.example/abc/"},
+    "securityProfile": {
+      "workloadIdentity": {"enabled": true},
+      "defender": {"securityMonitoring": {"enabled": false}},
+      "imageCleaner": {"enabled": true}
+    },
+    "addonProfiles": {
+      "omsagent": {
+        "enabled": true,
+        "config": {"logAnalyticsWorkspaceResourceID": "/subscriptions/s1/resourceGroups/rg-mon/providers/Microsoft.OperationalInsights/workspaces/law-main"}
+      },
+      "azurepolicy": {"enabled": false}
+    },
+    "ingressProfile": {"webAppRouting": {"enabled": true}},
+    "workloadAutoScalerProfile": {"keda": {"enabled": false}, "verticalPodAutoscaler": {"enabled": true}},
+    "serviceMeshProfile": {"mode": "Istio"},
+    "azureMonitorProfile": {"metrics": {"enabled": true}},
+    "metricsProfile": {"costAnalysis": {"enabled": false}}
+  }
+}

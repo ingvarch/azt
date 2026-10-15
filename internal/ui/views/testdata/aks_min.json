@@ -1,0 +1,6 @@
+{
+  "id": "/subscriptions/s1/resourceGroups/rg-app/providers/Microsoft.ContainerService/managedClusters/aks-bare",
+  "name": "aks-bare",
+  "type": "Microsoft.ContainerService/managedClusters",
+  "properties": {}
+}

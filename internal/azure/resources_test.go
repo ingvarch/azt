@@ -146,7 +146,9 @@ func TestResourceDetails(t *testing.T) {
 		t.Errorf("scope = %v, want [sub-1]", scope(req))
 	}
 	wantQuery := `resources
-| where id =~ '/x\'\\'`
+| where id =~ '/x\'\\'
+` + wantJoin + `
+| project-away subscriptionId1`
 	if *req.Query != wantQuery {
 		t.Errorf("query = %q, want %q", *req.Query, wantQuery)
 	}

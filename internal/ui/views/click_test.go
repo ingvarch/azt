@@ -106,12 +106,6 @@ func TestListClickWithoutTable(t *testing.T) {
 	}
 }
 
-func TestDetailsIsNotAClicker(t *testing.T) {
-	if _, ok := newDetails().(Clicker); ok {
-		t.Error("details implements Clicker")
-	}
-}
-
 func TestListClickReportsRowHit(t *testing.T) {
 	loaded := deliver(t, NewSubscriptions().Resize(80, 10), subs, nil)
 	for _, c := range []struct {
