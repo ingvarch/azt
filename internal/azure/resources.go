@@ -72,9 +72,10 @@ func ResourcesOfType(ctx context.Context, graph ResourceGraph, resourceType stri
 	return query[Resource](ctx, graph, kql)
 }
 
-// ResourceDetails returns every property of one resource.
+// ResourceDetails returns every property of one resource, with the subscription name.
 func ResourceDetails(ctx context.Context, graph ResourceGraph, subscriptionID, resourceID string) (map[string]any, error) {
-	kql := "resources\n| where id =~ " + kqlString(resourceID)
+	// The join repeats its key as subscriptionId1; the row needs it once.
+	kql := "resources\n| where id =~ " + kqlString(resourceID) + "\n" + withSubscriptionName + "\n| project-away subscriptionId1"
 	rows, err := query[map[string]any](ctx, graph, kql, subscriptionID)
 	if err != nil {
 		return nil, err

@@ -22,9 +22,9 @@ func click(m Model, x, y int) (Model, tea.Cmd) {
 var fullRows = []string{
 	"▾ Dev",
 	"  ▾ rg-a",
-	"      keyvault/vaults 1",
-	"      sql/servers 3",
-	"      web/sites 2",
+	"    ▸ keyvault/vaults 1",
+	"    ▸ sql/servers 3",
+	"    ▸ web/sites 2",
 	"  ▸ rg-b",
 	"▸ Prod",
 }
@@ -41,8 +41,6 @@ func TestClickSelectsRow(t *testing.T) {
 		{"group label", 5, 1, "rg-a"},
 		{"type label", 10, 3, "sql/servers"},
 		{"type indent", 0, 3, "sql/servers"},
-		{"type marker cells", 4, 4, "web/sites"},
-		{"type second marker cell", 5, 4, "web/sites"},
 		{"far right", 39, 6, "Prod"},
 	}
 	for _, tt := range tests {

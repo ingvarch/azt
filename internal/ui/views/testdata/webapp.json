@@ -1,0 +1,14 @@
+{
+  "id": "/subscriptions/s2/resourceGroups/rg-web/providers/Microsoft.Web/sites/web-demo",
+  "name": "web-demo",
+  "type": "microsoft.web/sites",
+  "location": "northeurope",
+  "resourceGroup": "rg-web",
+  "subscriptionId": "s2",
+  "subscription": "Prod",
+  "kind": "app,linux",
+  "sku": {"name": "P1v3", "tier": "PremiumV3"},
+  "zones": ["1", "2"],
+  "tags": {"team": "web", "cost": "42"},
+  "properties": {"provisioningState": "Succeeded"}
+}

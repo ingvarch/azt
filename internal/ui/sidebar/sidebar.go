@@ -1,5 +1,5 @@
-// Package sidebar holds the explorer tree: subscriptions, resource groups and
-// resource types.
+// Package sidebar holds the explorer tree: subscriptions, resource groups,
+// resource types, resources and their tabs.
 package sidebar
 
 import (
@@ -23,17 +23,20 @@ const (
 	subscription kind = iota
 	group
 	resourceType
+	resource
+	tab
 )
 
 type node struct {
 	kind     kind
 	id       string
 	label    string
-	key      data.Key // data behind the children; empty for types
+	key      data.Key // data behind the children; empty below groups
 	sub      azure.Subscription
 	group    azure.ResourceGroup
 	typ      string
-	count    int
+	resource azure.Resource
+	tabName  string
 	expanded bool
 	loaded   bool
 	loading  bool
@@ -166,8 +169,15 @@ func (m Model) Stack() ([]views.View, bool) {
 	}
 	g := r.path[1].group
 	stack = append(stack, views.NewResources(sub.ID, g))
-	if r.n.kind == resourceType {
-		stack = append(stack, views.NewResourcesOfType(sub.ID, g, r.n.typ))
+	if r.n.kind == group {
+		return stack, true
+	}
+	stack = append(stack, views.NewResourcesOfType(sub.ID, g, r.path[2].typ))
+	switch r.n.kind {
+	case resource:
+		stack = append(stack, views.NewDetails(sub.ID, r.n.resource))
+	case tab:
+		stack = append(stack, views.NewDetailsAt(sub.ID, r.path[3].resource, r.n.tabName))
 	}
 	return stack, true
 }
@@ -196,7 +206,7 @@ func appendRows(rows []row, parents []*node, n *node) []row {
 	path := append(slices.Clone(parents), n)
 	depth := len(parents)
 	marker := "  "
-	if n.kind != resourceType {
+	if n.kind != tab {
 		marker = "▸ "
 		if n.expanded {
 			marker = "▾ "
@@ -293,7 +303,7 @@ func (m *Model) apply(msg data.ResultMsg) {
 			return
 		}
 		resources, _ := msg.Data.([]azure.Resource)
-		n.children = typeNodes(n, resources)
+		n.children = keepExpanded(typeNodes(n, resources), n.children)
 	}
 }
 
@@ -336,19 +346,39 @@ func mergeNodes[T any](old []*node, items []T, build func(T) *node) []*node {
 	return nodes
 }
 
-// typeNodes groups resources by type, ignoring case, sorted by short type.
+// keepExpanded carries the expanded state of old nodes over to the fresh
+// nodes with the same ids, at every depth.
+func keepExpanded(fresh, old []*node) []*node {
+	for _, f := range fresh {
+		if i := slices.IndexFunc(old, func(o *node) bool { return o.id == f.id }); i >= 0 {
+			f.expanded = old[i].expanded
+			keepExpanded(f.children, old[i].children)
+		}
+	}
+	return fresh
+}
+
+// typeNodes groups resources by type, ignoring case, sorted by short type;
+// each type holds its resources sorted by name.
 func typeNodes(parent *node, resources []azure.Resource) []*node {
 	types := map[string]*node{}
 	for _, r := range resources {
 		lower := strings.ToLower(r.Type)
 		if types[lower] == nil {
-			types[lower] = &node{kind: resourceType, id: "t/" + parent.id + "/" + lower, typ: r.Type}
+			types[lower] = &node{kind: resourceType, id: "t/" + parent.id + "/" + lower, typ: r.Type, loaded: true}
 		}
-		types[lower].count++
+		types[lower].children = append(types[lower].children, resourceNode(r))
 	}
 	nodes := slices.Collect(maps.Values(types))
 	for _, n := range nodes {
-		n.label = views.ShortType(n.typ) + " " + strconv.Itoa(n.count)
+		n.label = views.ShortType(n.typ) + " " + strconv.Itoa(len(n.children))
+		slices.SortFunc(n.children, func(a, b *node) int {
+			return cmp.Or(
+				cmp.Compare(strings.ToLower(a.label), strings.ToLower(b.label)),
+				cmp.Compare(a.label, b.label),
+				cmp.Compare(a.id, b.id),
+			)
+		})
 	}
 	slices.SortFunc(nodes, func(a, b *node) int {
 		return cmp.Or(
@@ -357,6 +387,15 @@ func typeNodes(parent *node, resources []azure.Resource) []*node {
 		)
 	})
 	return nodes
+}
+
+// resourceNode is a resource with its tabs as children.
+func resourceNode(r azure.Resource) *node {
+	n := &node{kind: resource, id: "r/" + r.ID, label: r.Name, resource: r, loaded: true}
+	for _, name := range views.Tabs(r.Type) {
+		n.children = append(n.children, &node{kind: tab, id: "x/" + r.ID + "/" + name, label: name, tabName: name})
+	}
+	return n
 }
 
 // press handles one key; it returns the fetch the key asks for.
@@ -387,8 +426,8 @@ func (m *Model) press(k string) tea.Cmd {
 	return nil
 }
 
-// click selects the row on line y; a click on the marker of a subscription or
-// group also toggles it. It returns the fetch that expanding asks for.
+// click selects the row on line y; a click on the marker of a node with
+// children also toggles it. It returns the fetch that expanding asks for.
 func (m *Model) click(x, y int) (tea.Cmd, bool) {
 	rows := m.rows()
 	i := m.top + y
@@ -407,24 +446,26 @@ func (m *Model) click(x, y int) (tea.Cmd, bool) {
 	return m.expand(rows, i), true
 }
 
-// refresh reloads the children of the selected node, or of its parent for a
-// type or status row; without rows it reloads the subscriptions.
+// refresh reloads the nearest node on the selected row's path that has data
+// to load; without rows it reloads the subscriptions.
 func refresh(rows []row, i int) tea.Cmd {
 	if i < 0 || i >= len(rows) {
 		return data.Refresh(data.Key{Kind: data.Subscriptions})
 	}
-	n := rows[i].n
-	if n == nil || n.kind == resourceType {
-		n = rows[i].parent()
+	path := rows[i].path
+	for j := len(path) - 1; j >= 0; j-- {
+		if path[j].key != (data.Key{}) {
+			return data.Refresh(path[j].key)
+		}
 	}
-	return data.Refresh(n.key)
+	return nil
 }
 
 // expand opens a collapsed node, fetching its children when it has none, or moves into an expanded one.
 func (m *Model) expand(rows []row, i int) tea.Cmd {
 	n := rows[i].n
 	switch {
-	case n == nil || n.kind == resourceType:
+	case n == nil || n.kind == tab:
 		return nil
 	case n.expanded:
 		m.sel = rows[i+1].id

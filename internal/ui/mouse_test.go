@@ -632,3 +632,17 @@ func TestDragPutsBoundaryUnderPointer(t *testing.T) {
 		t.Errorf("inner widths = %d, %d, want 13, 9 (boundary at x=15)", a, b)
 	}
 }
+
+func TestDoublePressWithNothingToOpenClicksAgain(t *testing.T) {
+	h := newHarness(100, 30)
+	h.recs[0].noOpen = true
+	h.press(10, 5)
+	h.clock = h.clock.Add(100 * time.Millisecond)
+	h.press(20, 5)
+	if got := len(h.pane(0).clicks); got != 2 {
+		t.Errorf("clicks = %d, want 2: the second press must reach the view", got)
+	}
+	if got := len(h.m.stacks[0]); got != 1 {
+		t.Errorf("stack depth = %d, want 1", got)
+	}
+}

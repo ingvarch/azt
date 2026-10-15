@@ -203,8 +203,10 @@ func TestRefreshingShowsUntilResult(t *testing.T) {
 			t.Errorf("%s: refreshing before r", name)
 		}
 		v, _ = press(v, keyR)
-		if got := firstLine(v); !strings.Contains(got, "refreshing…") {
-			t.Errorf("%s: first line after r = %q, want refreshing…", name, got)
+		// The details view keeps its tab bar on the first line.
+		line := map[string]int{"list": 0, "details": 1}[name]
+		if got := strings.Split(v.Render(), "\n")[line]; !strings.Contains(got, "refreshing…") {
+			t.Errorf("%s: line %d after r = %q, want refreshing…", name, line, got)
 		}
 		if got := sendForeign(v, nil).Render(); !strings.Contains(got, "refreshing…") {
 			t.Errorf("%s: result of another key cleared refreshing", name)
@@ -238,7 +240,7 @@ func TestRefreshingTakesOneLine(t *testing.T) {
 	for i := range 40 {
 		big[fmt.Sprintf("k%02d", i)] = i
 	}
-	v := deliver(t, newDetails().Resize(80, 6), big, nil)
+	v := deliver(t, newDetailsAt("JSON").Resize(80, 6), big, nil)
 	v, _ = press(v, keyR)
 	if got := strings.Count(v.Render(), "\n") + 1; got != 6 {
 		t.Errorf("height = %d, want 6", got)
@@ -276,7 +278,7 @@ func TestRefreshResultRestoresSizeOfDetails(t *testing.T) {
 	for i := range 50 {
 		big[fmt.Sprintf("k%02d", i)] = i
 	}
-	v := deliver(t, newDetails().Resize(80, 6), big, nil)
+	v := deliver(t, newDetailsAt("JSON").Resize(80, 6), big, nil)
 	v, _ = press(v, keyR)
 	v = deliver(t, v, big, nil)
 	if got := strings.Count(v.Render(), "\n") + 1; got != 6 {

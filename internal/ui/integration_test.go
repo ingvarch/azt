@@ -101,7 +101,7 @@ func TestDrillDownAndBack(t *testing.T) {
 	s.want(t, "resources", "web-app", "microsoft.web/sites", "Subscriptions › Dev › rg-a")
 
 	s.press("enter")
-	s.want(t, "details", `"kind": "app,linux"`, "Subscriptions › Dev › rg-a › web-app")
+	s.want(t, "details", "Essentials", "app,linux", "Subscriptions › Dev › rg-a › web-app")
 
 	for range 3 {
 		s.press("esc")
@@ -126,7 +126,7 @@ func TestSplitSharesTheCache(t *testing.T) {
 	for range 3 {
 		s.press("enter")
 	}
-	s.want(t, "second pane", `"kind": "app,linux"`)
+	s.want(t, "second pane", "Essentials", "app,linux")
 
 	if len(s.calls) != 4 {
 		t.Errorf("fetched keys = %v, want 4", s.calls)

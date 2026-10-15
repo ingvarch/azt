@@ -17,6 +17,7 @@ var helpSections = []struct {
 		{"enter", "open the selected item"},
 		{"esc", "back to the previous view"},
 		{"j k / ↑ ↓", "move the cursor"},
+		{"tab / shift+tab", "next / previous tab of a resource"},
 		{"/", "filter the list (enter keeps, esc clears)"},
 		{"r", "refresh"},
 		{"?", "this help"},

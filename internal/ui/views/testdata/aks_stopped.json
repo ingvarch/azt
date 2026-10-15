@@ -1,0 +1,17 @@
+{
+  "name": "aks-off",
+  "type": "microsoft.containerservice/managedclusters",
+  "sku": {"name": "Automatic", "tier": "Standard"},
+  "properties": {
+    "powerState": {"code": "Stopped"},
+    "provisioningState": "Failed",
+    "kubernetesVersion": "1.31",
+    "privateFQDN": "aks-off.privatelink.westeurope.azmk8s.io",
+    "disableLocalAccounts": true,
+    "apiServerAccessProfile": {"enablePrivateCluster": true},
+    "agentPoolProfiles": [
+      {"name": "p1", "mode": "System", "orchestratorVersion": "1.31", "powerState": {"code": "Running"}, "provisioningState": "Succeeded"}
+    ],
+    "networkProfile": {"serviceCidrs": ["10.1.0.0/16", "fd00::/108"], "podCidrs": ["10.2.0.0/16"]}
+  }
+}
