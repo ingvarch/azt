@@ -21,7 +21,7 @@ const aksType = "microsoft.containerservice/managedclusters"
 
 // kinds lists the kinds in the order of the palette; a type belongs to the first kind that lists it.
 var kinds = []resourceKind{
-	{types: []string{"microsoft.compute/virtualmachines"}, command: "vm", desc: "virtual machines in every subscription"},
+	{types: []string{"microsoft.compute/virtualmachines"}, command: "vm", desc: "virtual machines in every subscription", tabs: vmTabs, attention: vmAttention},
 	{types: []string{aksType}, command: "aks", desc: "AKS clusters in every subscription", tabs: aksTabs, attention: aksAttention},
 	{types: []string{"microsoft.keyvault/vaults"}, command: "kv", desc: "key vaults in every subscription", tabs: kvTabs, attention: kvAttention},
 	{types: []string{"microsoft.sql/servers"}, command: "sql", desc: "SQL servers in every subscription"},

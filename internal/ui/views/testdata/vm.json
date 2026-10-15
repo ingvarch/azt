@@ -1,0 +1,86 @@
+{
+  "id": "/subscriptions/s2/resourceGroups/rg-web/providers/Microsoft.Compute/virtualMachines/vm-web-01",
+  "name": "vm-web-01",
+  "type": "microsoft.compute/virtualmachines",
+  "location": "norwayeast",
+  "resourceGroup": "rg-web",
+  "subscriptionId": "s2",
+  "subscription": "Prod",
+  "zones": ["1"],
+  "tags": {"env": "prod", "owner": "web-team"},
+  "identity": {
+    "type": "UserAssigned",
+    "userAssignedIdentities": {
+      "/subscriptions/s2/resourceGroups/rg-web/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-web": {
+        "principalId": "55555555-5555-5555-5555-555555555555",
+        "clientId": "66666666-6666-6666-6666-666666666666"
+      }
+    }
+  },
+  "properties": {
+    "vmId": "77777777-7777-7777-7777-777777777777",
+    "provisioningState": "Succeeded",
+    "timeCreated": "2025-03-14T09:26:53.5Z",
+    "priority": "Regular",
+    "hardwareProfile": {"vmSize": "Standard_D4s_v5"},
+    "extended": {
+      "instanceView": {
+        "computerName": "vm-web-01",
+        "osName": "ubuntu",
+        "osVersion": "22.04",
+        "powerState": {"code": "PowerState/running", "displayStatus": "VM running", "level": "Info"}
+      }
+    },
+    "storageProfile": {
+      "imageReference": {
+        "id": "/subscriptions/s2/resourceGroups/rg-img/providers/Microsoft.Compute/galleries/gal-prod/images/ubuntu-2204-hardened/versions/2024.09.01",
+        "exactVersion": "2024.09.01"
+      },
+      "osDisk": {
+        "osType": "Linux",
+        "name": "vm-web-01_OsDisk_1_f3a9",
+        "caching": "ReadWrite",
+        "createOption": "FromImage",
+        "deleteOption": "Delete",
+        "diskSizeGB": 128,
+        "managedDisk": {
+          "storageAccountType": "Premium_LRS",
+          "id": "/subscriptions/s2/resourceGroups/rg-web/providers/Microsoft.Compute/disks/vm-web-01_OsDisk_1_f3a9"
+        }
+      },
+      "dataDisks": [
+        {
+          "lun": 2, "name": "vm-web-01-data-b", "caching": "ReadWrite", "createOption": "Attach", "deleteOption": "Detach",
+          "diskSizeGB": 64, "toBeDetached": false, "writeAcceleratorEnabled": false,
+          "managedDisk": {"storageAccountType": "Standard_LRS", "id": "/subscriptions/s2/resourceGroups/rg-web/providers/Microsoft.Compute/disks/vm-web-01-data-b"}
+        },
+        {
+          "lun": 0, "name": "vm-web-01-data-c", "caching": "None", "createOption": "Attach", "deleteOption": "Detach",
+          "diskSizeGB": 256, "toBeDetached": false, "writeAcceleratorEnabled": false,
+          "managedDisk": {"storageAccountType": "StandardSSD_ZRS", "id": "/subscriptions/s2/resourceGroups/rg-web/providers/Microsoft.Compute/disks/vm-web-01-data-c"}
+        },
+        {
+          "lun": 1, "name": "vm-web-01-data-a", "caching": "ReadOnly", "createOption": "Attach", "deleteOption": "Detach",
+          "diskSizeGB": 1024, "toBeDetached": false, "writeAcceleratorEnabled": false,
+          "managedDisk": {"storageAccountType": "Premium_LRS", "id": "/subscriptions/s2/resourceGroups/rg-web/providers/Microsoft.Compute/disks/vm-web-01-data-a"}
+        }
+      ]
+    },
+    "networkProfile": {
+      "networkInterfaces": [
+        {
+          "id": "/subscriptions/s2/resourceGroups/rg-web/providers/Microsoft.Network/networkInterfaces/vm-web-01-nic",
+          "properties": {"primary": true, "deleteOption": "Delete"}
+        }
+      ]
+    },
+    "osProfile": {
+      "computerName": "vm-web-01",
+      "adminUsername": "azureuser",
+      "linuxConfiguration": {
+        "disablePasswordAuthentication": true,
+        "ssh": {"publicKeys": [{"path": "/home/azureuser/.ssh/authorized_keys", "keyData": "ssh-rsa AAAA"}]}
+      }
+    }
+  }
+}

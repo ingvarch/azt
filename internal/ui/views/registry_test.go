@@ -44,6 +44,8 @@ func TestTabsOfEveryKind(t *testing.T) {
 		switch k.command {
 		case "aks":
 			want = aksTabNames
+		case "vm":
+			want = []string{"Overview", "Disks", "Network", "JSON"}
 		case "vnet":
 			want = []string{"Overview", "Subnets", "Peerings", "JSON"}
 		case "nsg":

@@ -57,12 +57,14 @@ func fmtLast(v any) string { return orDash(lastSegment(text(v))) }
 func fmtJoin(v any) string { return joined(v) }
 
 // fieldDef is a labeled line of a box: the value at path in the row shown in
-// format (text when nil), or whatever value returns for what a path cannot say.
+// format (text when nil), or whatever value returns for what a path cannot
+// say. show drops the field for rows it returns false for.
 type fieldDef struct {
 	label  string
 	path   []string
 	format format
 	value  func(row map[string]any) string
+	show   func(row map[string]any) bool
 }
 
 func (f fieldDef) text(row map[string]any) string {
@@ -162,7 +164,9 @@ func (b boxDef) lines(row map[string]any, width int) []string {
 		pairs = b.extra(row)
 	}
 	for _, f := range b.fields {
-		pairs = append(pairs, pair{f.label, f.text(row)})
+		if f.show == nil || f.show(row) {
+			pairs = append(pairs, pair{f.label, f.text(row)})
+		}
 	}
 	if len(pairs) == 0 {
 		return []string{"none"}

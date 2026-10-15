@@ -34,10 +34,15 @@ func stateTone(word string) color.Color {
 	switch strings.ToLower(word) {
 	case "running", "succeeded", "enabled", "available", "connected", "fullyinsync":
 		return good
-	case "stopped", "failed", "canceled", "disabled", "deleted", "unavailable", "disconnected":
+	case "stopped", "failed", "canceled", "disabled", "deleted", "unavailable", "disconnected", "deallocated":
 		return bad
 	}
 	return warn
+}
+
+// powerStatus draws a power state and a provisioning state as one status, a dash without either.
+func powerStatus(power, provisioning string) string {
+	return stateText(orDash(join(stateSeparator, power, provisioning)))
 }
 
 // stateText draws a status as one dot in the tone of its most severe part,
