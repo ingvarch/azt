@@ -27,29 +27,31 @@ type command struct {
 type commandInfo struct{ name, desc string }
 
 // commandTable lists the palette commands, in the order of the dialog.
-var commandTable = []commandInfo{
-	{"subs", "subscriptions"},
-	{"rg", "resource groups in every subscription"},
-	{"vm", "virtual machines in every subscription"},
-	{"aks", "AKS clusters in every subscription"},
-	{"kv", "key vaults in every subscription"},
-	{"sql", "SQL servers in every subscription"},
-	{"storage", "storage accounts in every subscription"},
-	{"app", "web apps in every subscription"},
-	{"vnet", "virtual networks in every subscription"},
-	{"type", "resources of any type: type <resource type>"},
-	{"help", "keys and commands"},
-	{"q", "quit"},
+var commandTable = buildCommandTable()
+
+func buildCommandTable() []commandInfo {
+	table := []commandInfo{
+		{"subs", "subscriptions"},
+		{"rg", "resource groups in every subscription"},
+	}
+	for _, c := range views.TypeCommands() {
+		table = append(table, commandInfo{c.Name, c.Desc})
+	}
+	return append(table,
+		commandInfo{"type", "resources of any type: type <resource type>"},
+		commandInfo{"help", "keys and commands"},
+		commandInfo{"q", "quit"},
+	)
 }
 
-var typeAliases = map[string]string{
-	"vm":      "microsoft.compute/virtualmachines",
-	"aks":     "microsoft.containerservice/managedclusters",
-	"kv":      "microsoft.keyvault/vaults",
-	"sql":     "microsoft.sql/servers",
-	"storage": "microsoft.storage/storageaccounts",
-	"app":     "microsoft.web/sites",
-	"vnet":    "microsoft.network/virtualnetworks",
+// typeCommand returns the resource type the command called name lists.
+func typeCommand(name string) (string, bool) {
+	for _, c := range views.TypeCommands() {
+		if c.Name == name {
+			return c.Type, true
+		}
+	}
+	return "", false
 }
 
 // parseCommand turns palette input into a command; the first word names it.
@@ -59,7 +61,7 @@ func parseCommand(input string) (command, error) {
 		return command{}, nil
 	}
 	name := strings.ToLower(words[0])
-	if t, ok := typeAliases[name]; ok {
+	if t, ok := typeCommand(name); ok {
 		return command{cmdView, views.NewResourcesByType(t)}, nil
 	}
 	switch name {

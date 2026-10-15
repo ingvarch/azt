@@ -469,7 +469,7 @@ func aksCases(t *testing.T) []renderCase {
 }
 
 func TestRenderFitsSize(t *testing.T) {
-	tests := append(renderCases(t), aksCases(t)...)
+	tests := append(append(renderCases(t), aksCases(t)...), resourceCases(t)...)
 	sizes := [][2]int{{40, 10}, {120, 20}, {20, 4}, {0, 0}, {1, 1}, {0, 10}, {40, 0}}
 	for _, tt := range tests {
 		for _, s := range sizes {

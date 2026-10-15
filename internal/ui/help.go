@@ -51,7 +51,7 @@ var helpSections = []struct {
 		{":", "command dialog: ↑ ↓ choose, tab completes, enter runs, esc closes"},
 		{"subs  rg", "all subscriptions, all resource groups"},
 		{"vm aks kv sql", "all resources of that type, in every subscription"},
-		{"storage app vnet", "storage accounts, web apps, virtual networks"},
+		{"storage app vnet mi", "storage accounts, web apps, virtual networks, managed identities"},
 		{"type <type>", "all resources of a resource type"},
 		{"help  q", "this help, quit"},
 	}},

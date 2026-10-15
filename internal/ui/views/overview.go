@@ -16,16 +16,7 @@ type tabDef struct {
 	render func(row map[string]any, width int) []string
 }
 
-var genericTabs = []tabDef{{overviewTab, genericOverview}, {"JSON", jsonTab}}
-
-const aksType = "microsoft.containerservice/managedclusters"
-
-func tabDefs(resourceType string) []tabDef {
-	if strings.EqualFold(resourceType, aksType) {
-		return aksTabs
-	}
-	return genericTabs
-}
+var genericTabs = []tabDef{{overviewTab, boxesTab(genericEssentials)}, {"JSON", jsonTab}}
 
 // Tabs lists the tabs the details of a resource of this type have.
 func Tabs(resourceType string) []string {
@@ -72,19 +63,24 @@ func tagLines(row map[string]any) []string {
 	return lines
 }
 
-func genericOverview(row map[string]any, width int) []string {
-	essentials := block([]pair{
-		{"Status", stateText(field(row, "properties", "provisioningState"))},
-		{"Resource group", field(row, "resourceGroup")},
-		{"Location", field(row, "location")},
-		{"Subscription", subscription(row)},
-		{"Type", orDash(ShortType(str(row, "type")))},
-		{"Kind", field(row, "kind")},
-		{"SKU", orDash(join(" ", str(row, "sku", "name"), str(row, "sku", "tier")))},
-		{"Zones", joined(row, "zones")},
-	})
-	return sections(width, section{title: "Essentials", lines: essentials}, section{title: "Tags", lines: tagLines(row)})
-}
+var (
+	resourceGroupField = fieldDef{label: "Resource group", path: []string{"resourceGroup"}}
+	locationField      = fieldDef{label: "Location", path: []string{"location"}}
+	subscriptionField  = fieldDef{label: "Subscription", value: subscription}
+)
+
+var genericEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{
+	{label: "Status", path: []string{"properties", "provisioningState"}, format: fmtState},
+	resourceGroupField,
+	locationField,
+	subscriptionField,
+	{label: "Type", value: func(row map[string]any) string { return orDash(ShortType(str(row, "type"))) }},
+	{label: "Kind", path: []string{"kind"}},
+	{label: "SKU", value: func(row map[string]any) string {
+		return orDash(join(" ", str(row, "sku", "name"), str(row, "sku", "tier")))
+	}},
+	{label: "Zones", path: []string{"zones"}, format: fmtJoin},
+}}
 
 // jsonTab shows the row as JSON; Update has checked that it encodes.
 func jsonTab(row map[string]any, _ int) []string { return jsonLines(row) }
