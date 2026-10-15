@@ -25,6 +25,11 @@ func TestFormats(t *testing.T) {
 		{"off", fmtOnOff, false, "off"},
 		{"on/off missing", fmtOnOff, nil, dash},
 		{"on/off of a string", fmtOnOff, "true", dash},
+		{"on/off missing, default on", fmtOnOffOr(true), nil, "on"},
+		{"on/off missing, default off", fmtOnOffOr(false), nil, "off"},
+		{"on/off set off, default on", fmtOnOffOr(true), false, "off"},
+		{"on/off set on, default off", fmtOnOffOr(false), true, "on"},
+		{"on/off of a string, default on", fmtOnOffOr(true), "false", "on"},
 		{"enabled", fmtEnabled, "enabled", "on"},
 		{"disabled", fmtEnabled, "disabled", "off"},
 		{"enabled in upper case", fmtEnabled, "ENABLED", "on"},
@@ -68,6 +73,8 @@ func TestFormatColors(t *testing.T) {
 	wantFg(t, fmtOnOff(true), "on", fgGood)
 	wantFg(t, fmtOnOff(false), "off", fgMuted)
 	wantFg(t, fmtOnOff(nil), dash, "")
+	wantFg(t, fmtOnOffOr(true)(nil), "on", fgGood)
+	wantFg(t, fmtOnOffOr(false)(nil), "off", fgMuted)
 	wantFg(t, fmtEnabled("enabled"), "on", fgGood)
 	wantFg(t, fmtEnabled("disabled"), "off", fgMuted)
 	wantFg(t, fmtEnabled(nil), dash, "")
@@ -214,6 +221,15 @@ func TestBoxLinesTakeOneColumnRatherThanCut(t *testing.T) {
 		}
 		if got := plainAll(fiveFields().lines(row, 90)); !reflect.DeepEqual(got, want) {
 			t.Errorf("long %s: lines = %q, want %q", k, got, want)
+		}
+	}
+}
+
+func TestBoxWithoutPairsSaysNone(t *testing.T) {
+	for _, split := range []bool{false, true} {
+		got := boxDef{title: "Empty", split: split}.lines(nil, 120)
+		if !reflect.DeepEqual(got, []string{"none"}) {
+			t.Errorf("split %v: lines = %q, want none", split, got)
 		}
 	}
 }

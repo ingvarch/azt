@@ -1,9 +1,6 @@
 package views
 
-import (
-	"fmt"
-	"strings"
-)
+import "fmt"
 
 var kvTabs = []tabDef{
 	{overviewTab, boxesTab(kvEssentials, kvAccess, kvProtection, kvNetwork)},
@@ -34,9 +31,9 @@ var kvProtection = boxDef{title: "Protection", fields: []fieldDef{
 
 var kvNetwork = boxDef{title: "Network", fields: []fieldDef{
 	publicAccessField,
-	{label: "Default action", value: defaultAction},
-	{label: "IP rules", path: []string{"properties", "networkAcls", "ipRules"}, format: fmtCount},
-	{label: "Virtual network rules", path: []string{"properties", "networkAcls", "virtualNetworkRules"}, format: fmtCount},
+	defaultActionField,
+	ipRulesField,
+	vnetRulesField,
 	privateEndpointsField,
 }}
 
@@ -59,18 +56,13 @@ func purgeProtected(row map[string]any) bool {
 	return on
 }
 
-// defaultAction is the default action of the network rules; a vault without one allows.
-func defaultAction(row map[string]any) string {
-	return first(str(row, "properties", "networkAcls", "defaultAction"), "Allow")
-}
-
 // kvAttention lists what needs a look in a vault row.
 func kvAttention(row map[string]any) []alert {
 	var out []alert
 	if !purgeProtected(row) {
 		out = append(out, alert{text: "purge protection is off"})
 	}
-	if publicAccess(row) && strings.EqualFold(defaultAction(row), "Allow") {
+	if openToAnyNetwork(row) {
 		out = append(out, alert{text: "the vault accepts connections from any network"})
 	}
 	return out

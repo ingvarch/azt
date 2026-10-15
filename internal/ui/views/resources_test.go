@@ -138,7 +138,7 @@ func TestKeyVaultMissingFields(t *testing.T) {
 		"Purge protection  off",
 		"",
 		"Network",
-		"Public network access  —",
+		"Public network access  Enabled",
 		"Default action         Allow",
 		"IP rules               0",
 		"Virtual network rules  0",
@@ -178,6 +178,9 @@ func TestKeyVaultValues(t *testing.T) {
 		{`{"enablePurgeProtection":true}`, "Purge protection  on"},
 		{`{"enablePurgeProtection":false}`, "Purge protection  off"},
 		{`{}`, "Purge protection  off"},
+		{`{"publicNetworkAccess":"Disabled"}`, "Public network access  Disabled"},
+		{`{"publicNetworkAccess":"SecuredByPerimeter"}`, "Public network access  SecuredByPerimeter"},
+		{`{}`, "Public network access  Enabled"},
 		{`{"networkAcls":{"defaultAction":"Deny"}}`, "Default action         Deny"},
 		{`{"networkAcls":{"defaultAction":"Allow"}}`, "Default action         Allow"},
 		{`{"networkAcls":{}}`, "Default action         Allow"},
@@ -298,10 +301,10 @@ func TestKeyVaultTabs(t *testing.T) {
 	}
 }
 
-// resourceCases are details views of the Key Vault, managed identity and registry fixtures on every tab.
+// resourceCases are details views of the Key Vault, managed identity, registry and storage fixtures on every tab.
 func resourceCases(t *testing.T) []renderCase {
 	var cases []renderCase
-	for name, typ := range map[string]string{"kv": kvType, "mi": miType, "acr": acrType} {
+	for name, typ := range map[string]string{"kv": kvType, "mi": miType, "acr": acrType, "storage": storageType} {
 		row := fixture(t, name)
 		for _, tab := range Tabs(typ) {
 			cases = append(cases, renderCase{name + " " + tab, func(w, h int) View {

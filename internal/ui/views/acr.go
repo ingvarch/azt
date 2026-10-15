@@ -59,9 +59,9 @@ func acrDaysPolicy(row map[string]any, policy, days string) string {
 func acrEncryption(row map[string]any) string {
 	switch enabledState(dig(row, "properties", "encryption", "status")) {
 	case "on":
-		return "customer-managed key"
+		return customerKey
 	case "off":
-		return "Microsoft-managed key"
+		return microsoftKey
 	}
 	return dash
 }

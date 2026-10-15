@@ -103,8 +103,8 @@ func TestStateTone(t *testing.T) {
 		words []string
 		want  any
 	}{
-		{[]string{"Running", "Succeeded", "Enabled", "running", "SUCCEEDED", "eNaBlEd"}, good},
-		{[]string{"Stopped", "Failed", "Canceled", "Disabled", "Deleted", "stopped", "FAILED"}, bad},
+		{[]string{"Running", "Succeeded", "Enabled", "running", "SUCCEEDED", "eNaBlEd", "available", "Available"}, good},
+		{[]string{"Stopped", "Failed", "Canceled", "Disabled", "Deleted", "stopped", "FAILED", "unavailable", "UNAVAILABLE"}, bad},
 		{[]string{
 			"Creating", "Updating", "Upgrading", "Scaling", "Starting", "Stopping", "Deleting",
 			"Migrating", "Warned", "PastDue", "updating", "Unknown", "", "Cancelled",

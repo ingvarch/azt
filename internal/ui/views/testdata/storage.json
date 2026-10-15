@@ -1,0 +1,56 @@
+{
+  "id": "/subscriptions/s5/resourceGroups/rg-data/providers/Microsoft.Storage/storageAccounts/stdemo",
+  "name": "stdemo",
+  "type": "microsoft.storage/storageaccounts",
+  "kind": "StorageV2",
+  "location": "norwayeast",
+  "resourceGroup": "rg-data",
+  "subscriptionId": "s5",
+  "subscription": "Prod",
+  "sku": {"name": "Standard_ZRS", "tier": "Standard"},
+  "tags": {"owner": "data"},
+  "properties": {
+    "accessTier": "Cool",
+    "allowBlobPublicAccess": false,
+    "allowCrossTenantReplication": true,
+    "allowSharedKeyAccess": false,
+    "creationTime": "2024-05-06T23:30:00-02:00",
+    "defaultToOAuthAuthentication": true,
+    "dnsEndpointType": "Standard",
+    "encryption": {
+      "keySource": "Microsoft.Keyvault",
+      "requireInfrastructureEncryption": true,
+      "services": {
+        "blob": {"enabled": true, "keyType": "Account", "lastEnabledTime": "2024-05-06T23:30:00Z"},
+        "file": {"enabled": true, "keyType": "Account", "lastEnabledTime": "2024-05-06T23:30:00Z"}
+      }
+    },
+    "isHnsEnabled": true,
+    "isLocalUserEnabled": true,
+    "isNfsV3Enabled": false,
+    "isSftpEnabled": false,
+    "keyCreationTime": {"key1": "2024-05-06T23:30:00Z", "key2": "2024-05-06T23:30:00Z"},
+    "minimumTlsVersion": "TLS1_1",
+    "networkAcls": {
+      "bypass": "Logging, Metrics",
+      "defaultAction": "Deny",
+      "ipRules": [{"value": "10.0.0.0/24"}, {"value": "10.0.1.0/24"}],
+      "ipv6Rules": [{"value": "fd00::/64"}],
+      "virtualNetworkRules": [{"id": "/v/1"}, {"id": "/v/2"}, {"id": "/v/3"}]
+    },
+    "primaryEndpoints": {
+      "web": "https://stdemo.z1.web.core.windows.net/",
+      "table": "https://stdemo.table.core.windows.net/",
+      "queue": "https://stdemo.queue.core.windows.net/",
+      "file": "https://stdemo.file.core.windows.net/",
+      "dfs": "https://stdemo.dfs.core.windows.net/",
+      "blob": "https://stdemo.blob.core.windows.net/"
+    },
+    "primaryLocation": "norwayeast",
+    "privateEndpointConnections": [{"name": "pe-1"}, {"name": "pe-2"}, {"name": "pe-3"}, {"name": "pe-4"}],
+    "provisioningState": "Succeeded",
+    "publicNetworkAccess": "Enabled",
+    "statusOfPrimary": "available",
+    "supportsHttpsTrafficOnly": true
+  }
+}
