@@ -12,6 +12,7 @@ import (
 
 	"github.com/ingvarch/azt/internal/azure"
 	"github.com/ingvarch/azt/internal/ui"
+	"github.com/ingvarch/azt/internal/ui/views"
 )
 
 func main() {
@@ -37,6 +38,6 @@ func run() error {
 	defer cancel()
 
 	load := func() ([]azure.Subscription, error) { return azure.Subscriptions(ctx, graph) }
-	_, err = tea.NewProgram(ui.New(load)).Run()
+	_, err = tea.NewProgram(ui.New(func() views.View { return views.NewSubscriptions(load) })).Run()
 	return err
 }
