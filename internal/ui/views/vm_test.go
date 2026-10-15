@@ -340,9 +340,9 @@ func TestVMAttention(t *testing.T) {
 		return `"extended":{"instanceView":{"powerState":{"code":"PowerState/` + code + `"}}}`
 	}
 	const (
-		failed  = "✗ Provisioning failed"
-		stopped = "▲ Stopped but not deallocated: still billed"
-		login   = "▲ Password login is enabled"
+		failed  = "✗ provisioning failed"
+		stopped = "▲ the VM is stopped but not deallocated and is still billed"
+		login   = "▲ password login is enabled"
 	)
 	for _, c := range []struct {
 		name, props string
@@ -386,10 +386,10 @@ func TestVMAttentionOfFixtureAndEmptyRow(t *testing.T) {
 func TestVMAttentionColors(t *testing.T) {
 	failed := vmView(t, typedRow(t, vmType, `{"provisioningState":"Failed"}`))
 	wantFg(t, styledLine(t, failed, "╭ Attention"), "Attention", fgBad)
-	wantFg(t, styledLine(t, failed, "Provisioning failed"), "Provisioning", fgBad)
+	wantFg(t, styledLine(t, failed, "provisioning failed"), "provisioning", fgBad)
 	stopped := vmView(t, typedRow(t, vmType, `{"extended":{"instanceView":{"powerState":{"code":"PowerState/stopped"}}}}`))
 	wantFg(t, styledLine(t, stopped, "╭ Attention"), "Attention", fgWarn)
-	wantFg(t, styledLine(t, stopped, "Stopped but"), "Stopped", fgWarn)
+	wantFg(t, styledLine(t, stopped, "stopped but"), "stopped but", fgWarn)
 }
 
 func TestVMOSDiskDefaults(t *testing.T) {

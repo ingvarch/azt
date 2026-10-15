@@ -265,7 +265,7 @@ func TestPostgresStateColors(t *testing.T) {
 
 func TestPostgresAttention(t *testing.T) {
 	const (
-		stopped  = "▲ Stopped: Azure starts it again after seven days"
+		stopped  = "▲ the server is stopped; Azure starts it again after seven days"
 		disabled = "✗ the server is Disabled"
 		dropping = "✗ the server is Dropping"
 		public   = "▲ public network access is enabled"

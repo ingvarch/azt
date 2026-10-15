@@ -52,7 +52,7 @@ func TestDocumentDBOverview(t *testing.T) {
 		"Private endpoints      1",
 		"",
 		"Attention",
-		"▲ High availability is off",
+		"▲ high availability is off",
 		"",
 		"Tags",
 		"team = orders",
@@ -84,7 +84,7 @@ func TestDocumentDBOverviewOneColumn(t *testing.T) {
 		"",
 		"Attention",
 		"▲ public network access is enabled",
-		"▲ High availability is off",
+		"▲ high availability is off",
 		"",
 		"Tags",
 		"env = test",
@@ -142,7 +142,7 @@ func TestDocumentDBMissingFields(t *testing.T) {
 		"",
 		"Attention",
 		"▲ public network access is enabled",
-		"▲ High availability is off",
+		"▲ high availability is off",
 		"",
 		"Tags",
 		"none",
@@ -195,7 +195,7 @@ func TestDocumentDBHidesCredentials(t *testing.T) {
 func TestDocumentDBAttention(t *testing.T) {
 	const (
 		public = "▲ public network access is enabled"
-		ha     = "▲ High availability is off"
+		ha     = "▲ high availability is off"
 	)
 	tests := []struct {
 		name string

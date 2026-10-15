@@ -173,13 +173,13 @@ func vmInterfaceRows(row map[string]any) []any {
 func vmAttention(row map[string]any) []alert {
 	var out []alert
 	if strings.EqualFold(str(row, "properties", "provisioningState"), "Failed") {
-		out = append(out, alert{text: "Provisioning failed", severe: true})
+		out = append(out, alert{text: "provisioning failed", severe: true})
 	}
 	if strings.EqualFold(vmPower(row), "Stopped") {
-		out = append(out, alert{text: "Stopped but not deallocated: still billed"})
+		out = append(out, alert{text: "the VM is stopped but not deallocated and is still billed"})
 	}
 	if on, _ := passwordLogin(row); on && isLinuxVM(row) {
-		out = append(out, alert{text: "Password login is enabled"})
+		out = append(out, alert{text: "password login is enabled"})
 	}
 	return out
 }
