@@ -161,6 +161,21 @@ func TestBoxExtraPairsComeFirst(t *testing.T) {
 	}
 }
 
+func TestBoxFieldWithShowIsDrawnOnlyWhenShown(t *testing.T) {
+	only := func(v string) func(map[string]any) bool {
+		return func(row map[string]any) bool { return str(row, "a") == v }
+	}
+	b := boxDef{fields: []fieldDef{
+		{label: "a", path: []string{"a"}},
+		{label: "yes", path: []string{"a"}, show: only("1")},
+		{label: "no", path: []string{"a"}, show: only("2")},
+	}}
+	want := []string{"a    1", "yes  1"}
+	if got := plainAll(b.lines(fiveRow, 50)); !reflect.DeepEqual(got, want) {
+		t.Errorf("lines = %q, want %q", got, want)
+	}
+}
+
 func TestBoxesTabDrawsEachBoxAsASection(t *testing.T) {
 	boxes := []boxDef{
 		{title: "One", fields: []fieldDef{{label: "a", path: []string{"a"}}}},

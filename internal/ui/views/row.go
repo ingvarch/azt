@@ -69,6 +69,14 @@ func flagText(on, off string, v any, path ...string) string {
 	return off
 }
 
+// gb is a disk size in gigabytes, empty when size is empty.
+func gb(size string) string {
+	if size == "" {
+		return ""
+	}
+	return size + " GB"
+}
+
 func onOff(v any, path ...string) string { return flagText("on", "off", v, path...) }
 func choose(cond bool, a, b string) string {
 	if cond {

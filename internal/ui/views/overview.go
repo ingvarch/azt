@@ -66,6 +66,7 @@ func tagLines(row map[string]any) []string {
 var (
 	resourceGroupField = fieldDef{label: "Resource group", path: []string{"resourceGroup"}}
 	locationField      = fieldDef{label: "Location", path: []string{"location"}}
+	identityField      = fieldDef{label: "Identity", path: []string{"identity", "type"}}
 	// The network lines kinds share; the ACL ones are for kinds with properties.networkAcls.
 	publicAccessField     = fieldDef{label: "Public network access", value: publicAccessText}
 	defaultActionField    = fieldDef{label: "Default action", value: defaultAction}

@@ -30,7 +30,7 @@ const overviewPools = "Node pools"
 func aksEssentials(row map[string]any, width int) []string {
 	p := dig(row, "properties")
 	left := []pair{
-		{"Status", stateText(orDash(join(stateSeparator, str(p, "powerState", "code"), str(p, "provisioningState"))))},
+		{"Status", powerStatus(str(p, "powerState", "code"), str(p, "provisioningState"))},
 		{"Resource group", field(row, "resourceGroup")},
 		{"Location", field(row, "location")},
 		{"Subscription", subscription(row)},
@@ -196,7 +196,7 @@ func aksPools(row map[string]any, width int) []string {
 }
 
 func poolPairs(pool map[string]any) []pair {
-	disk := join(" ", str(pool, "osDiskType"), diskSize(pool))
+	disk := join(" ", str(pool, "osDiskType"), gb(str(pool, "osDiskSizeGB")))
 	return []pair{
 		{"VM size", field(pool, "vmSize")},
 		{"Nodes", poolNodes(pool)},
@@ -212,13 +212,6 @@ func poolPairs(pool map[string]any) []pair {
 		{"Max surge", field(pool, "upgradeSettings", "maxSurge")},
 		{"State", stateText(poolState(pool))},
 	}
-}
-
-func diskSize(pool map[string]any) string {
-	if size := str(pool, "osDiskSizeGB"); size != "" {
-		return size + " GB"
-	}
-	return ""
 }
 
 var aksNetworking = boxDef{title: "Networking", fields: []fieldDef{
@@ -270,7 +263,7 @@ func rawOnOff(path ...string) func(row map[string]any) string {
 }
 
 var aksIdentity = boxDef{title: "Identity", fields: []fieldDef{
-	{label: "Identity", path: []string{"identity", "type"}},
+	identityField,
 	{label: "User-assigned identities", value: userAssigned},
 	{label: "Kubelet identity", path: []string{"properties", "identityProfile", "kubeletidentity", "resourceId"}, format: fmtLast},
 	{label: "Kubernetes RBAC", value: rawOnOff("properties", "enableRBAC")},
