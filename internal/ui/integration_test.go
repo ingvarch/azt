@@ -234,6 +234,31 @@ func TestPaletteFilterRenameHelp(t *testing.T) {
 	s.want(t, "completion", ":storage")
 }
 
+func TestCommandDialogArrowsOpenTheChosenView(t *testing.T) {
+	s := newScenario(t)
+	s.settle(s.m.Init())
+
+	s.press(":")
+	s.want(t, "dialog", "┌ Command ", "subscriptions", "resource groups in every subscription")
+	s.press("down")
+	s.press("down")
+	s.press("enter")
+	s.want(t, "second command", "Resource groups", "rg-a", "Dev")
+	if f := s.frame(); strings.Contains(f, "┌ Command ") {
+		t.Errorf("dialog stayed open:\n%s", f)
+	}
+}
+
+func TestCommandDialogTypedCommandShowsTheViews(t *testing.T) {
+	s := newScenario(t)
+	s.settle(s.m.Init())
+
+	s.press(":")
+	s.typ("vm")
+	s.press("enter")
+	s.want(t, ":vm", "compute/virtualmachines", "vm-web", "vm-db", "vm-cache")
+}
+
 func TestMouseSessionRoundTrip(t *testing.T) {
 	s := newScenario(t)
 	s.settle(s.m.Init())

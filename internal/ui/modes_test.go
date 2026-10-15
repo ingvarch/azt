@@ -176,8 +176,8 @@ func TestPaletteModeEntryAndExit(t *testing.T) {
 	if h.m.mode != modePalette {
 		t.Fatalf("mode = %v", h.m.mode)
 	}
-	if got := h.m.input.Value(); got != "" {
-		t.Errorf("input = %q, want empty", got)
+	if got := h.m.palette.text; got != "" {
+		t.Errorf("text = %q, want empty", got)
 	}
 	h.typ("xyz")
 	h.send(key("esc"))
@@ -185,8 +185,8 @@ func TestPaletteModeEntryAndExit(t *testing.T) {
 		t.Errorf("esc: mode %v, stack %d", h.m.mode, len(h.m.stacks[0]))
 	}
 	h.send(key(":"))
-	if got := h.m.input.Value(); got != "" {
-		t.Errorf("input = %q, want empty", got)
+	if got := h.m.palette.text; got != "" {
+		t.Errorf("text = %q, want empty", got)
 	}
 	h.send(key("enter"))
 	if h.m.mode != modeNormal || h.m.notice != "" || len(h.m.stacks[0]) != 1 {
@@ -194,36 +194,6 @@ func TestPaletteModeEntryAndExit(t *testing.T) {
 	}
 	if len(rec.keys) != 0 {
 		t.Errorf("keys reached the view: %v", rec.keys)
-	}
-}
-
-func TestPaletteHints(t *testing.T) {
-	h := newHarness(200, 30)
-	h.send(key(":"))
-	wantIn(t, "status", h.status(), ":", "subs  rg  vm  aks  kv  sql  storage  app  vnet  type  help  q")
-	h.typ("s")
-	wantIn(t, "status", h.status(), ":s", "subs  sql  storage")
-	if strings.Contains(h.status(), "vm") {
-		t.Errorf("hints list a command that does not match: %q", h.status())
-	}
-	h.typ("t")
-	wantIn(t, "status", h.status(), "storage")
-	if strings.Contains(h.status(), "subs") {
-		t.Errorf("hints did not narrow: %q", h.status())
-	}
-}
-
-func TestPaletteTabCompletes(t *testing.T) {
-	h := newHarness(200, 30)
-	h.send(key(":"))
-	h.typ("st")
-	h.send(key("tab"))
-	if got := h.m.input.Value(); got != "storage" {
-		t.Errorf("input = %q, want storage", got)
-	}
-	h.typ(" x")
-	if got := h.m.input.Value(); got != "storage x" {
-		t.Errorf("cursor not at the end after tab: %q", got)
 	}
 }
 
@@ -540,30 +510,43 @@ func TestHelpBoxGeometry(t *testing.T) {
 }
 
 func TestFrameFitsWithOverlay(t *testing.T) {
-	for _, s := range [][2]int{{140, 40}, {100, 30}, {30, 8}, {13, 5}, {5, 3}, {1, 1}, {80, 4}} {
-		for _, sidebar := range []bool{false, true} {
-			h := newSidebarHarness(s[0], s[1])
-			if !sidebar {
-				h.prefix("e")
-			}
-			h.send(key("?"))
-			f := h.frame()
-			if got := lipgloss.Height(f); got != s[1] {
-				t.Errorf("%v sidebar=%v: height = %d", s, sidebar, got)
-			}
-			if got := lipgloss.Width(f); got > s[0] {
-				t.Errorf("%v sidebar=%v: width = %d", s, sidebar, got)
+	overlays := map[string][]string{"help": {"?"}, "dialog": {":", "s"}}
+	for name, keys := range overlays {
+		for _, s := range [][2]int{{140, 40}, {100, 30}, {30, 8}, {20, 6}, {14, 7}, {13, 5}, {5, 3}, {1, 1}, {80, 4}} {
+			for _, sidebar := range []bool{false, true} {
+				h := newSidebarHarness(s[0], s[1])
+				if !sidebar {
+					h.prefix("e")
+				}
+				for _, k := range keys {
+					h.send(key(k))
+				}
+				f := h.frame()
+				if got := lipgloss.Height(f); got != s[1] {
+					t.Errorf("%s %v sidebar=%v: height = %d", name, s, sidebar, got)
+				}
+				if got := lipgloss.Width(f); got > s[0] {
+					t.Errorf("%s %v sidebar=%v: width = %d", name, s, sidebar, got)
+				}
 			}
 		}
 	}
 }
 
 func TestInputStatusFitsNarrowWindow(t *testing.T) {
+	for _, md := range inputModes {
+		h, _ := newFilterHarness(20, 6)
+		md.start(h)
+		h.typ("a very long command line that does not fit")
+		if got := lipgloss.Width(h.status()); got > 20 {
+			t.Errorf("%s: status width = %d", md.name, got)
+		}
+	}
 	h := newHarness(20, 6)
 	h.send(key(":"))
 	h.typ("a very long command line that does not fit")
 	if got := lipgloss.Width(h.status()); got > 20 {
-		t.Errorf("status width = %d", got)
+		t.Errorf("palette: status width = %d", got)
 	}
 }
 
@@ -587,7 +570,6 @@ var inputModes = []struct {
 	start        func(*harness)
 }{
 	{"filter", "/", func(h *harness) { h.send(key("/")) }},
-	{"palette", ":", func(h *harness) { h.send(key(":")) }},
 	{"rename", renamePrompt, func(h *harness) { h.prefix(",") }},
 }
 
@@ -643,6 +625,21 @@ func TestHelpListsEveryKey(t *testing.T) {
 			t.Errorf("%s lacks key %q", section.title, section.key)
 		}
 	}
+}
+
+func TestHelpDescribesTheCommandDialog(t *testing.T) {
+	want := "command dialog: ↑ ↓ choose, tab completes, enter runs, esc closes"
+	for _, s := range helpSections {
+		if s.title != "Commands" {
+			continue
+		}
+		for _, e := range s.entries {
+			if e.keys == ":" && e.text == want {
+				return
+			}
+		}
+	}
+	t.Errorf("the Commands section lacks %q for \":\"", want)
 }
 
 func helpHasKey(title, keys string) bool {

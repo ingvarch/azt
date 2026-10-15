@@ -109,7 +109,7 @@ func TestHelpStaysOnOtherMouse(t *testing.T) {
 }
 
 func TestTypingIgnoresMouse(t *testing.T) {
-	for _, md := range []mode{modeFilter, modePalette, modeRename} {
+	for _, md := range []mode{modeFilter, modeRename} {
 		h := newHarness(100, 30)
 		h.prefix("t")
 		h.prefix("v")

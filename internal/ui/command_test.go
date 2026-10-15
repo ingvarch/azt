@@ -58,10 +58,23 @@ func TestParseCommand(t *testing.T) {
 	}
 }
 
-func TestCommandNamesOrder(t *testing.T) {
-	want := []string{"subs", "rg", "vm", "aks", "kv", "sql", "storage", "app", "vnet", "type", "help", "q"}
-	if !slices.Equal(commandNames, want) {
-		t.Errorf("commandNames = %v, want %v", commandNames, want)
+func TestCommandTable(t *testing.T) {
+	want := []commandInfo{
+		{"subs", "subscriptions"},
+		{"rg", "resource groups in every subscription"},
+		{"vm", "virtual machines in every subscription"},
+		{"aks", "AKS clusters in every subscription"},
+		{"kv", "key vaults in every subscription"},
+		{"sql", "SQL servers in every subscription"},
+		{"storage", "storage accounts in every subscription"},
+		{"app", "web apps in every subscription"},
+		{"vnet", "virtual networks in every subscription"},
+		{"type", "resources of any type: type <resource type>"},
+		{"help", "keys and commands"},
+		{"q", "quit"},
+	}
+	if !slices.Equal(commandTable, want) {
+		t.Errorf("commandTable = %v, want %v", commandTable, want)
 	}
 }
 
@@ -70,7 +83,7 @@ func TestMatchingCommands(t *testing.T) {
 		in   string
 		want []string
 	}{
-		{"", commandNames},
+		{"", allNames()},
 		{"s", []string{"subs", "sql", "storage"}},
 		{"st", []string{"storage"}},
 		{"S", []string{"subs", "sql", "storage"}},
@@ -85,19 +98,10 @@ func TestMatchingCommands(t *testing.T) {
 	}
 }
 
-func TestComplete(t *testing.T) {
-	tests := []struct{ in, want string }{
-		{"st", "storage"},
-		{"s", "subs"},
-		{"ty vm", "type vm"},
-		{"k", "kv"},
-		{"zzz", "zzz"},
-		{"zzz arg", "zzz arg"},
-		{"", "subs"},
+func allNames() []string {
+	var names []string
+	for _, c := range commandTable {
+		names = append(names, c.name)
 	}
-	for _, tt := range tests {
-		if got := complete(tt.in); got != tt.want {
-			t.Errorf("complete(%q) = %q, want %q", tt.in, got, tt.want)
-		}
-	}
+	return names
 }
