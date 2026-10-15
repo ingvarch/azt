@@ -103,7 +103,7 @@ func docdbAttention(row map[string]any) []alert {
 		out = append(out, alert{text: "public network access is enabled"})
 	}
 	if docdbHAOff(row) {
-		out = append(out, alert{text: "High availability is off"})
+		out = append(out, alert{text: "high availability is off"})
 	}
 	return out
 }

@@ -115,7 +115,7 @@ func pgAttention(row map[string]any) []alert {
 	var out []alert
 	switch state := str(row, propPath("state")...); strings.ToLower(state) {
 	case "stopped":
-		out = append(out, alert{text: "Stopped: Azure starts it again after seven days"})
+		out = append(out, alert{text: "the server is stopped; Azure starts it again after seven days"})
 	case "disabled", "dropping":
 		out = append(out, alert{text: "the server is " + state, severe: true})
 	}
