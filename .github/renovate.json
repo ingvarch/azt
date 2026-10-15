@@ -1,0 +1,57 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits", ":semanticCommitTypeAll(chore)"],
+  "timezone": "UTC",
+  "schedule": ["* 0-5 * * 1"],
+  "prConcurrentLimit": 3,
+  "automerge": false,
+  "postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"],
+  "packageRules": [
+    {
+      "description": "The go line of go.mod is the oldest Go azt supports, picked by hand; there is no toolchain line.",
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go"],
+      "matchDepTypes": ["golang", "toolchain"],
+      "enabled": false
+    },
+    {
+      "description": "Minor, patch and pseudo-version updates of Go modules come in one weekly PR; majors come alone.",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "Go modules"
+    },
+    {
+      "description": "Runner images are pinned and changed by hand.",
+      "matchManagers": ["github-actions"],
+      "matchDepTypes": ["github-runner"],
+      "enabled": false
+    },
+    {
+      "description": "CI and the Makefile get a new golangci-lint in one PR.",
+      "matchPackageNames": ["golangci/golangci-lint"],
+      "groupName": "golangci-lint"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The golangci-lint that make lint requires; the github-actions manager finds CI's.",
+      "managerFilePatterns": ["/^Makefile$/"],
+      "matchStrings": ["GOLANGCI_LINT_VERSION := (?<currentValue>\\S+)"],
+      "depNameTemplate": "golangci-lint",
+      "packageNameTemplate": "golangci/golangci-lint",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "The goreleaser that CI and the release run (version-file); the asdf manager does not know it.",
+      "managerFilePatterns": ["/^\\.tool-versions$/"],
+      "matchStrings": ["goreleaser (?<currentValue>\\S+)"],
+      "depNameTemplate": "goreleaser",
+      "packageNameTemplate": "goreleaser/goreleaser",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    }
+  ]
+}

@@ -611,7 +611,7 @@ func TestOtherMessagesReachAllViews(t *testing.T) {
 
 func TestFrameFits(t *testing.T) {
 	setups := map[string]func(h *harness){
-		"one pane": func(h *harness) {},
+		"one pane": func(*harness) {},
 		"splits": func(h *harness) {
 			h.prefix("v")
 			h.prefix("s")

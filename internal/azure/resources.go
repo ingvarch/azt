@@ -9,6 +9,7 @@ import (
 // ErrNotFound is returned when a resource does not exist.
 var ErrNotFound = errors.New("resource not found")
 
+// ResourceGroup is a resource group as Resource Graph returns it.
 type ResourceGroup struct {
 	Name           string `json:"name"`
 	Location       string `json:"location"`
@@ -17,6 +18,7 @@ type ResourceGroup struct {
 	Subscription   string `json:"subscription"` // name; only tenant-wide queries fill it
 }
 
+// Resource is an Azure resource as Resource Graph returns it.
 type Resource struct {
 	ID             string `json:"id"`
 	Name           string `json:"name"`

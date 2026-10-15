@@ -75,22 +75,28 @@ type Model struct {
 	focused       bool
 }
 
+// New returns an empty explorer.
 func New() Model { return Model{} }
 
+// SetFocused sets whether the explorer has keyboard focus.
 func (m Model) SetFocused(f bool) Model {
 	m.focused = f
 	return m
 }
 
+// Title is the pane border title.
 func (m Model) Title() string { return "Explorer" }
 
+// Init requests the subscriptions that form the top of the tree.
 func (m Model) Init() tea.Cmd { return data.Fetch(data.Key{Kind: data.Subscriptions}) }
 
+// Open never opens a view: the tree opens items itself.
 func (m Model) Open() (views.View, bool) { return nil, false }
 
 // Spec is never saved: the sidebar is not part of a pane stack.
 func (m Model) Spec() views.Spec { return views.Spec{Kind: "explorer"} }
 
+// Update applies fetched data and key presses to the tree.
 func (m Model) Update(msg tea.Msg) (views.View, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
@@ -104,17 +110,20 @@ func (m Model) Update(msg tea.Msg) (views.View, tea.Cmd) {
 	return m.fix(), cmd
 }
 
+// Click selects the row at y and toggles it when x is on its marker; false when no row is hit.
 func (m Model) Click(x, y int) (views.View, tea.Cmd, bool) {
 	m.nodes = cloneAll(m.nodes)
 	cmd, hit := m.click(x, y)
 	return m.fix(), cmd, hit
 }
 
+// Resize sets the inner size and keeps the cursor visible.
 func (m Model) Resize(width, height int) views.View {
 	m.width, m.height = width, height
 	return m.fix()
 }
 
+// Render draws the tree, or a message while loading or after an error.
 func (m Model) Render() string {
 	if m.width <= 0 || m.height <= 0 {
 		return ""

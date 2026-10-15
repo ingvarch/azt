@@ -2,8 +2,10 @@
 // Every operation returns a new tree and leaves the receiver intact.
 package layout
 
+// PaneID identifies a pane; it stays the same across tree operations.
 type PaneID int
 
+// Orientation is how a split arranges its children.
 type Orientation int
 
 const (
@@ -13,8 +15,10 @@ const (
 	Vertical
 )
 
+// Direction is a way to move between panes.
 type Direction int
 
+// Left, Right, Up and Down are the Direction values.
 const (
 	Left Direction = iota
 	Right
@@ -22,16 +26,19 @@ const (
 	Down
 )
 
+// MinRatio and MaxRatio bound a split's Ratio.
 const (
 	MinRatio = 0.1
 	MaxRatio = 0.9
 )
 
+// Rect is an area in terminal cells.
 type Rect struct{ X, Y, W, H int }
 
 // Branch picks a child of a split.
 type Branch int
 
+// A is the first child of a split, B the second.
 const (
 	A Branch = iota
 	B
@@ -48,8 +55,10 @@ type Node struct {
 	A, B  *Node       // nil on leaves
 }
 
+// Leaf returns a tree of the single pane id.
 func Leaf(id PaneID) *Node { return &Node{Pane: id} }
 
+// IsLeaf reports whether n is a pane rather than a split.
 func (n *Node) IsLeaf() bool { return n.A == nil && n.B == nil }
 
 // Panes returns the leaves in order: left to right, top to bottom.
@@ -169,8 +178,6 @@ func (n *Node) onBoundary(area, a, b Rect, x, y int) bool {
 	return inCols && (a.H > 0 && y == a.Y+a.H-1 || b.H > 0 && y == b.Y)
 }
 
-// SplitArea returns the area the split at p covers; false when p does not
-// end at a split.
 // SplitAt returns the split node at p; false when p does not end at a split.
 func (n *Node) SplitAt(p Path) (*Node, bool) {
 	for _, b := range p {
@@ -189,6 +196,8 @@ func (n *Node) SplitAt(p Path) (*Node, bool) {
 	return n, true
 }
 
+// SplitArea returns the area the split at p covers; false when p does not
+// end at a split.
 func (n *Node) SplitArea(p Path, area Rect) (Rect, bool) {
 	if n.IsLeaf() {
 		return Rect{}, false

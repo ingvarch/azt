@@ -10,8 +10,10 @@ import (
 	"github.com/ingvarch/azt/internal/azure"
 )
 
+// Kind is the type of data a Key asks for.
 type Kind int
 
+// Subscriptions and the kinds after it each map to one Resource Graph query.
 const (
 	Subscriptions Kind = iota
 	ResourceGroups
@@ -42,6 +44,7 @@ type ResultMsg struct {
 	Err  error
 }
 
+// Fetcher loads the data for a Key; it may block on the network.
 type Fetcher func(Key) (any, error)
 
 // Fetch asks for the data of k, served from the cache when present.
@@ -61,6 +64,7 @@ type Cache struct {
 	inFlight map[Key]bool
 }
 
+// NewCache returns an empty cache that loads missing keys with f.
 func NewCache(f Fetcher) *Cache {
 	return &Cache{fetch: f, data: map[Key]any{}, inFlight: map[Key]bool{}}
 }

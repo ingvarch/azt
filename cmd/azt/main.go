@@ -3,7 +3,10 @@ package main
 
 import (
 	"context"
+	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"os"
 
 	tea "charm.land/bubbletea/v2"
@@ -14,16 +17,33 @@ import (
 	"github.com/ingvarch/azt/internal/ui"
 	"github.com/ingvarch/azt/internal/ui/data"
 	"github.com/ingvarch/azt/internal/ui/views"
+	"github.com/ingvarch/azt/internal/version"
 )
 
 func main() {
-	if err := run(); err != nil {
+	err := run(os.Args[1:], os.Stdout, os.Stderr)
+	if err != nil && !errors.Is(err, flag.ErrHelp) {
 		fmt.Fprintln(os.Stderr, "azt:", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+// run handles the flags, then starts the terminal UI.
+func run(args []string, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("azt", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	showVersion := flags.Bool("version", false, "print the version and exit")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if *showVersion {
+		_, err := fmt.Fprintln(stdout, "azt", version.Full())
+		return err
+	}
+	return runUI()
+}
+
+func runUI() error {
 	// Uses the account from `az login`.
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {

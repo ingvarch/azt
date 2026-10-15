@@ -400,7 +400,12 @@ func TestDetailsRefresh(t *testing.T) {
 	}
 }
 
-func TestRenderFitsSize(t *testing.T) {
+type renderCase struct {
+	name string
+	view func(w, h int) View
+}
+
+func renderCases(t *testing.T) []renderCase {
 	manySubs := make([]azure.Subscription, 100)
 	for i := range manySubs {
 		manySubs[i] = azure.Subscription{ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("sub-%d", i), State: "Enabled"}
@@ -411,10 +416,7 @@ func TestRenderFitsSize(t *testing.T) {
 	}
 	long := errors.New(strings.Repeat("very long error text without end ", 20))
 
-	tests := []struct {
-		name string
-		view func(w, h int) View
-	}{
+	return []renderCase{
 		{"loading", func(w, h int) View { return NewSubscriptions().Resize(w, h) }},
 		{"table", func(w, h int) View { return deliver(t, NewSubscriptions().Resize(w, h), manySubs, nil) }},
 		{"long error", func(w, h int) View { return deliver(t, NewSubscriptions().Resize(w, h), nil, long) }},
@@ -440,6 +442,10 @@ func TestRenderFitsSize(t *testing.T) {
 			return v
 		}},
 	}
+}
+
+func TestRenderFitsSize(t *testing.T) {
+	tests := renderCases(t)
 	sizes := [][2]int{{40, 10}, {120, 20}, {20, 4}, {0, 0}, {1, 1}, {0, 10}, {40, 0}}
 	for _, tt := range tests {
 		for _, s := range sizes {

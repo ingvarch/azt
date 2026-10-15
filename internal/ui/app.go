@@ -88,6 +88,7 @@ type Model struct {
 	sidebarFocused bool
 }
 
+// New returns a model with one tab and one pane; newView makes each new view.
 func New(newView func() views.View, fetch data.Fetcher) Model {
 	m := newModel(newView, fetch)
 	m.tabs = []tab{{root: layout.Leaf(0), focus: 0}}
@@ -137,6 +138,7 @@ func (m Model) top(id layout.PaneID) views.View {
 	return s[len(s)-1]
 }
 
+// Update routes keys, mouse and data messages to the prefix, sidebar or views.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
@@ -420,24 +422,21 @@ func (m Model) runPrefix(k string) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
+	if !m.layoutAction(t, k) && !m.focusAction(t, k) {
+		cmd = m.tabAction(t, k)
+	}
+	m.resizeViews()
+	return m, cmd
+}
+
+// layoutAction runs the prefix keys that split, close, zoom or resize panes;
+// false when k is not one of them.
+func (m *Model) layoutAction(t *tab, k string) bool {
 	switch k {
 	case "v":
 		m.split(t, layout.Horizontal)
 	case "s":
 		m.split(t, layout.Vertical)
-	case "h":
-		if !m.moveFocus(t, layout.Left) && m.sidebarDrawn() {
-			m.focusSidebar(true)
-		}
-	case "j":
-		m.moveFocus(t, layout.Down)
-	case "k":
-		m.moveFocus(t, layout.Up)
-	case "l":
-		m.moveFocus(t, layout.Right)
-	case "e":
-		m.sidebarVisible = !m.sidebarVisible
-		m.focusSidebar(m.sidebarFocused && m.sidebarVisible)
 	case "q":
 		m.closePane(t)
 	case "z":
@@ -452,8 +451,40 @@ func (m Model) runPrefix(k string) (tea.Model, tea.Cmd) {
 		t.root = t.root.Resize(t.focus, layout.Vertical, resizeStep)
 	case "-":
 		t.root = t.root.Resize(t.focus, layout.Vertical, -resizeStep)
+	default:
+		return false
+	}
+	return true
+}
+
+// focusAction runs the prefix keys that move focus between panes and the
+// sidebar; false when k is not one of them.
+func (m *Model) focusAction(t *tab, k string) bool {
+	switch k {
+	case "h":
+		if !m.moveFocus(t, layout.Left) && m.sidebarDrawn() {
+			m.focusSidebar(true)
+		}
+	case "j":
+		m.moveFocus(t, layout.Down)
+	case "k":
+		m.moveFocus(t, layout.Up)
+	case "l":
+		m.moveFocus(t, layout.Right)
+	case "e":
+		m.sidebarVisible = !m.sidebarVisible
+		m.focusSidebar(m.sidebarFocused && m.sidebarVisible)
+	default:
+		return false
+	}
+	return true
+}
+
+// tabAction runs the remaining prefix keys: new, rename, switch and help.
+func (m *Model) tabAction(t *tab, k string) tea.Cmd {
+	switch k {
 	case "t":
-		cmd = m.newTab()
+		return m.newTab()
 	case ",":
 		m.startInput(modeRename, t.name)
 	case "?":
@@ -467,8 +498,7 @@ func (m Model) runPrefix(k string) (tea.Model, tea.Cmd) {
 			m.active = n - 1
 		}
 	}
-	m.resizeViews()
-	return m, cmd
+	return nil
 }
 
 func (m Model) sidebarDrawn() bool {
@@ -565,6 +595,7 @@ func (m *Model) newTab() tea.Cmd {
 	return v.Init()
 }
 
+// View draws the tab bar, panes, sidebar, status bar and help box.
 func (m Model) View() tea.View {
 	var content string
 	if m.width > 0 && m.height > 0 {

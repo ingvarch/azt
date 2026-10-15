@@ -14,6 +14,7 @@ import (
 // Version is the file format version; Load rejects any other.
 const Version = 1
 
+// Session is the saved state of the whole UI.
 type Session struct {
 	Version        int   `json:"version"`
 	Tabs           []Tab `json:"tabs"`
@@ -21,6 +22,7 @@ type Session struct {
 	SidebarVisible bool  `json:"sidebarVisible"`
 }
 
+// Tab is one tab: its pane layout and view state.
 type Tab struct {
 	Name   string `json:"name,omitempty"`
 	Zoomed bool   `json:"zoomed,omitempty"`
@@ -52,6 +54,7 @@ func DefaultPath() (string, error) {
 	return filepath.Join(dir, "azt", "session.json"), nil
 }
 
+// Load reads the session file at path.
 func Load(path string) (Session, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {

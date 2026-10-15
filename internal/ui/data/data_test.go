@@ -178,63 +178,66 @@ func (g *fakeGraph) Resources(_ context.Context, q armresourcegraph.QueryRequest
 	}, nil
 }
 
-func TestNewFetcherRoutesKinds(t *testing.T) {
-	tests := []struct {
-		name      string
-		key       Key
-		row       map[string]any
-		want      any
-		wantScope []string
-		wantQuery string
-	}{
-		{
-			name: "subscriptions",
-			key:  Key{Kind: Subscriptions},
-			row:  map[string]any{"subscriptionId": "s1", "name": "Dev", "state": "Enabled"},
-			want: []azure.Subscription{{ID: "s1", Name: "Dev", State: "Enabled"}},
+type fetcherCase struct {
+	name      string
+	key       Key
+	row       map[string]any
+	want      any
+	wantScope []string
+	wantQuery string
+}
 
-			wantQuery: "microsoft.resources/subscriptions'",
-		},
-		{
-			name:      "groups",
-			key:       Key{Kind: ResourceGroups, Subscription: "s1"},
-			row:       map[string]any{"name": "rg"},
-			want:      []azure.ResourceGroup{{Name: "rg"}},
-			wantScope: []string{"s1"},
-			wantQuery: "resourcegroups'",
-		},
-		{
-			name:      "resources",
-			key:       Key{Kind: Resources, Subscription: "s1", Group: "rg"},
-			row:       map[string]any{"id": "/a", "name": "a"},
-			want:      []azure.Resource{{ID: "/a", Name: "a"}},
-			wantScope: []string{"s1"},
-			wantQuery: "resourceGroup =~ 'rg'",
-		},
-		{
-			name:      "all groups",
-			key:       Key{Kind: AllResourceGroups},
-			row:       map[string]any{"name": "rg", "subscriptionId": "s1", "subscription": "Dev"},
-			want:      []azure.ResourceGroup{{Name: "rg", SubscriptionID: "s1", Subscription: "Dev"}},
-			wantQuery: "order by subscription asc, name asc",
-		},
-		{
-			name:      "resources of type",
-			key:       Key{Kind: ResourcesOfType, Type: "microsoft.web/sites"},
-			row:       map[string]any{"id": "/a", "name": "a", "resourceGroup": "rg", "subscription": "Dev"},
-			want:      []azure.Resource{{ID: "/a", Name: "a", ResourceGroup: "rg", Subscription: "Dev"}},
-			wantQuery: "type =~ 'microsoft.web/sites'",
-		},
-		{
-			name:      "details",
-			key:       Key{Kind: Details, Subscription: "s1", ID: "/a"},
-			row:       map[string]any{"id": "/a"},
-			want:      map[string]any{"id": "/a"},
-			wantScope: []string{"s1"},
-			wantQuery: "id =~ '/a'",
-		},
-	}
-	for _, tt := range tests {
+var fetcherCases = []fetcherCase{
+	{
+		name: "subscriptions",
+		key:  Key{Kind: Subscriptions},
+		row:  map[string]any{"subscriptionId": "s1", "name": "Dev", "state": "Enabled"},
+		want: []azure.Subscription{{ID: "s1", Name: "Dev", State: "Enabled"}},
+
+		wantQuery: "microsoft.resources/subscriptions'",
+	},
+	{
+		name:      "groups",
+		key:       Key{Kind: ResourceGroups, Subscription: "s1"},
+		row:       map[string]any{"name": "rg"},
+		want:      []azure.ResourceGroup{{Name: "rg"}},
+		wantScope: []string{"s1"},
+		wantQuery: "resourcegroups'",
+	},
+	{
+		name:      "resources",
+		key:       Key{Kind: Resources, Subscription: "s1", Group: "rg"},
+		row:       map[string]any{"id": "/a", "name": "a"},
+		want:      []azure.Resource{{ID: "/a", Name: "a"}},
+		wantScope: []string{"s1"},
+		wantQuery: "resourceGroup =~ 'rg'",
+	},
+	{
+		name:      "all groups",
+		key:       Key{Kind: AllResourceGroups},
+		row:       map[string]any{"name": "rg", "subscriptionId": "s1", "subscription": "Dev"},
+		want:      []azure.ResourceGroup{{Name: "rg", SubscriptionID: "s1", Subscription: "Dev"}},
+		wantQuery: "order by subscription asc, name asc",
+	},
+	{
+		name:      "resources of type",
+		key:       Key{Kind: ResourcesOfType, Type: "microsoft.web/sites"},
+		row:       map[string]any{"id": "/a", "name": "a", "resourceGroup": "rg", "subscription": "Dev"},
+		want:      []azure.Resource{{ID: "/a", Name: "a", ResourceGroup: "rg", Subscription: "Dev"}},
+		wantQuery: "type =~ 'microsoft.web/sites'",
+	},
+	{
+		name:      "details",
+		key:       Key{Kind: Details, Subscription: "s1", ID: "/a"},
+		row:       map[string]any{"id": "/a"},
+		want:      map[string]any{"id": "/a"},
+		wantScope: []string{"s1"},
+		wantQuery: "id =~ '/a'",
+	},
+}
+
+func TestNewFetcherRoutesKinds(t *testing.T) {
+	for _, tt := range fetcherCases {
 		t.Run(tt.name, func(t *testing.T) {
 			graph := &fakeGraph{rows: []map[string]any{tt.row}}
 

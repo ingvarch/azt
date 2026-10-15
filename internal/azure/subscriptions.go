@@ -12,6 +12,7 @@ type ResourceGraph interface {
 	Resources(ctx context.Context, query armresourcegraph.QueryRequest, options *armresourcegraph.ClientResourcesOptions) (armresourcegraph.ClientResourcesResponse, error)
 }
 
+// Subscription is a subscription as Resource Graph returns it.
 type Subscription struct {
 	ID    string `json:"subscriptionId"`
 	Name  string `json:"name"`

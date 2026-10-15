@@ -2,6 +2,16 @@ version: "2"
 
 linters:
   enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - revive
+    - dupl
+    - gocritic
+    - funlen
+    - gocognit
     - errorlint
     - misspell
 

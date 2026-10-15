@@ -161,7 +161,7 @@ func (l list[T]) Open() (View, bool) {
 }
 
 // Click selects the row drawn on line y; the info line is line 0 when shown.
-func (l list[T]) Click(x, y int) (View, tea.Cmd, bool) {
+func (l list[T]) Click(_, y int) (View, tea.Cmd, bool) {
 	i, ok := l.table.RowAt(y - lines(l.hasInfo()))
 	if ok {
 		l.table.selectRow(i)
@@ -169,6 +169,7 @@ func (l list[T]) Click(x, y int) (View, tea.Cmd, bool) {
 	return l, nil, ok
 }
 
+// NewSubscriptions lists the subscriptions of the signed-in account.
 func NewSubscriptions() View {
 	return newList(listConfig[azure.Subscription]{
 		key:   data.Key{Kind: data.Subscriptions},
@@ -182,10 +183,11 @@ func NewSubscriptions() View {
 			{"State", 10},
 		},
 		row:  func(s azure.Subscription) []string { return []string{s.Name, s.ID, s.State} },
-		open: func(s azure.Subscription) View { return NewResourceGroups(s) },
+		open: NewResourceGroups,
 	})
 }
 
+// NewResourceGroups lists the resource groups of sub.
 func NewResourceGroups(sub azure.Subscription) View {
 	return newList(listConfig[azure.ResourceGroup]{
 		key:   data.Key{Kind: data.ResourceGroups, Subscription: sub.ID},
@@ -203,6 +205,7 @@ func NewResourceGroups(sub azure.Subscription) View {
 	})
 }
 
+// NewResources lists the resources of one resource group.
 func NewResources(subscriptionID string, group azure.ResourceGroup) View {
 	return newList(resourcesConfig(subscriptionID, group))
 }
@@ -244,6 +247,7 @@ func resourcesConfig(subscriptionID string, group azure.ResourceGroup) listConfi
 	}
 }
 
+// NewAllResourceGroups lists the resource groups of every subscription.
 func NewAllResourceGroups() View {
 	return newList(listConfig[azure.ResourceGroup]{
 		key:   data.Key{Kind: data.AllResourceGroups},

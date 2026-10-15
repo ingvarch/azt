@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -42,7 +43,12 @@ func TestDefaultPath(t *testing.T) {
 	})
 	t.Run("home", func(t *testing.T) {
 		t.Setenv("XDG_STATE_HOME", "")
-		t.Setenv("HOME", "/home/u")
+		// os.UserHomeDir reads USERPROFILE on Windows.
+		home := "HOME"
+		if runtime.GOOS == "windows" {
+			home = "USERPROFILE"
+		}
+		t.Setenv(home, "/home/u")
 		got, err := DefaultPath()
 		if err != nil || got != filepath.Join("/home/u", ".local", "state", "azt", "session.json") {
 			t.Errorf("got %q, %v", got, err)
@@ -81,6 +87,9 @@ func TestSaveOverwrites(t *testing.T) {
 }
 
 func TestSaveModes(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no POSIX file modes")
+	}
 	root := t.TempDir()
 	dir := filepath.Join(root, "azt")
 	path := filepath.Join(dir, "session.json")

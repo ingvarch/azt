@@ -1,0 +1,84 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Weekly too: govulncheck finds new vulnerabilities in code that did not change.
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: false
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14.0
+      # A module azt links, on any platform the release builds for, may only have a license internal/licenses allows.
+      # It runs after a lint failure too, so one failure does not hide the other; the job fails if either does.
+      - if: success() || failure()
+        run: go run ./internal/licenses/cmd/licenses ./cmd/azt
+
+  test:
+    name: test ${{ matrix.os }} go ${{ matrix.go }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-26.04, macos-15, windows-2025]
+        # The newest Go, which builds the release.
+        go: [stable]
+        include:
+          # The oldest Go azt supports: the go line of go.mod.
+          - os: ubuntu-26.04
+            go: go.mod
+    steps:
+      - uses: actions/checkout@v7
+      # One input per job: setup-go warns when it gets both.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ matrix.go == 'go.mod' && 'go.mod' || '' }}
+          go-version: ${{ matrix.go != 'go.mod' && matrix.go || '' }}
+      - run: go test -race ./...
+
+  snapshot:
+    name: release snapshot
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - uses: anchore/sbom-action/download-syft@v0.24.3
+      # Keyless signing needs the release workflow's identity, so the snapshot skips it.
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          version-file: .tool-versions
+          args: release --snapshot --clean --skip=sign
+
+  govulncheck:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      # The Go that builds the release: its standard library is what ships.
+      - uses: golang/govulncheck-action@v1.1.0
+        with:
+          go-version-input: stable
