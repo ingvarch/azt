@@ -69,9 +69,23 @@ func TestParseCommand(t *testing.T) {
 	}
 }
 
+func TestParseCommandFoundry(t *testing.T) {
+	c, err := parseCommand("Foundry")
+	if err != nil || c.kind != cmdView {
+		t.Fatalf("parseCommand(Foundry) = %+v, %v", c, err)
+	}
+	if got, want := c.view.Title(), "cognitiveservices/accounts, cognitiveservices/accounts/projects"; got != want {
+		t.Errorf("title = %q, want %q", got, want)
+	}
+	if _, err := parseCommand("ai"); err == nil || err.Error() != "unknown command: ai" {
+		t.Errorf("parseCommand(ai) error = %v", err)
+	}
+}
+
 func TestParseCommandTypes(t *testing.T) {
 	tests := []struct{ in, want string }{
 		{"dns", "microsoft.network/dnszones,microsoft.network/privatednszones"},
+		{"foundry", "microsoft.cognitiveservices/accounts,microsoft.cognitiveservices/accounts/projects"},
 		{"app", "microsoft.web/sites"},
 		{"type microsoft.web/sites", "microsoft.web/sites"},
 	}
@@ -96,6 +110,7 @@ func TestCommandTable(t *testing.T) {
 		{"sql", "SQL servers in every subscription"},
 		{"pg", "PostgreSQL servers in every subscription"},
 		{"docdb", "DocumentDB clusters in every subscription"},
+		{"foundry", "AI Foundry resources and projects in every subscription"},
 		{"storage", "storage accounts in every subscription"},
 		{"app", "web apps in every subscription"},
 		{"vnet", "virtual networks in every subscription"},
@@ -130,6 +145,7 @@ func TestMatchingCommands(t *testing.T) {
 		{"p", []string{"pg"}},
 		{"PG", []string{"pg"}},
 		{"doc", []string{"docdb"}},
+		{"f", []string{"foundry"}},
 		{"pd", nil},
 		{"zzz", nil},
 	}
