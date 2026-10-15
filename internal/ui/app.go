@@ -2,6 +2,7 @@
 package ui
 
 import (
+	"image/color"
 	"slices"
 	"strconv"
 	"strings"
@@ -65,6 +66,15 @@ var (
 // tabGap separates two labels in the tab bar.
 const tabGap = " "
 
+const (
+	tabPadding  = 4 // cells around a tab's text
+	minTabWidth = 8 // cells of the narrowest tab
+
+	// barShadeStep and tabShadeStep lighten or darken the terminal background for the tab bar and the inactive tabs.
+	barShadeStep = 0.05
+	tabShadeStep = 0.12
+)
+
 // plusLabel is the button after the last tab that opens a named tab.
 const plusLabel = " + "
 
@@ -92,6 +102,8 @@ type Model struct {
 	now           func() time.Time
 	drag          *drag
 	last          *lastPress
+	barShade      color.Color // tab bar background; nil until the terminal reports its own
+	tabShade      color.Color // inactive tab background
 
 	sidebar        sidebar.Model
 	sidebarVisible bool
@@ -129,9 +141,9 @@ func newModel(newView func() views.View, fetch data.Fetcher) Model {
 	}
 }
 
-// Init starts every view of every stack of every tab, and the sidebar.
+// Init starts every view of every stack of every tab, and the sidebar, and asks for the background color.
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.sidebar.Init()}
+	cmds := []tea.Cmd{m.sidebar.Init(), tea.RequestBackgroundColor}
 	for _, t := range m.tabs {
 		for _, id := range t.root.Panes() {
 			for _, v := range m.stacks[id] {
@@ -157,6 +169,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.focusSidebar(m.sidebarFocused && m.sidebarDrawn())
 		m.resizeViews()
+		return m, nil
+	case tea.BackgroundColorMsg:
+		m.barShade, m.tabShade = shades(msg)
 		return m, nil
 	case data.FetchMsg:
 		return m, m.cache.Request(msg)
@@ -659,31 +674,56 @@ func (m Model) helpRect() layout.Rect {
 	return layout.Rect{X: (m.width - w) / 2, Y: (m.height - h) / 2, W: w, H: h}
 }
 
-// tabBar draws the tab labels and the plus button, one tabGap apart; the canvas cuts it at the window edge.
+// shades returns the tab bar and the inactive tab backgrounds for the terminal background bg.
+func shades(bg tea.BackgroundColorMsg) (bar, tab color.Color) {
+	shift := lipgloss.Darken
+	if bg.IsDark() {
+		shift = lipgloss.Lighten
+	}
+	return shift(bg.Color, barShadeStep), shift(bg.Color, tabShadeStep)
+}
+
+// onBg returns style on the background c; style as is when c is nil.
+func onBg(style lipgloss.Style, c color.Color) lipgloss.Style {
+	if c == nil {
+		return style
+	}
+	return style.Background(c)
+}
+
+// tabBar draws the tab labels and the plus button, one tabGap apart. With shades it
+// fills the line to the window edge; the canvas cuts it there.
 func (m Model) tabBar() string {
+	bar := onBg(lipgloss.NewStyle(), m.barShade)
 	var b strings.Builder
 	for i := range m.tabs {
 		if i > 0 {
-			b.WriteString(tabGap)
+			b.WriteString(bar.Render(tabGap))
 		}
-		style := hintStyle
+		style := onBg(hintStyle, m.tabShade)
 		if i == m.active {
-			style = tabStyle
+			style = onBg(tabStyle, m.barShade)
 		}
 		b.WriteString(style.Render(m.tabLabel(i)))
 	}
-	b.WriteString(tabGap)
-	b.WriteString(hintStyle.Render(plusLabel))
+	b.WriteString(bar.Render(tabGap))
+	b.WriteString(onBg(hintStyle, m.barShade).Render(plusLabel))
+	if m.barShade != nil {
+		b.WriteString(bar.Render(strings.Repeat(" ", max(m.paneArea().W-lipgloss.Width(b.String()), 0))))
+	}
 	return b.String()
 }
 
-// tabLabel is tab i as drawn in the tab bar: its number and its name, if any.
+// tabLabel is tab i as drawn in the tab bar: its number and its name, if any,
+// centered in a cell of at least minTabWidth.
 func (m Model) tabLabel(i int) string {
-	label := " " + strconv.Itoa(i+1) + " "
+	text := strconv.Itoa(i + 1)
 	if name := m.tabs[i].name; name != "" {
-		label += name + " "
+		text += " " + name
 	}
-	return label
+	w := lipgloss.Width(text)
+	free := max(w+tabPadding, minTabWidth) - w
+	return strings.Repeat(" ", free/2) + text + strings.Repeat(" ", free-free/2)
 }
 
 func (m Model) statusBar() string {
