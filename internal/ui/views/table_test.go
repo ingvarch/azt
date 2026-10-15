@@ -36,27 +36,27 @@ func TestTableView(t *testing.T) {
 		width, height int
 		want          []string
 	}{
-		{"header, rule, rows", 40, 5, []string{
-			"Name   ID  ",
-			"───────────",
-			"alpha  1   ",
-			"toolo… 22  ",
-			"b      333…",
+		{"header, rule, rows", 12, 5, []string{
+			"Name    ID  ",
+			"────────────",
+			"alpha   1   ",
+			"toolo…  22  ",
+			"b       333…",
 		}},
 		{"lines are cut to the width", 8, 4, []string{
-			"Name   I",
+			"Name    ",
 			"────────",
-			"alpha  1",
-			"toolo… 2",
+			"alpha   ",
+			"toolo…  ",
 		}},
-		{"rows are cut to the height", 40, 3, []string{
-			"Name   ID  ",
-			"───────────",
-			"alpha  1   ",
+		{"rows are cut to the height", 12, 3, []string{
+			"Name    ID  ",
+			"────────────",
+			"alpha   1   ",
 		}},
-		{"only the header and the rule", 40, 2, []string{"Name   ID  ", "───────────"}},
-		{"only the header", 40, 1, []string{"Name   ID  "}},
-		{"no height", 40, 0, nil},
+		{"only the header and the rule", 12, 2, []string{"Name    ID  ", "────────────"}},
+		{"only the header", 12, 1, []string{"Name    ID  "}},
+		{"no height", 12, 0, nil},
 		{"no width", 0, 5, nil},
 	}
 	for _, tt := range tests {
@@ -71,13 +71,13 @@ func TestTableView(t *testing.T) {
 }
 
 func TestTableStyles(t *testing.T) {
-	tb := testTable(40, 5, []string{"alpha", "1"}, []string{"b", "2"})
+	tb := testTable(12, 5, []string{"alpha", "1"}, []string{"b", "2"})
 	lines := strings.Split(tb.view(), "\n")
 	want := []string{
-		lipgloss.NewStyle().Bold(true).Render("Name   ID  "),
-		"───────────",
-		lipgloss.NewStyle().Reverse(true).Render("alpha  1   "),
-		"b      2   ",
+		lipgloss.NewStyle().Bold(true).Render("Name    ID  "),
+		"────────────",
+		lipgloss.NewStyle().Reverse(true).Render("alpha   1   "),
+		"b       2   ",
 	}
 	for i, w := range want {
 		if lines[i] != w {
@@ -88,11 +88,11 @@ func TestTableStyles(t *testing.T) {
 
 func TestTableWideAndEmptyCells(t *testing.T) {
 	tb := newTable([]column{{title: "A", width: 4}, {title: "B", width: 1}, {title: "C"}})
-	tb.resize(20, 4)
+	tb.resize(9, 4)
 	tb.setRows([][]string{{"日本語", "xy", "z"}, {"", "", ""}})
 	got := strings.Split(plain(tb.view()), "\n")
 	for i, line := range got {
-		if w := lipgloss.Width(line); w > 20 {
+		if w := lipgloss.Width(line); w != 9 {
 			t.Errorf("line %d is %d wide: %q", i, w, line)
 		}
 	}
@@ -288,8 +288,8 @@ func stateTable(width, height int) table {
 }
 
 func TestTableColorsTheStateColumn(t *testing.T) {
-	lines := strings.Split(stateTable(40, 5).view(), "\n")
-	if got, want := plain(lines[3]), "b      ● Failed    "; got != want {
+	lines := strings.Split(stateTable(20, 5).view(), "\n")
+	if got, want := plain(lines[3]), "b       ● Failed    "; got != want {
 		t.Errorf("line 3 = %q, want %q", got, want)
 	}
 	wantFg(t, lines[3], "Failed", fgBad)
@@ -301,8 +301,8 @@ func TestTableColorsTheStateColumn(t *testing.T) {
 }
 
 func TestTableSelectedRowIsOneColor(t *testing.T) {
-	lines := strings.Split(stateTable(40, 5).view(), "\n")
-	if got, want := plain(lines[2]), "a      ● Running   "; got != want {
+	lines := strings.Split(stateTable(20, 5).view(), "\n")
+	if got, want := plain(lines[2]), "a       ● Running   "; got != want {
 		t.Errorf("selected row = %q, want %q", got, want)
 	}
 	for _, sub := range []string{"a", "Running", "●", "   "} {
@@ -318,7 +318,7 @@ func TestTableSelectedRowIsOneColor(t *testing.T) {
 
 func TestTableCutsAColoredStateCell(t *testing.T) {
 	tb := newTable([]column{{title: "State", width: 6, state: true}})
-	tb.resize(20, 3)
+	tb.resize(6, 3)
 	tb.setRows([][]string{{"Updating"}})
 	if got := plain(strings.Split(tb.view(), "\n")[2]); got != "● Upd…" {
 		t.Errorf("cell = %q", got)

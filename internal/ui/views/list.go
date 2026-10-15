@@ -60,6 +60,7 @@ func (l list[T]) Update(msg tea.Msg) (View, tea.Cmd) {
 		if l.cfg.keep != nil {
 			l.items = slices.DeleteFunc(slices.Clone(l.items), func(it T) bool { return !l.cfg.keep(it) })
 		}
+		l.table.cols = listColumns(l.cfg.columns, mapRows(l.items, l.cfg.row))
 		l.applyFilter()
 		return l.fit(), nil
 	case spinner.TickMsg:
@@ -178,9 +179,9 @@ func NewSubscriptions() View {
 		noun:  "subscriptions",
 		empty: "No subscriptions found. Check the account you signed in with az login.",
 		columns: []column{
-			{title: "Name", width: 32},
-			{title: "Subscription ID", width: 36},
-			{title: "State", width: 10, state: true},
+			{title: "Name"},
+			{title: "Subscription ID"},
+			{title: "State", state: true},
 		},
 		row:  func(s azure.Subscription) []string { return []string{s.Name, s.ID, s.State} },
 		open: NewResourceGroups,
@@ -196,9 +197,9 @@ func NewResourceGroups(sub azure.Subscription) View {
 		noun:  "resource groups",
 		empty: "No resource groups in this subscription.",
 		columns: []column{
-			{title: "Name", width: 40},
-			{title: "Location", width: 16},
-			{title: "State", width: 12, state: true},
+			{title: "Name"},
+			{title: "Location"},
+			{title: "State", state: true},
 		},
 		row:  func(g azure.ResourceGroup) []string { return []string{g.Name, g.Location, g.State} },
 		open: func(g azure.ResourceGroup) View { return NewResources(sub.ID, g) },
@@ -238,9 +239,9 @@ func resourcesConfig(subscriptionID string, group azure.ResourceGroup) listConfi
 		noun:  "resources",
 		empty: "No resources in this resource group.",
 		columns: []column{
-			{title: "Name", width: 36},
-			{title: "Type", width: 44},
-			{title: "Location", width: 16},
+			{title: "Name"},
+			{title: "Type"},
+			{title: "Location"},
 		},
 		row:  func(r azure.Resource) []string { return []string{r.Name, r.Type, r.Location} },
 		open: func(r azure.Resource) View { return NewDetails(subscriptionID, r) },
@@ -256,10 +257,10 @@ func NewAllResourceGroups() View {
 		noun:  "resource groups",
 		empty: "No resource groups found.",
 		columns: []column{
-			{title: "Name", width: 36},
-			{title: "Subscription", width: 28},
-			{title: "Location", width: 16},
-			{title: "State", width: 12, state: true},
+			{title: "Name"},
+			{title: "Subscription"},
+			{title: "Location"},
+			{title: "State", state: true},
 		},
 		row:  func(g azure.ResourceGroup) []string { return []string{g.Name, g.Subscription, g.Location, g.State} },
 		open: func(g azure.ResourceGroup) View { return NewResources(g.SubscriptionID, g) },
@@ -277,14 +278,14 @@ func NewResourcesByType(resourceTypes ...string) View {
 	several := len(resourceTypes) > 1
 	empty := "No resources of this type."
 	columns := []column{
-		{title: "Name", width: 32},
-		{title: "Resource group", width: 28},
-		{title: "Subscription", width: 24},
-		{title: "Location", width: 16},
+		{title: "Name"},
+		{title: "Resource group"},
+		{title: "Subscription"},
+		{title: "Location"},
 	}
 	if several {
 		empty = "No resources of these types."
-		columns = slices.Insert(columns, 1, column{title: "Type", width: 24})
+		columns = slices.Insert(columns, 1, column{title: "Type"})
 	}
 	return newList(listConfig[azure.Resource]{
 		key:     data.Key{Kind: data.ResourcesOfType, Type: joined},
@@ -310,4 +311,16 @@ func mapRows[T any](items []T, row func(T) []string) [][]string {
 		rows[i] = row(it)
 	}
 	return rows
+}
+
+// listColumnMax is the widest a list column is by its own content.
+const listColumnMax = 40
+
+// listColumns is cols sized to the rows, none wider than listColumnMax.
+func listColumns(cols []column, rows [][]string) []column {
+	cols = sizeColumns(cols, rows, true)
+	for i := range cols {
+		cols[i].width = min(cols[i].width, listColumnMax)
+	}
+	return cols
 }
