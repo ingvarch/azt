@@ -27,7 +27,7 @@ var kinds = []resourceKind{
 	{types: []string{"microsoft.sql/servers"}, command: "sql", desc: "SQL servers in every subscription"},
 	{types: []string{"microsoft.storage/storageaccounts"}, command: "storage", desc: "storage accounts in every subscription", tabs: storageTabs, attention: storageAttention},
 	{types: []string{"microsoft.web/sites"}, command: "app", desc: "web apps in every subscription"},
-	{types: []string{"microsoft.network/virtualnetworks"}, command: "vnet", desc: "virtual networks in every subscription"},
+	{types: []string{"microsoft.network/virtualnetworks"}, command: "vnet", desc: "virtual networks in every subscription", tabs: vnetTabs, attention: vnetAttention},
 	{types: []string{"microsoft.managedidentity/userassignedidentities"}, command: "mi", desc: "managed identities in every subscription", tabs: miTabs},
 	{types: []string{"microsoft.containerregistry/registries"}, command: "acr", desc: "container registries in every subscription", tabs: acrTabs, attention: acrAttention},
 }

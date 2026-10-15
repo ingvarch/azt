@@ -323,8 +323,8 @@ func TestTableCutsAColoredStateCell(t *testing.T) {
 }
 
 func TestSummaryTable(t *testing.T) {
-	cols := []column{{title: "Name"}, {title: "State", state: true}}
-	lines := summaryTable(cols, [][]string{{"a", "Running"}, {"bb", "Stopped · Updating"}})
+	cols := []column{{title: "Name"}, {title: "State"}}
+	lines := summaryTable(cols, [][]string{{"a", stateText("Running")}, {"bb", stateText("Stopped · Updating")}})
 	want := []string{
 		"Name  State",
 		"a     ● Running",

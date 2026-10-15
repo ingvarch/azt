@@ -19,7 +19,7 @@ var aksTabs = []tabDef{
 func aksOverview(row map[string]any, width int) []string {
 	return sections(width,
 		section{title: "Essentials", lines: aksEssentials(row, innerWidth(width))},
-		section{title: overviewPools, lines: poolTable(row)},
+		aksPoolSummary.asSection(row, width),
 	)
 }
 
@@ -82,12 +82,12 @@ func pools(props any) []map[string]any {
 	return out
 }
 
-func poolVersion(pool map[string]any) string {
+func poolVersion(pool any) string {
 	return first(str(pool, "currentOrchestratorVersion"), str(pool, "orchestratorVersion"))
 }
 
 // poolRange is "min–max" for a pool with autoscaling, else "".
-func poolRange(pool map[string]any) string {
+func poolRange(pool any) string {
 	lo, hi := str(pool, "minCount"), str(pool, "maxCount")
 	if on, _ := flag(pool, "enableAutoScaling"); !on || lo == "" || hi == "" {
 		return ""
@@ -95,7 +95,7 @@ func poolRange(pool map[string]any) string {
 	return lo + "–" + hi
 }
 
-func poolNodes(pool map[string]any) string {
+func poolNodes(pool any) string {
 	count := str(pool, "count")
 	if r := poolRange(pool); count != "" && r != "" {
 		return count + " (" + r + ")"
@@ -114,21 +114,26 @@ func poolAutoscaling(pool map[string]any) string {
 	return first(poolRange(pool), "on")
 }
 
-func poolState(pool map[string]any) string {
+func poolState(pool any) string {
 	return orDash(join(stateSeparator, str(pool, "powerState", "code"), notSucceeded(str(pool, "provisioningState"))))
 }
 
-func poolTable(row map[string]any) []string {
-	ps := pools(dig(row, "properties"))
-	if len(ps) == 0 {
-		return []string{"none"}
-	}
-	cols := []column{{title: "Name"}, {title: "Mode"}, {title: "VM size"}, {title: "Nodes"}, {title: "Version"}, {title: "State", state: true}}
-	rows := make([][]string, len(ps))
-	for i, p := range ps {
-		rows[i] = []string{field(p, "name"), field(p, "mode"), field(p, "vmSize"), poolNodes(p), orDash(poolVersion(p)), poolState(p)}
-	}
-	return summaryTable(cols, rows)
+var aksPoolSummary = boxDef{title: overviewPools, table: &tableDef{
+	path: []string{"properties", "agentPoolProfiles"},
+	keep: isMap,
+	cols: []colDef{
+		{title: "Name", path: []string{"name"}},
+		{title: "Mode", path: []string{"mode"}},
+		{title: "VM size", path: []string{"vmSize"}},
+		{title: "Nodes", value: poolNodes},
+		{title: "Version", value: func(pool any) string { return orDash(poolVersion(pool)) }},
+		{title: "State", value: func(pool any) string { return stateText(poolState(pool)) }},
+	},
+}}
+
+func isMap(v any) bool {
+	_, ok := v.(map[string]any)
+	return ok
 }
 
 func isStopped(v any) bool { return strings.EqualFold(str(v, "powerState", "code"), "Stopped") }

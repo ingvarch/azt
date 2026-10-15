@@ -154,16 +154,12 @@ func summaryTable(cols []column, rows [][]string) []string {
 		titles[i] = cols[i].title
 		cols[i].width = lipgloss.Width(cols[i].title)
 		for _, r := range rows {
-			shown := cellAt(r, i)
-			if cols[i].state {
-				shown = stateText(shown)
-			}
-			cols[i].width = max(cols[i].width, lipgloss.Width(shown))
+			cols[i].width = max(cols[i].width, lipgloss.Width(cellAt(r, i)))
 		}
 	}
 	lines := []string{headerStyle.Render(strings.TrimRight(rowLine(cols, titles, summaryGap, false), " "))}
 	for _, r := range rows {
-		lines = append(lines, strings.TrimRight(rowLine(cols, r, summaryGap, true), " "))
+		lines = append(lines, strings.TrimRight(rowLine(cols, r, summaryGap, false), " "))
 	}
 	return lines
 }
