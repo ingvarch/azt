@@ -19,17 +19,20 @@ import (
 // bar is line 0 of the frame without styling codes.
 func (h *harness) bar() string { return strings.Split(h.frame(), "\n")[0] }
 
+// barLayouts are the window setups where the tab bar starts in a different column.
+var barLayouts = []struct {
+	name  string
+	build func() *harness
+	start int // first column of the tab bar
+	paneW int // width of a pane view
+}{
+	{"explorer shown", func() *harness { return newSidebarHarness(100, 30) }, sidebarWidth, 100 - sidebarWidth - 2},
+	{"explorer hidden", func() *harness { return newHarness(100, 30) }, 0, 98},
+	{"narrow window", func() *harness { return newSidebarHarness(sidebarWidth+minPaneWidth-1, 30) }, 0, sidebarWidth + minPaneWidth - 3},
+}
+
 func TestTabBarStartsWhereThePanesStart(t *testing.T) {
-	tests := []struct {
-		name  string
-		build func() *harness
-		start int
-	}{
-		{"explorer shown", func() *harness { return newSidebarHarness(100, 30) }, sidebarWidth},
-		{"explorer hidden", func() *harness { return newHarness(100, 30) }, 0},
-		{"narrow window", func() *harness { return newSidebarHarness(sidebarWidth+minPaneWidth-1, 30) }, 0},
-	}
-	for _, tt := range tests {
+	for _, tt := range barLayouts {
 		t.Run(tt.name, func(t *testing.T) {
 			bar := []rune(tt.build().bar() + strings.Repeat(" ", 40)) // padded: a short bar fails instead of panicking
 			if got := string(bar[tt.start : tt.start+3]); got != " 1 " {
@@ -77,7 +80,7 @@ func TestTabLabels(t *testing.T) {
 	h.prefix("t")
 	h.prefix("t")
 	h.m.tabs[1].name = "ab"
-	if got, want := strings.TrimRight(h.bar(), " "), " 1   2 ab   3"; got != want {
+	if got, want := strings.TrimRight(h.bar(), " "), " 1   2 ab   3   +"; got != want {
 		t.Errorf("bar = %q, want %q", got, want)
 	}
 }
@@ -87,7 +90,7 @@ func TestTabLabelsIgnoreViews(t *testing.T) {
 	h.prefix("t")
 	check := func(step string) {
 		t.Helper()
-		if got, want := strings.TrimRight(h.bar(), " "), " 1   2"; got != want {
+		if got, want := strings.TrimRight(h.bar(), " "), " 1   2   +"; got != want {
 			t.Errorf("after %s: bar = %q, want %q", step, got, want)
 		}
 	}
@@ -216,5 +219,117 @@ func TestRestoredSessionKeepsNamesInLabels(t *testing.T) {
 	line := strings.Split(sgr.ReplaceAllString(next.(Model).View().Content, ""), "\n")[0]
 	if want := " 1 work   2   3 second "; !strings.Contains(line, want) {
 		t.Errorf("bar = %q, want it to contain %q", line, want)
+	}
+}
+
+// plusX is the column of the " + " label after n tabs without names, for a bar starting at start.
+func plusX(start, n int) int { return start + n*4 }
+
+func TestPlusLabelFollowsTheLastTab(t *testing.T) {
+	plusStyle := regexp.MustCompile("\x1b\\[([0-9;]*)m \\+ ")
+	for _, l := range barLayouts {
+		for _, n := range []int{1, 3} {
+			h := l.build()
+			for range n - 1 {
+				h.prefix("t")
+			}
+			x := plusX(l.start, n)
+			bar := []rune(h.bar() + strings.Repeat(" ", 40)) // padded: a short bar fails instead of panicking
+			if got := string(bar[x : x+3]); got != " + " {
+				t.Errorf("%s n=%d: bar at %d = %q, want %q", l.name, n, x, got, " + ")
+			}
+			if got := string(bar[x-1]); got != " " {
+				t.Errorf("%s n=%d: no gap before the plus: %q", l.name, n, got)
+			}
+			raw := strings.Split(h.raw(), "\n")[0]
+			match := plusStyle.FindStringSubmatch(raw)
+			if match == nil || !slices.Equal(strings.Split(match[1], ";"), []string{"2"}) {
+				t.Errorf("%s n=%d: plus style = %v, want faint only", l.name, n, match)
+			}
+		}
+	}
+}
+
+func TestPressOnPlusOpensNamedTabAtTheEnd(t *testing.T) {
+	for _, l := range barLayouts {
+		for dx := range 3 {
+			h := l.build()
+			h.prefix("t")
+			h.prefix("p") // active is the first of two tabs
+			cmd := h.press(plusX(l.start, 2)+dx, 0)
+			if len(h.m.tabs) != 3 || h.m.active != 2 {
+				t.Fatalf("%s dx=%d: tabs %d, active %d", l.name, dx, len(h.m.tabs), h.m.active)
+			}
+			if cmd == nil || cmd() != "init-3" || h.recs[2].inits != 1 {
+				t.Errorf("%s dx=%d: the new view's Init did not run", l.name, dx)
+			}
+			if h.pane(h.focused()).rec.id != 3 {
+				t.Errorf("%s dx=%d: the active tab does not hold the new view", l.name, dx)
+			}
+			if v := h.pane(h.focused()); v.w != l.paneW || v.h != 26 {
+				t.Errorf("%s dx=%d: new view size = %dx%d, want %dx26", l.name, dx, v.w, v.h, l.paneW)
+			}
+			if h.m.mode != modeRename || h.m.input.Value() != "" {
+				t.Errorf("%s dx=%d: mode %v, input %q", l.name, dx, h.m.mode, h.m.input.Value())
+			}
+		}
+	}
+}
+
+func TestPlusTabNameFlow(t *testing.T) {
+	tests := []struct {
+		name  string
+		typed string
+		end   string
+		label string
+	}{
+		{"typed name", " Prod ", "enter", " 2 Prod "},
+		{"enter with nothing typed", "", "enter", " 2 "},
+		{"blank name", "   ", "enter", " 2 "},
+		{"esc", "", "esc", " 2 "},
+		{"esc after typing", "x", "esc", " 2 "},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(100, 30)
+			h.press(plusX(0, 1), 0)
+			h.typ(tt.typed)
+			h.send(key(tt.end))
+			if h.m.mode != modeNormal || len(h.m.tabs) != 2 || h.m.active != 1 {
+				t.Fatalf("mode %v, tabs %d, active %d", h.m.mode, len(h.m.tabs), h.m.active)
+			}
+			if got := h.m.tabLabel(1); got != tt.label {
+				t.Errorf("label = %q, want %q", got, tt.label)
+			}
+		})
+	}
+}
+
+func TestPressInTheGapAndPastPlusDoesNothing(t *testing.T) {
+	for _, x := range []int{plusX(0, 1) - 1, plusX(0, 1) + 3, 40, 99} {
+		h := newHarness(100, 30)
+		if cmd := h.press(x, 0); cmd != nil {
+			t.Errorf("x=%d: press returned a command", x)
+		}
+		if len(h.m.tabs) != 1 || h.m.mode != modeNormal {
+			t.Errorf("x=%d: tabs %d, mode %v", x, len(h.m.tabs), h.m.mode)
+		}
+	}
+}
+
+func TestPressOnPlusIsIgnoredInOtherModes(t *testing.T) {
+	enter := map[string]func(h *harness){
+		"help":   func(h *harness) { h.send(key("?")) },
+		"prefix": func(h *harness) { h.send(key("ctrl+w")) },
+		"rename": func(h *harness) { h.prefix(",") },
+		"filter": func(h *harness) { h.send(key("/")) },
+	}
+	for name, do := range enter {
+		h, _ := newFilterHarness(100, 30)
+		do(h)
+		h.press(plusX(0, 1), 0)
+		if len(h.m.tabs) != 1 {
+			t.Errorf("%s: a tab was opened", name)
+		}
 	}
 }

@@ -535,11 +535,11 @@ func TestNewTabInsertsAfterActive(t *testing.T) {
 	h.m.tabs[1].name = "two"
 	h.prefix("1")
 	h.prefix("t") // [1 new two]
-	if got, want := strings.TrimRight(h.bar(), " "), " 1   2   3 two"; got != want {
+	if got, want := strings.TrimRight(h.bar(), " "), " 1   2   3 two   +"; got != want {
 		t.Errorf("tab bar = %q, want %q", got, want)
 	}
-	if h.m.active != 1 {
-		t.Errorf("active = %d, want 1", h.m.active)
+	if h.m.active != 1 || h.m.mode != modeNormal {
+		t.Errorf("active = %d, mode %v, want 1 and normal", h.m.active, h.m.mode)
 	}
 }
 
@@ -1051,7 +1051,7 @@ func TestTabLabelIgnoresPathAndStatusBarShowsNoPath(t *testing.T) {
 	h.send(key("enter"))
 	h.send(key("enter"))
 	lines := strings.Split(h.frame(), "\n")
-	if got := strings.TrimRight(lines[0], " "); got != " 1" {
+	if got := strings.TrimRight(lines[0], " "); got != " 1   +" {
 		t.Errorf("tab bar = %q", got)
 	}
 	if status := lines[len(lines)-1]; !strings.Contains(status, normalHints) || strings.Contains(status, "Fake") {

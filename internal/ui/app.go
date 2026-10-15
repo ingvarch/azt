@@ -62,8 +62,11 @@ var (
 	border       = lipgloss.NormalBorder()
 )
 
-// tabGap separates two tab labels in the tab bar.
+// tabGap separates two labels in the tab bar.
 const tabGap = " "
+
+// plusLabel is the button after the last tab that opens a named tab.
+const plusLabel = " + "
 
 type tab struct {
 	root   *layout.Node
@@ -494,7 +497,7 @@ func (m *Model) focusAction(t *tab, k string) bool {
 func (m *Model) tabAction(t *tab, k string) tea.Cmd {
 	switch k {
 	case "t":
-		return m.newTab()
+		return m.newTab(m.active + 1)
 	case ",":
 		m.startInput(modeRename, t.name)
 	case "?":
@@ -595,13 +598,14 @@ func (m *Model) closeTab() {
 	m.active = max(m.active-1, 0)
 }
 
-func (m *Model) newTab() tea.Cmd {
+// newTab opens a tab at index at, makes it active and runs its view's Init.
+func (m *Model) newTab(at int) tea.Cmd {
 	id := m.nextID
 	m.nextID++
 	v := m.newView()
 	m.stacks[id] = []views.View{v}
-	m.tabs = slices.Insert(m.tabs, m.active+1, tab{root: layout.Leaf(id), focus: id})
-	m.active++
+	m.tabs = slices.Insert(m.tabs, at, tab{root: layout.Leaf(id), focus: id})
+	m.active = at
 	return v.Init()
 }
 
@@ -655,7 +659,7 @@ func (m Model) helpRect() layout.Rect {
 	return layout.Rect{X: (m.width - w) / 2, Y: (m.height - h) / 2, W: w, H: h}
 }
 
-// tabBar draws the tab labels, one tabGap apart; the canvas cuts it at the window edge.
+// tabBar draws the tab labels and the plus button, one tabGap apart; the canvas cuts it at the window edge.
 func (m Model) tabBar() string {
 	var b strings.Builder
 	for i := range m.tabs {
@@ -668,6 +672,8 @@ func (m Model) tabBar() string {
 		}
 		b.WriteString(style.Render(m.tabLabel(i)))
 	}
+	b.WriteString(tabGap)
+	b.WriteString(hintStyle.Render(plusLabel))
 	return b.String()
 }
 
