@@ -16,10 +16,10 @@ Tabs, split panes and one session for every subscription you can see.
 
 - Walks from subscriptions to resource groups, resources and the full JSON of
   a resource: `enter` goes in, `esc` comes back.
-- Lists every VM, AKS cluster, key vault, SQL server, storage account, web app,
-  virtual network, managed identity, container registry, network security
-  group, DNS zone or private DNS zone across all your subscriptions in one
-  table: `:vm`, `:aks`, `:kv` and the other commands.
+- Lists every VM, AKS cluster, key vault, SQL server, PostgreSQL server,
+  storage account, web app, virtual network, managed identity, container
+  registry, network security group, DNS zone or private DNS zone across all
+  your subscriptions in one table: `:vm`, `:aks`, `:kv` and the other commands.
 - Splits the screen into panes and keeps several tabs, the way vim does with
   `ctrl+w`. Each pane has its own path; a split copies it.
 - Shows an explorer tree of subscriptions, resource groups and resource types
@@ -81,7 +81,7 @@ Press `?` for help, `:` for a command, `/` to filter and `q` to quit.
 | `enter` / `esc` | open the selected item / go back |
 | `j` `k`, `↑` `↓` | move |
 | `/` | filter the list |
-| `:` | command: `subs`, `rg`, `vm`, `aks`, `kv`, `sql`, `storage`, `app`, `vnet`, `mi`, `acr`, `nsg`, `dns`, `type <type>`, `help`, `q` |
+| `:` | command: `subs`, `rg`, `vm`, `aks`, `kv`, `sql`, `pg`, `storage`, `app`, `vnet`, `mi`, `acr`, `nsg`, `dns`, `type <type>`, `help`, `q` |
 | `r` | refresh |
 | `ctrl+w v` / `ctrl+w s` | split into left and right / top and bottom |
 | `ctrl+w h j k l`, `ctrl+w` arrows | move to the neighbor pane or the explorer |

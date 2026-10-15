@@ -1,0 +1,31 @@
+{
+  "id": "/subscriptions/s9/resourceGroups/rg-orders/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-orders",
+  "name": "pg-orders",
+  "type": "microsoft.dbforpostgresql/flexibleservers",
+  "location": "northeurope",
+  "resourceGroup": "rg-orders",
+  "subscriptionId": "s9",
+  "subscription": "Prod",
+  "sku": {"name": "Standard_D4ds_v5", "tier": "GeneralPurpose"},
+  "tags": {"team": "orders"},
+  "properties": {
+    "state": "Ready",
+    "version": "17",
+    "minorVersion": "6",
+    "administratorLogin": "pgadmin",
+    "fullyQualifiedDomainName": "pg-orders.postgres.database.azure.com",
+    "availabilityZone": "2",
+    "authConfig": {"activeDirectoryAuth": "Enabled", "passwordAuth": "Disabled"},
+    "backup": {"backupRetentionDays": 14, "geoRedundantBackup": "Enabled", "earliestRestoreDate": "2025-08-13T01:45:10+02:00"},
+    "dataEncryption": {"type": "AzureKeyVault"},
+    "highAvailability": {"mode": "ZoneRedundant", "state": "Healthy", "standbyAvailabilityZone": "3"},
+    "maintenanceWindow": {"customWindow": "Enabled", "dayOfWeek": 5, "startHour": 4, "startMinute": 30},
+    "network": {
+      "delegatedSubnetResourceId": "/subscriptions/s9/resourceGroups/rg-net/providers/Microsoft.Network/virtualNetworks/vnet-hub/subnets/snet-pg",
+      "privateDnsZoneArmResourceId": "/subscriptions/s9/resourceGroups/rg-net/providers/Microsoft.Network/privateDnsZones/pg-orders.private.postgres.database.azure.com",
+      "publicNetworkAccess": "Enabled"
+    },
+    "replica": {"role": "Primary", "capacity": 7},
+    "storage": {"autoGrow": "Enabled", "iops": 500, "storageSizeGB": 128, "tier": "P10", "type": "Premium_LRS"}
+  }
+}

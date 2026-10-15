@@ -50,7 +50,7 @@ var helpSections = []struct {
 	{"Commands", []helpEntry{
 		{":", "command dialog (↑ ↓ choose, tab completes)"},
 		{"subs  rg", "all subscriptions, all resource groups"},
-		{"vm aks kv sql", "all resources of that type, in every subscription"},
+		{"vm aks kv sql pg", "all resources of that type, in every subscription"},
 		{"storage app vnet", "storage accounts, web apps, virtual networks"},
 		{"mi acr", "managed identities, container registries"},
 		{"nsg dns", "network security groups, public and private DNS zones"},
