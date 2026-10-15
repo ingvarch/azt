@@ -22,7 +22,7 @@ var helpSections = []struct {
 		{"r", "refresh"},
 		{"?", "this help"},
 		{"q", "quit"},
-		{"ctrl+c", "quit from any mode"},
+		{"ctrl+c", "quit; clears the field in a tab dialog"},
 	}},
 	{"Layout (ctrl+w)", []helpEntry{
 		{"v / s", "split into left and right / top and bottom"},

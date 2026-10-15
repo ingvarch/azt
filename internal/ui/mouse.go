@@ -44,6 +44,12 @@ func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.mode = modeNormal
 		}
 		return m, nil
+	case m.mode == modeTabDialog:
+		var cmd tea.Cmd
+		if _, ok := msg.(tea.MouseClickMsg); ok && mo.Button == tea.MouseLeft {
+			cmd = m.dialogPress(mo.X, mo.Y)
+		}
+		return m, cmd
 	case m.typing() || m.mode == modePalette:
 		return m, nil
 	}
@@ -70,10 +76,8 @@ func (m *Model) leftPress(x, y int) tea.Cmd {
 	m.last = nil
 	if i, ok := m.tabAt(x, y); ok {
 		if i == len(m.tabs) {
-			cmd := m.newTab(i)
-			m.resizeViews()
-			m.startInput(modeRename, "")
-			return cmd
+			m.openTabDialog(true)
+			return nil
 		}
 		m.active = i
 		m.resizeViews()

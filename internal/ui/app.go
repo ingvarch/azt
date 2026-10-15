@@ -31,9 +31,7 @@ const (
 	pathCut            = "… › "
 	prefixHints        = "v/s split  hjkl/←↓↑→ focus  q close  z zoom  = equal  <>+- resize  t tab  n/p/1-9 switch  e explorer  , rename  ? help  esc cancel"
 	filterHints        = "enter apply  esc clear"
-	renameHints        = "enter save  esc cancel"
 	paletteHints       = "↑↓ choose  tab complete  enter run  esc close"
-	renamePrompt       = "rename tab: "
 )
 
 type mode int
@@ -43,7 +41,7 @@ const (
 	modePrefix
 	modeFilter
 	modePalette
-	modeRename
+	modeTabDialog
 	modeHelp
 )
 
@@ -96,7 +94,8 @@ type Model struct {
 	nextID        layout.PaneID
 	width, height int
 	mode          mode
-	input         textinput.Model // serves the filter and the rename
+	input         textinput.Model // serves the filter and the tab dialog
+	newTabDialog  bool            // the tab dialog opens a tab; otherwise it renames the active one
 	palette       paletteModel    // the command dialog, while the mode is palette
 	notice        string          // command error shown until the next key
 	now           func() time.Time
@@ -195,21 +194,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	k := msg.String()
-	if k == "ctrl+c" {
+	if k == "ctrl+c" && m.mode != modeTabDialog {
 		return m, tea.Quit
 	}
 	m.notice = ""
 	m.drag, m.last = nil, nil
-	switch {
-	case m.mode == modePrefix:
+	switch m.mode {
+	case modePrefix:
 		m.mode = modeNormal
 		return m.runPrefix(k)
-	case m.mode == modeHelp:
+	case modeHelp:
 		m.mode = modeNormal
 		return m, nil
-	case m.mode == modePalette:
+	case modePalette:
 		return m.paletteKey(msg)
-	case m.typing():
+	case modeTabDialog:
+		return m.dialogKey(msg)
+	case modeFilter:
 		return m.inputKey(msg)
 	}
 	if m.openOverlay(k) {
@@ -271,19 +272,17 @@ func (m *Model) startFilter() {
 
 // typing reports whether keys and pastes go to the input.
 func (m Model) typing() bool {
-	return m.mode == modeFilter || m.mode == modeRename
+	return m.mode == modeFilter || m.mode == modeTabDialog
 }
 
-// inputKey handles a key in filter and rename mode.
+// inputKey handles a key in filter mode.
 func (m Model) inputKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		m.finishInput()
+		m.mode = modeNormal
 		return m, nil
 	case "esc":
-		if m.mode == modeFilter {
-			m.setFilter(m.tabs[m.active].focus, "")
-		}
+		m.setFilter(m.tabs[m.active].focus, "")
 		m.mode = modeNormal
 		return m, nil
 	}
@@ -299,14 +298,6 @@ func (m *Model) editInput(msg tea.Msg) tea.Cmd {
 		m.setFilter(m.tabs[m.active].focus, m.input.Value())
 	}
 	return cmd
-}
-
-// finishInput applies the input on enter and returns to normal mode.
-func (m *Model) finishInput() {
-	if m.mode == modeRename {
-		m.tabs[m.active].name = strings.TrimSpace(m.input.Value())
-	}
-	m.mode = modeNormal
 }
 
 // runCommand runs a palette command; an error becomes the notice.
@@ -451,7 +442,7 @@ func (m Model) runPrefix(k string) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	if !m.layoutAction(t, k) && !m.focusAction(t, k) {
-		cmd = m.tabAction(t, k)
+		cmd = m.tabAction(k)
 	}
 	m.resizeViews()
 	return m, cmd
@@ -509,12 +500,12 @@ func (m *Model) focusAction(t *tab, k string) bool {
 }
 
 // tabAction runs the remaining prefix keys: new, rename, switch and help.
-func (m *Model) tabAction(t *tab, k string) tea.Cmd {
+func (m *Model) tabAction(k string) tea.Cmd {
 	switch k {
 	case "t":
 		return m.newTab(m.active + 1)
 	case ",":
-		m.startInput(modeRename, t.name)
+		m.openTabDialog(false)
 	case "?":
 		m.mode = modeHelp
 	case "n":
@@ -664,6 +655,11 @@ func (m Model) frame() string {
 			comp.AddLayers(lipgloss.NewLayer(m.paletteBox(r)).X(r.X).Y(r.Y))
 		}
 	}
+	if m.mode == modeTabDialog {
+		if r, ok := m.tabDialogRect(); ok {
+			comp.AddLayers(lipgloss.NewLayer(m.tabDialogBox(r)).X(r.X).Y(r.Y))
+		}
+	}
 	return lipgloss.NewCanvas(m.width, m.height).Compose(comp).Render()
 }
 
@@ -733,8 +729,8 @@ func (m Model) statusBar() string {
 		bar = m.inputLine("/") + "  " + hintStyle.Render(filterHints)
 	case modePalette:
 		bar = hintStyle.Render(paletteHints)
-	case modeRename:
-		bar = m.inputLine(renamePrompt) + "  " + hintStyle.Render(renameHints)
+	case modeTabDialog:
+		bar = hintStyle.Render(dialogHints)
 	default:
 		bar = m.modeBar()
 	}
@@ -744,15 +740,21 @@ func (m Model) statusBar() string {
 // inputLine draws prompt and the input, as wide as its text, up to the window.
 // A long text scrolls and keeps the cursor in view.
 func (m Model) inputLine(prompt string) string {
-	in := m.input
 	// One cell stays free for the cursor at the end of the text.
-	in.SetWidth(min(lipgloss.Width(in.Value())+1, max(m.width-lipgloss.Width(prompt)-1, 1)))
-	// The stored input has no width, so it never scrolled: rebuild the
-	// window from the end, then move it back to the cursor.
+	width := min(lipgloss.Width(m.input.Value())+1, max(m.width-lipgloss.Width(prompt)-1, 1))
+	return prompt + m.sizedInput(width).View()
+}
+
+// sizedInput is the input set to width cells. The stored input has no width,
+// so it never scrolled: rebuild the window from the end, then move it back to
+// the cursor.
+func (m Model) sizedInput(width int) textinput.Model {
+	in := m.input
+	in.SetWidth(width)
 	pos := in.Position()
 	in.CursorEnd()
 	in.SetCursor(pos)
-	return prompt + in.View()
+	return in
 }
 
 // modeBar is the status bar outside the input modes: badge, path or notice, hints.

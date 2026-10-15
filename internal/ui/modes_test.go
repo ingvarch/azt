@@ -313,48 +313,6 @@ func TestPaletteErrorShowsUntilNextKey(t *testing.T) {
 	}
 }
 
-func TestRenameFlow(t *testing.T) {
-	h := newHarness(200, 30)
-	h.prefix(",")
-	if h.m.mode != modeRename {
-		t.Fatalf("mode = %v", h.m.mode)
-	}
-	wantIn(t, "status", h.status(), "rename tab: ", "enter save  esc cancel")
-	h.typ("  Prod ")
-	wantIn(t, "status", h.status(), "rename tab:   Prod ")
-	h.send(key("enter"))
-	if h.m.mode != modeNormal || h.m.tabs[0].name != "Prod" {
-		t.Errorf("after enter: mode %v, name %q", h.m.mode, h.m.tabs[0].name)
-	}
-	wantIn(t, "tab bar", strings.Split(h.frame(), "\n")[0], "  1 Prod  ")
-
-	h.prefix(",")
-	wantIn(t, "status", h.status(), "rename tab: Prod")
-	h.send(key("esc"))
-	if h.m.mode != modeNormal || h.m.tabs[0].name != "Prod" {
-		t.Errorf("after esc: mode %v, name %q", h.m.mode, h.m.tabs[0].name)
-	}
-
-	h.prefix(",")
-	h.typ("x")
-	h.send(key("esc"))
-	if h.m.tabs[0].name != "Prod" {
-		t.Errorf("esc saved the input: %q", h.m.tabs[0].name)
-	}
-
-	h.prefix(",")
-	for range len("Prod") {
-		h.send(key("backspace"))
-	}
-	h.send(key("enter"))
-	if h.m.tabs[0].name != "" {
-		t.Errorf("name = %q, want cleared", h.m.tabs[0].name)
-	}
-	if got := strings.TrimRight(strings.Split(h.frame(), "\n")[0], " "); got != "   1    "+" "+" +" {
-		t.Errorf("tab bar = %q, want the number and the plus", got)
-	}
-}
-
 func TestRenameAppliesToActiveTabOnly(t *testing.T) {
 	h := newHarness(200, 30)
 	h.prefix("t")
@@ -367,16 +325,6 @@ func TestRenameAppliesToActiveTabOnly(t *testing.T) {
 	}
 	if h.m.tabs[0].name != "" {
 		t.Errorf("first tab renamed: %q", h.m.tabs[0].name)
-	}
-}
-
-func TestRenameKeysAreNotForwarded(t *testing.T) {
-	h := newHarness(200, 30)
-	h.prefix(",")
-	h.typ("abc")
-	h.send(key("enter"))
-	if got := h.pane(0).keys; len(got) != 0 {
-		t.Errorf("view got %v", got)
 	}
 }
 
@@ -422,7 +370,6 @@ func TestCtrlCQuitsInEveryMode(t *testing.T) {
 		"prefix":  {"ctrl+w"},
 		"filter":  {"/"},
 		"palette": {":"},
-		"rename":  {"ctrl+w", ","},
 		"help":    {"?"},
 	}
 	for name, keys := range enter {
@@ -440,7 +387,7 @@ func TestNewPrefixKeysWorkInSidebar(t *testing.T) {
 	h := newSidebarHarness(100, 30)
 	h.prefix("h")
 	h.prefix(",")
-	if h.m.mode != modeRename {
+	if h.m.mode != modeTabDialog {
 		t.Errorf(", mode = %v", h.m.mode)
 	}
 	h.send(key("esc"))
@@ -514,7 +461,7 @@ func TestHelpBoxGeometry(t *testing.T) {
 }
 
 func TestFrameFitsWithOverlay(t *testing.T) {
-	overlays := map[string][]string{"help": {"?"}, "dialog": {":", "s"}}
+	overlays := map[string][]string{"help": {"?"}, "dialog": {":", "s"}, "tab dialog": {"ctrl+w", ","}}
 	for name, keys := range overlays {
 		for _, s := range [][2]int{{140, 40}, {100, 30}, {30, 8}, {20, 6}, {14, 7}, {13, 5}, {5, 3}, {1, 1}, {80, 4}} {
 			for _, sidebar := range []bool{false, true} {
@@ -574,7 +521,6 @@ var inputModes = []struct {
 	start        func(*harness)
 }{
 	{"filter", "/", func(h *harness) { h.send(key("/")) }},
-	{"rename", renamePrompt, func(h *harness) { h.prefix(",") }},
 }
 
 func TestInputKeepsCursorInView(t *testing.T) {
