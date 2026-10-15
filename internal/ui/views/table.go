@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // headerLines is the column titles plus the rule below them.
@@ -101,7 +102,7 @@ func (t table) view() string {
 	for i := t.top; i < min(t.top+t.visible(), len(t.rows)); i++ {
 		text := t.line(t.rows[i], true)
 		if i == t.cursor {
-			text = reverse(text)
+			text = selectedStyle.Render(ansi.Strip(text))
 		}
 		lines = append(lines, text)
 	}
@@ -135,11 +136,8 @@ func cellAt(cells []string, i int) string {
 	return ""
 }
 
-// reverse draws s reversed, also behind the colors it has.
-func reverse(s string) string {
-	const on, off = "\x1b[7m", "\x1b[m"
-	return on + strings.ReplaceAll(s, off, off+on) + off
-}
+// selectedStyle draws the selected row: reversed, without the colors of its cells.
+var selectedStyle = lipgloss.NewStyle().Reverse(true)
 
 // headerStyle draws the column titles of a summary table.
 var headerStyle = lipgloss.NewStyle().Bold(true).Foreground(muted)
