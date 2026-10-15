@@ -37,10 +37,10 @@ func (h *harness) sidebarTitles() []string {
 func TestSidebarShownAtStart(t *testing.T) {
 	h := newSidebarHarness(100, 30)
 	lines := strings.Split(h.frame(), "\n")
-	if !strings.HasPrefix(lines[1], "┌ Explorer ") {
-		t.Errorf("top border = %q", lines[1])
+	if !strings.HasPrefix(lines[0], "┌ Explorer ") {
+		t.Errorf("top border = %q", lines[0])
 	}
-	if got := []rune(lines[1]); string(got[sidebarWidth-1:sidebarWidth+1]) != "┐┌" {
+	if got := []rune(lines[1]); string(got[sidebarWidth-1:sidebarWidth+1]) != "│┌" {
 		t.Errorf("sidebar does not end at column %d: %q", sidebarWidth, lines[1])
 	}
 	if got := []rune(lines[len(lines)-2]); got[0] != '└' || string(got[sidebarWidth-1:sidebarWidth+1]) != "┘└" {
@@ -292,21 +292,24 @@ func TestSidebarBorderColors(t *testing.T) {
 	focus := strings.TrimSuffix(lipgloss.NewStyle().Foreground(focusColor).Render("┌"), "\x1b[m")
 	gray := strings.TrimSuffix(lipgloss.NewStyle().Foreground(borderColor).Render("┌"), "\x1b[m")
 	h := newSidebarHarness(100, 30)
-	line := func() string { return strings.Split(h.raw(), "\n")[1] }
+	// the sidebar corner is on line 0, the pane corner on line 1
+	corners := func() (side, pane string) {
+		lines := strings.Split(h.raw(), "\n")
+		return lines[0], lines[1]
+	}
+	check := func(step, sideColor, paneColor string) {
+		t.Helper()
+		side, pane := corners()
+		if !strings.Contains(side, sideColor) || !strings.Contains(pane, paneColor) {
+			t.Errorf("%s: sidebar line %q, pane line %q", step, side, pane)
+		}
+	}
 
-	l := line()
-	if strings.Count(l, focus) != 1 || strings.Count(l, gray) != 1 || strings.Index(l, gray) > strings.Index(l, focus) {
-		t.Errorf("pane focused: want gray sidebar then focus pane, got %q", l)
-	}
+	check("pane focused", gray, focus)
 	h.prefix("h")
-	l = line()
-	if strings.Count(l, focus) != 1 || strings.Count(l, gray) != 1 || strings.Index(l, focus) > strings.Index(l, gray) {
-		t.Errorf("sidebar focused: want focus sidebar then gray pane, got %q", l)
-	}
+	check("sidebar focused", focus, gray)
 	h.prefix("l")
-	if l = line(); strings.Index(l, gray) > strings.Index(l, focus) {
-		t.Errorf("focus did not return to the pane: %q", l)
-	}
+	check("focus returned to the pane", gray, focus)
 }
 
 func TestSidebarSelectionStyleFollowsFocus(t *testing.T) {

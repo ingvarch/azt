@@ -263,11 +263,11 @@ func TestMouseSessionRoundTrip(t *testing.T) {
 	s := newScenario(t)
 	s.settle(s.m.Init())
 
-	s.settle(s.harness.press(1, 2)) // marker of Dev
+	s.settle(s.harness.press(1, 1)) // marker of Dev
 	s.want(t, "subscription expanded", "▾ Dev", "▸ rg-a")
 
-	s.settle(s.harness.press(10, 3))
-	s.settle(s.harness.press(10, 3)) // double press on rg-a
+	s.settle(s.harness.press(10, 2))
+	s.settle(s.harness.press(10, 2)) // double press on rg-a
 	s.want(t, "group opened", "Subscriptions › Dev › rg-a", "web-app", "sql-db")
 	if s.m.sidebarFocused {
 		t.Error("sidebar kept focus after the double press")

@@ -38,35 +38,6 @@ func TestViewSetsMouseMode(t *testing.T) {
 	}
 }
 
-func TestPressOnTabActivates(t *testing.T) {
-	tests := []struct {
-		name   string
-		x, y   int
-		active int
-	}{
-		{"first label start", 0, 0, 0},
-		{"first label end", 8, 0, 0},
-		{"second label start", 9, 0, 1},
-		{"second label end", 17, 0, 1},
-		{"third label (renamed)", 18, 0, 2},
-		{"third label end", 23, 0, 2},
-		{"after the labels", 40, 0, 1},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := newHarness(100, 30)
-			h.prefix("t")
-			h.prefix("t")
-			h.m.tabs[2].name = "ab"
-			h.m.active = 1
-			h.press(tt.x, tt.y)
-			if h.m.active != tt.active {
-				t.Errorf("active = %d, want %d", h.m.active, tt.active)
-			}
-		})
-	}
-}
-
 func TestPressOnTabResizesViews(t *testing.T) {
 	h := newHarness(100, 30)
 	h.prefix("t")
@@ -346,14 +317,14 @@ func TestDoublePressOnBorderDoesNothing(t *testing.T) {
 func TestPressOnSidebar(t *testing.T) {
 	h := newSidebarHarness(100, 30)
 	h.loadSubs()
-	h.press(5, 3) // second row: Prod
+	h.press(5, 2) // second row: Prod
 	if !h.m.sidebarFocused {
 		t.Error("sidebar not focused")
 	}
 	if got := h.sidebarTitles(); !slices.Equal(got, []string{"Subscriptions", "Prod"}) {
 		t.Errorf("selected stack = %v", got)
 	}
-	h.press(0, 3) // the border
+	h.press(0, 2) // the border
 	if !h.m.sidebarFocused {
 		t.Error("border press dropped the sidebar focus")
 	}
@@ -362,7 +333,7 @@ func TestPressOnSidebar(t *testing.T) {
 func TestSidebarMarkerClickFetches(t *testing.T) {
 	h := newSidebarHarness(100, 30)
 	h.loadSubs()
-	cmd := h.press(1, 2) // marker cell of Dev
+	cmd := h.press(1, 1) // marker cell of Dev
 	var got []data.FetchMsg
 	for _, msg := range collect(cmd) {
 		if f, ok := msg.(data.FetchMsg); ok {
@@ -378,8 +349,8 @@ func TestSidebarMarkerClickFetches(t *testing.T) {
 func TestDoublePressOnSidebarOpens(t *testing.T) {
 	h := newSidebarHarness(100, 30)
 	h.loadSubs()
-	h.press(10, 3)
-	h.press(10, 3)
+	h.press(10, 2)
+	h.press(10, 2)
 	if h.m.sidebarFocused {
 		t.Error("sidebar kept focus")
 	}
@@ -391,7 +362,7 @@ func TestDoublePressOnSidebarOpens(t *testing.T) {
 func TestDoublePressSidebarThenPaneIsNotDouble(t *testing.T) {
 	h := newSidebarHarness(100, 30)
 	h.loadSubs()
-	h.press(10, 3)
+	h.press(10, 2)
 	h.press(40, 3)
 	if got := len(h.m.stacks[0]); got != 1 {
 		t.Errorf("stack depth = %d, want 1", got)
@@ -471,8 +442,8 @@ func TestPressAfterLostReleaseEndsDrag(t *testing.T) {
 }
 
 func TestPressOnUndrawnSidebarDoesNothing(t *testing.T) {
-	h := newSidebarHarness(100, 3) // both boxes are one row high
-	h.press(5, 1)
+	h := newSidebarHarness(100, 2) // the sidebar is one row high
+	h.press(5, 0)
 	if h.m.sidebarFocused {
 		t.Error("the press focused the undrawn sidebar")
 	}

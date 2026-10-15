@@ -199,12 +199,13 @@ func (m Model) tabAt(x, y int) (int, bool) {
 	if y != 0 {
 		return 0, false
 	}
-	end := 0
+	start := m.paneArea().X
 	for i := range m.tabs {
-		end += lipgloss.Width(m.tabLabel(i))
-		if x < end {
+		end := start + lipgloss.Width(m.tabLabel(i))
+		if x >= start && x < end {
 			return i, true
 		}
+		start = end + lipgloss.Width(tabGap)
 	}
 	return 0, false
 }

@@ -56,10 +56,14 @@ var (
 	borderColor  = lipgloss.Color("8")
 	reverseStyle = lipgloss.NewStyle().Reverse(true)
 	hintStyle    = lipgloss.NewStyle().Faint(true)
+	tabStyle     = lipgloss.NewStyle().Foreground(focusColor).Reverse(true).Bold(true)
 	boldStyle    = lipgloss.NewStyle().Bold(true)
 	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Red)
 	border       = lipgloss.NormalBorder()
 )
+
+// tabGap separates two tab labels in the tab bar.
+const tabGap = " "
 
 type tab struct {
 	root   *layout.Node
@@ -512,7 +516,7 @@ func (m Model) sidebarDrawn() bool {
 }
 
 func (m Model) sidebarRect() layout.Rect {
-	return layout.Rect{X: 0, Y: 1, W: sidebarWidth, H: max(m.height-2, 0)}
+	return layout.Rect{X: 0, Y: 0, W: sidebarWidth, H: max(m.height-1, 0)}
 }
 
 func (m Model) paneArea() layout.Rect {
@@ -615,7 +619,7 @@ func (m Model) View() tea.View {
 
 func (m Model) frame() string {
 	comp := lipgloss.NewCompositor(
-		lipgloss.NewLayer(m.tabBar()),
+		lipgloss.NewLayer(m.tabBar()).X(m.paneArea().X),
 		lipgloss.NewLayer(m.statusBar()).Y(m.height-1),
 	)
 	focus := m.tabs[m.active].focus
@@ -651,26 +655,29 @@ func (m Model) helpRect() layout.Rect {
 	return layout.Rect{X: (m.width - w) / 2, Y: (m.height - h) / 2, W: w, H: h}
 }
 
+// tabBar draws the tab labels, one tabGap apart; the canvas cuts it at the window edge.
 func (m Model) tabBar() string {
 	var b strings.Builder
 	for i := range m.tabs {
-		label := m.tabLabel(i)
-		if i == m.active {
-			label = reverseStyle.Render(label)
+		if i > 0 {
+			b.WriteString(tabGap)
 		}
-		b.WriteString(label)
+		style := hintStyle
+		if i == m.active {
+			style = tabStyle
+		}
+		b.WriteString(style.Render(m.tabLabel(i)))
 	}
-	return lipgloss.NewStyle().MaxWidth(m.width).Render(b.String())
+	return b.String()
 }
 
-// tabLabel is tab i as drawn in the tab bar, without the active mark.
+// tabLabel is tab i as drawn in the tab bar: its number and its name, if any.
 func (m Model) tabLabel(i int) string {
-	t := m.tabs[i]
-	name := t.name
-	if name == "" {
-		name = m.top(t.focus).Title()
+	label := " " + strconv.Itoa(i+1) + " "
+	if name := m.tabs[i].name; name != "" {
+		label += name + " "
 	}
-	return " " + strconv.Itoa(i+1) + " " + name + " "
+	return label
 }
 
 func (m Model) statusBar() string {

@@ -350,7 +350,9 @@ func TestRenameFlow(t *testing.T) {
 	if h.m.tabs[0].name != "" {
 		t.Errorf("name = %q, want cleared", h.m.tabs[0].name)
 	}
-	wantIn(t, "tab bar", strings.Split(h.frame(), "\n")[0], " 1 Fake1 ")
+	if got := strings.TrimRight(strings.Split(h.frame(), "\n")[0], " "); got != " 1" {
+		t.Errorf("tab bar = %q, want the number only", got)
+	}
 }
 
 func TestRenameAppliesToActiveTabOnly(t *testing.T) {
@@ -360,7 +362,9 @@ func TestRenameAppliesToActiveTabOnly(t *testing.T) {
 	h.typ("Two")
 	h.send(key("enter"))
 	bar := strings.Split(h.frame(), "\n")[0]
-	wantIn(t, "tab bar", bar, " 1 Fake1 ", " 2 Two ")
+	if got := strings.TrimRight(bar, " "); got != " 1   2 Two" {
+		t.Errorf("tab bar = %q", got)
+	}
 	if h.m.tabs[0].name != "" {
 		t.Errorf("first tab renamed: %q", h.m.tabs[0].name)
 	}
