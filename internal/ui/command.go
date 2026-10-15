@@ -23,8 +23,24 @@ type command struct {
 	view views.View
 }
 
-// commandNames lists the palette commands, in the order of completion and hints.
-var commandNames = []string{"subs", "rg", "vm", "aks", "kv", "sql", "storage", "app", "vnet", "type", "help", "q"}
+// commandInfo is a palette command and what it does.
+type commandInfo struct{ name, desc string }
+
+// commandTable lists the palette commands, in the order of the dialog.
+var commandTable = []commandInfo{
+	{"subs", "subscriptions"},
+	{"rg", "resource groups in every subscription"},
+	{"vm", "virtual machines in every subscription"},
+	{"aks", "AKS clusters in every subscription"},
+	{"kv", "key vaults in every subscription"},
+	{"sql", "SQL servers in every subscription"},
+	{"storage", "storage accounts in every subscription"},
+	{"app", "web apps in every subscription"},
+	{"vnet", "virtual networks in every subscription"},
+	{"type", "resources of any type: type <resource type>"},
+	{"help", "keys and commands"},
+	{"q", "quit"},
+}
 
 var typeAliases = map[string]string{
 	"vm":      "microsoft.compute/virtualmachines",
@@ -79,20 +95,10 @@ func matchingCommands(input string) []string {
 	word, _ := firstWord(input)
 	word = strings.ToLower(word)
 	var out []string
-	for _, name := range commandNames {
-		if strings.HasPrefix(name, word) {
-			out = append(out, name)
+	for _, c := range commandTable {
+		if strings.HasPrefix(c.name, word) {
+			out = append(out, c.name)
 		}
 	}
 	return out
-}
-
-// complete replaces the first word of input with the first command that starts with it.
-func complete(input string) string {
-	matches := matchingCommands(input)
-	if len(matches) == 0 {
-		return input
-	}
-	_, rest := firstWord(input)
-	return matches[0] + rest
 }

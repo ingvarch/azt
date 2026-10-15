@@ -44,7 +44,7 @@ func (m Model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.mode = modeNormal
 		}
 		return m, nil
-	case m.typing():
+	case m.typing() || m.mode == modePalette:
 		return m, nil
 	}
 	var cmd tea.Cmd

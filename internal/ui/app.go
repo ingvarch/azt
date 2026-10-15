@@ -31,6 +31,7 @@ const (
 	prefixHints        = "v/s split  hjkl/←↓↑→ focus  q close  z zoom  = equal  <>+- resize  t tab  n/p/1-9 switch  e explorer  , rename  ? help  esc cancel"
 	filterHints        = "enter apply  esc clear"
 	renameHints        = "enter save  esc cancel"
+	paletteHints       = "↑↓ choose  tab complete  enter run  esc close"
 	renamePrompt       = "rename tab: "
 )
 
@@ -55,6 +56,7 @@ var (
 	borderColor  = lipgloss.Color("8")
 	reverseStyle = lipgloss.NewStyle().Reverse(true)
 	hintStyle    = lipgloss.NewStyle().Faint(true)
+	boldStyle    = lipgloss.NewStyle().Bold(true)
 	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Red)
 	border       = lipgloss.NormalBorder()
 )
@@ -77,7 +79,8 @@ type Model struct {
 	nextID        layout.PaneID
 	width, height int
 	mode          mode
-	input         textinput.Model // serves the filter, the palette and the rename
+	input         textinput.Model // serves the filter and the rename
+	palette       paletteModel    // the command dialog, while the mode is palette
 	notice        string          // command error shown until the next key
 	now           func() time.Time
 	drag          *drag
@@ -155,6 +158,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		return m.mouse(msg)
 	case tea.PasteMsg:
+		if m.mode == modePalette {
+			m.palette = m.palette.paste(msg.Content)
+			return m, nil
+		}
 		if m.typing() {
 			cmd := m.editInput(msg)
 			return m, cmd
@@ -178,18 +185,12 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case m.mode == modeHelp:
 		m.mode = modeNormal
 		return m, nil
+	case m.mode == modePalette:
+		return m.paletteKey(msg)
 	case m.typing():
 		return m.inputKey(msg)
 	}
-	switch k {
-	case "/":
-		m.startFilter()
-		return m, nil
-	case ":":
-		m.startInput(modePalette, "")
-		return m, nil
-	case "?":
-		m.mode = modeHelp
+	if m.openOverlay(k) {
 		return m, nil
 	}
 	if m.sidebarFocused && k != "q" && k != "ctrl+w" {
@@ -212,6 +213,22 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// openOverlay opens the filter, the command dialog or help for k; false when
+// k opens none of them.
+func (m *Model) openOverlay(k string) bool {
+	switch k {
+	case "/":
+		m.startFilter()
+	case ":":
+		m.mode, m.palette = modePalette, newPalette()
+	case "?":
+		m.mode = modeHelp
+	default:
+		return false
+	}
+	return true
+}
+
 // startInput enters input mode md with the input set to text, cursor at the end.
 func (m *Model) startInput(md mode, text string) {
 	m.mode = md
@@ -232,27 +249,21 @@ func (m *Model) startFilter() {
 
 // typing reports whether keys and pastes go to the input.
 func (m Model) typing() bool {
-	return m.mode == modeFilter || m.mode == modePalette || m.mode == modeRename
+	return m.mode == modeFilter || m.mode == modeRename
 }
 
-// inputKey handles a key in filter, palette and rename mode.
+// inputKey handles a key in filter and rename mode.
 func (m Model) inputKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		cmd := m.finishInput()
-		return m, cmd
+		m.finishInput()
+		return m, nil
 	case "esc":
 		if m.mode == modeFilter {
 			m.setFilter(m.tabs[m.active].focus, "")
 		}
 		m.mode = modeNormal
 		return m, nil
-	case "tab":
-		if m.mode == modePalette {
-			m.input.SetValue(complete(m.input.Value()))
-			m.input.CursorEnd()
-			return m, nil
-		}
 	}
 	cmd := m.editInput(msg)
 	return m, cmd
@@ -269,16 +280,11 @@ func (m *Model) editInput(msg tea.Msg) tea.Cmd {
 }
 
 // finishInput applies the input on enter and returns to normal mode.
-func (m *Model) finishInput() tea.Cmd {
-	md := m.mode
-	m.mode = modeNormal
-	switch md {
-	case modeRename:
+func (m *Model) finishInput() {
+	if m.mode == modeRename {
 		m.tabs[m.active].name = strings.TrimSpace(m.input.Value())
-	case modePalette:
-		return m.runCommand(m.input.Value())
 	}
-	return nil
+	m.mode = modeNormal
 }
 
 // runCommand runs a palette command; an error becomes the notice.
@@ -630,6 +636,11 @@ func (m Model) frame() string {
 			comp.AddLayers(lipgloss.NewLayer(box).X(r.X).Y(r.Y))
 		}
 	}
+	if m.mode == modePalette {
+		if r, ok := m.paletteRect(); ok {
+			comp.AddLayers(lipgloss.NewLayer(m.paletteBox(r)).X(r.X).Y(r.Y))
+		}
+	}
 	return lipgloss.NewCanvas(m.width, m.height).Compose(comp).Render()
 }
 
@@ -668,7 +679,7 @@ func (m Model) statusBar() string {
 	case modeFilter:
 		bar = m.inputLine("/") + "  " + hintStyle.Render(filterHints)
 	case modePalette:
-		bar = m.inputLine(":") + "  " + hintStyle.Render(strings.Join(matchingCommands(m.input.Value()), "  "))
+		bar = hintStyle.Render(paletteHints)
 	case modeRename:
 		bar = m.inputLine(renamePrompt) + "  " + hintStyle.Render(renameHints)
 	default:
