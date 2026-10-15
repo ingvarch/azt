@@ -300,14 +300,17 @@ func TestTableColorsTheStateColumn(t *testing.T) {
 	}
 }
 
-func TestTableSelectedRowStaysReversedWithColoredState(t *testing.T) {
+func TestTableSelectedRowIsOneColor(t *testing.T) {
 	lines := strings.Split(stateTable(40, 5).view(), "\n")
+	if got, want := plain(lines[2]), "a      ● Running   "; got != want {
+		t.Errorf("selected row = %q, want %q", got, want)
+	}
 	for _, sub := range []string{"a", "Running", "●", "   "} {
-		if !attrsOf(t, lines[2], sub).reverse {
-			t.Errorf("%q is not reversed in %q", sub, lines[2])
+		if a := attrsOf(t, lines[2], sub); !a.reverse || a.fg != "" {
+			t.Errorf("%q in %q: %+v, want reversed in the row's own colors", sub, lines[2], a)
 		}
 	}
-	wantFg(t, lines[2], "Running", fgGood)
+	wantFg(t, lines[3], "Failed", fgBad)
 	if attrsOf(t, lines[3], "Failed").reverse {
 		t.Error("an unselected row is reversed")
 	}

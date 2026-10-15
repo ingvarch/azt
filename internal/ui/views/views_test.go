@@ -612,15 +612,19 @@ func TestListsColorTheState(t *testing.T) {
 		{"all groups deleting", NewAllResourceGroups(), allGroups, "Deleting", fgWarn},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			out := deliver(t, c.view.Resize(120, 10), c.data, nil).Render()
-			var line string
-			for _, l := range strings.Split(out, "\n") {
-				if strings.Contains(plain(l), c.state) {
-					line = l
+			v := deliver(t, c.view.Resize(120, 10), c.data, nil)
+			first := v.Render()
+			moved, _ := press(v, kDown)
+			var line string // the state on a row without the cursor
+			for _, out := range []string{first, moved.Render()} {
+				for _, l := range strings.Split(out, "\n") {
+					if strings.Contains(plain(l), c.state) && !attrsOf(t, l, c.state).reverse {
+						line = l
+					}
 				}
 			}
 			if line == "" {
-				t.Fatalf("no line with %q:\n%s", c.state, out)
+				t.Fatalf("no unselected line with %q:\n%s", c.state, first)
 			}
 			wantFg(t, line, "● "+c.state, c.fg)
 			wantFg(t, line, c.state, c.fg)
@@ -636,10 +640,12 @@ func TestListStateColumnKeepsItsPlace(t *testing.T) {
 	}
 }
 
-func TestListSelectedRowKeepsStateColor(t *testing.T) {
+func TestListSelectedRowIsOneColor(t *testing.T) {
 	v := deliver(t, NewSubscriptions().Resize(120, 10), subs, nil)
 	line := strings.Split(v.Render(), "\n")[2]
-	if a := attrsOf(t, line, "Enabled"); !a.reverse || a.fg != fgGood {
-		t.Errorf("selected state = %+v, want reversed good", a)
+	for _, sub := range []string{"Dev", "● Enabled"} {
+		if a := attrsOf(t, line, sub); !a.reverse || a.fg != "" {
+			t.Errorf("%q on the selected row = %+v, want reversed in the row's own colors", sub, a)
+		}
 	}
 }
