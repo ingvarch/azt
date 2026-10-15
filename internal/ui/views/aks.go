@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"image/color"
 	"slices"
 	"strconv"
 	"strings"
@@ -18,22 +19,32 @@ var aksTabs = []tabDef{
 	{"JSON", jsonTab},
 }
 
-// twoColumnWidth is the narrowest body that shows the essentials in two columns.
-const twoColumnWidth = 90
+const (
+	// twoColumnWidth is the narrowest box inside that shows the essentials in two columns.
+	twoColumnWidth = 90
+	// columnGap is the number of cells between the two columns.
+	columnGap = 4
+)
 
 func aksOverview(row map[string]any, width int) []string {
-	out := section("Essentials", aksEssentials(row, width))
-	out = append(out, section("Node pools", poolTable(row, width))...)
-	if att := attention(row); len(att) > 0 {
-		out = append(out, section("Attention", att)...)
+	secs := []section{
+		{title: "Essentials", lines: aksEssentials(row, innerWidth(width))},
+		{title: overviewPools, lines: poolTable(row)},
 	}
-	return append(out, section("Tags", tagLines(row))...)
+	if alerts := attention(row); len(alerts) > 0 {
+		secs = append(secs, alertSection(alerts))
+	}
+	return sections(width, append(secs, section{title: "Tags", lines: tagLines(row)})...)
 }
 
+// overviewPools is the title of the box with the node pools.
+const overviewPools = "Node pools"
+
+// aksEssentials lists the essentials in a box of the given inner width.
 func aksEssentials(row map[string]any, width int) []string {
 	p := dig(row, "properties")
 	left := []pair{
-		{"Status", orDash(join(" · ", str(p, "powerState", "code"), str(p, "provisioningState")))},
+		{"Status", stateText(orDash(join(stateSeparator, str(p, "powerState", "code"), str(p, "provisioningState"))))},
 		{"Resource group", field(row, "resourceGroup")},
 		{"Location", field(row, "location")},
 		{"Subscription", subscription(row)},
@@ -50,8 +61,19 @@ func aksEssentials(row map[string]any, width int) []string {
 	if width < twoColumnWidth {
 		return block(append(left, right...))
 	}
-	columns := lipgloss.JoinHorizontal(lipgloss.Top, strings.Join(block(left), "\n"), "    ", strings.Join(block(right), "\n"))
-	return strings.Split(columns, "\n")
+	return twoColumns(block(left), block(right), width)
+}
+
+// twoColumns puts the lines side by side in a width split between them; a
+// line longer than its column ends with "…".
+func twoColumns(left, right []string, width int) []string {
+	leftWidth := (width - columnGap) / 2
+	rightWidth := width - columnGap - leftWidth
+	out := make([]string, max(len(left), len(right)))
+	for i := range out {
+		out[i] = fitCell(cellAt(left, i), leftWidth) + strings.Repeat(" ", columnGap) + ellipsize(cellAt(right, i), rightWidth)
+	}
+	return out
 }
 
 func clusterVersion(props any) string {
@@ -122,82 +144,115 @@ func poolAutoscaling(pool map[string]any) string {
 }
 
 func poolState(pool map[string]any) string {
-	return orDash(join(" · ", str(pool, "powerState", "code"), notSucceeded(str(pool, "provisioningState"))))
+	return orDash(join(stateSeparator, str(pool, "powerState", "code"), notSucceeded(str(pool, "provisioningState"))))
 }
 
-func poolTable(row map[string]any, width int) []string {
+func poolTable(row map[string]any) []string {
 	ps := pools(dig(row, "properties"))
 	if len(ps) == 0 {
 		return []string{"none"}
 	}
-	cols := []column{{title: "Name"}, {title: "Mode"}, {title: "VM size"}, {title: "Nodes"}, {title: "Version"}, {title: "State"}}
+	cols := []column{{title: "Name"}, {title: "Mode"}, {title: "VM size"}, {title: "Nodes"}, {title: "Version"}, {title: "State", state: true}}
 	rows := make([][]string, len(ps))
 	for i, p := range ps {
 		rows[i] = []string{field(p, "name"), field(p, "mode"), field(p, "vmSize"), poolNodes(p), orDash(poolVersion(p)), poolState(p)}
 	}
-	for i := range cols {
-		cols[i].width = lipgloss.Width(cols[i].title)
-		for _, r := range rows {
-			cols[i].width = max(cols[i].width, lipgloss.Width(r[i]))
-		}
-	}
-	t := newTable(cols)
-	t.rows = rows
-	t.resize(width, len(rows)+headerLines)
-	return strings.Split(t.view(), "\n")
+	return summaryTable(cols, rows)
 }
 
-// attention lists what needs a look in a cluster row, one "! " line each.
-func attention(row map[string]any) []string {
+// alert is an item of the Attention box: an error, or else a warning.
+type alert struct {
+	text   string
+	severe bool
+}
+
+func (a alert) tone() color.Color {
+	if a.severe {
+		return bad
+	}
+	return warn
+}
+
+// line is the item with its symbol: "✗" for an error, "▲" for a warning.
+func (a alert) line() string {
+	if a.severe {
+		return "✗ " + a.text
+	}
+	return "▲ " + a.text
+}
+
+func (a alert) render() string { return lipgloss.NewStyle().Foreground(a.tone()).Render(a.line()) }
+
+// alertSection is the Attention box; it is bad when an item is an error, else warn.
+func alertSection(alerts []alert) section {
+	lines := make([]string, len(alerts))
+	tone := warn
+	for i, a := range alerts {
+		lines[i] = a.render()
+		if a.severe {
+			tone = bad
+		}
+	}
+	return section{title: "Attention", lines: lines, tone: tone}
+}
+
+func isStopped(v any) bool { return strings.EqualFold(str(v, "powerState", "code"), "Stopped") }
+
+// provisioning is the item for a provisioning state that is not Succeeded.
+func provisioning(what, state string) []alert {
+	if state = notSucceeded(state); state == "" {
+		return nil
+	}
+	return []alert{{text: what + state, severe: strings.EqualFold(state, "Failed")}}
+}
+
+// attention lists what needs a look in a cluster row.
+func attention(row map[string]any) []alert {
 	p := dig(row, "properties")
-	var out []string
-	if strings.EqualFold(str(p, "powerState", "code"), "Stopped") {
-		out = append(out, "! the cluster is stopped")
+	var out []alert
+	if isStopped(p) {
+		out = append(out, alert{text: "the cluster is stopped", severe: true})
 	}
-	if s := notSucceeded(str(p, "provisioningState")); s != "" {
-		out = append(out, "! provisioning state is "+s)
-	}
+	out = append(out, provisioning("provisioning state is ", str(p, "provisioningState"))...)
 	for _, pool := range pools(p) {
 		out = append(out, poolAttention(pool, clusterVersion(p))...)
 	}
 	if disabled, _ := flag(p, "disableLocalAccounts"); !disabled {
-		out = append(out, "! local accounts are enabled")
+		out = append(out, alert{text: "local accounts are enabled"})
 	}
 	if !private(p) && len(items(p, "apiServerAccessProfile", "authorizedIPRanges")) == 0 {
-		out = append(out, "! the API server accepts connections from any IP address")
+		out = append(out, alert{text: "the API server accepts connections from any IP address"})
 	}
 	return out
 }
 
-func poolAttention(pool map[string]any, controlPlane string) []string {
+func poolAttention(pool map[string]any, controlPlane string) []alert {
 	name := field(pool, "name")
-	var out []string
-	if strings.EqualFold(str(pool, "powerState", "code"), "Stopped") {
-		out = append(out, fmt.Sprintf("! node pool %s is stopped", name))
+	var out []alert
+	if isStopped(pool) {
+		out = append(out, alert{text: fmt.Sprintf("node pool %s is stopped", name), severe: true})
 	}
-	if s := notSucceeded(str(pool, "provisioningState")); s != "" {
-		out = append(out, fmt.Sprintf("! node pool %s is %s", name, s))
-	}
+	out = append(out, provisioning(fmt.Sprintf("node pool %s is ", name), str(pool, "provisioningState"))...)
 	if v := poolVersion(pool); v != "" && controlPlane != "" && v != controlPlane {
-		out = append(out, fmt.Sprintf("! node pool %s runs %s, the control plane %s", name, v, controlPlane))
+		out = append(out, alert{text: fmt.Sprintf("node pool %s runs %s, the control plane %s", name, v, controlPlane)})
 	}
 	return out
 }
 
-func aksPools(row map[string]any, _ int) []string {
+func aksPools(row map[string]any, width int) []string {
 	ps := pools(dig(row, "properties"))
 	if len(ps) == 0 {
-		return []string{"none"}
+		return section{title: overviewPools, lines: []string{"none"}}.render(width)
 	}
-	var out []string
-	for _, p := range ps {
+	secs := make([]section, len(ps))
+	for i, p := range ps {
 		title := field(p, "name")
 		if mode := str(p, "mode"); mode != "" {
-			title += " (" + mode + ")"
+			title += " · " + mode
 		}
-		out = append(out, section(title, block(poolPairs(p)))...)
+		secs[i] = section{title: title, lines: block(poolPairs(p))}
 	}
-	return out
+	return sections(width, secs...)
 }
 
 func poolPairs(pool map[string]any) []pair {
@@ -215,7 +270,7 @@ func poolPairs(pool map[string]any) []pair {
 		{"OS disk", orDash(disk)},
 		{"Subnet", orDash(lastSegment(str(pool, "vnetSubnetID")))},
 		{"Max surge", field(pool, "upgradeSettings", "maxSurge")},
-		{"State", poolState(pool)},
+		{"State", stateText(poolState(pool))},
 	}
 }
 
@@ -226,14 +281,14 @@ func diskSize(pool map[string]any) string {
 	return ""
 }
 
-func aksNetworking(row map[string]any, _ int) []string {
+func aksNetworking(row map[string]any, width int) []string {
 	p := dig(row, "properties")
 	n := dig(p, "networkProfile")
 	plugin := str(n, "networkPlugin")
 	if mode := str(n, "networkPluginMode"); mode != "" {
 		plugin += " (" + mode + ")"
 	}
-	return block([]pair{
+	return sections(width, section{title: "Networking", lines: block([]pair{
 		{"Network plugin", orDash(plugin)},
 		{"Network policy", field(n, "networkPolicy")},
 		{"Dataplane", field(n, "networkDataplane")},
@@ -247,12 +302,12 @@ func aksNetworking(row map[string]any, _ int) []string {
 		{"Authorized IP ranges", first(strings.Join(items(p, "apiServerAccessProfile", "authorizedIPRanges"), ", "), "any")},
 		{"API server", apiServer(p)},
 		{"Private FQDN", field(p, "privateFQDN")},
-	})
+	})})
 }
 
-func aksIdentity(row map[string]any, _ int) []string {
+func aksIdentity(row map[string]any, width int) []string {
 	p := dig(row, "properties")
-	return block([]pair{
+	return sections(width, section{title: "Identity", lines: block([]pair{
 		{"Identity", field(row, "identity", "type")},
 		{"User-assigned identities", userAssigned(row)},
 		{"Kubelet identity", orDash(lastSegment(str(p, "identityProfile", "kubeletidentity", "resourceId")))},
@@ -265,7 +320,7 @@ func aksIdentity(row map[string]any, _ int) []string {
 		{"Workload identity", onOff(p, "securityProfile", "workloadIdentity", "enabled")},
 		{"Defender", onOff(p, "securityProfile", "defender", "securityMonitoring", "enabled")},
 		{"Image cleaner", onOff(p, "securityProfile", "imageCleaner", "enabled")},
-	})
+	})})
 }
 
 func userAssigned(row map[string]any) string {
@@ -290,25 +345,32 @@ func adminGroups(props any) string {
 	return strconv.Itoa(len(groups))
 }
 
+// localAccounts is "disabled", or "enabled" in warn.
 func localAccounts(props any) string {
-	disabled, _ := flag(props, "disableLocalAccounts")
-	return choose(disabled, "disabled", "enabled")
+	if disabled, _ := flag(props, "disableLocalAccounts"); disabled {
+		return "disabled"
+	}
+	return warnStyle.Render("enabled")
 }
 
-func aksAddons(row map[string]any, _ int) []string {
+func aksAddons(row map[string]any, width int) []string {
 	p := dig(row, "properties")
 	var pairs []pair
 	addons := dig(p, "addonProfiles")
 	for _, name := range mapKeys(addons) {
 		a := dig(addons, name)
-		pairs = append(pairs, pair{name, join(" · ", onOff(a, "enabled"), lastSegment(str(a, "config", "logAnalyticsWorkspaceResourceID")))})
+		pairs = append(pairs, pair{name, join(" · ", switchText(onOff(a, "enabled")), lastSegment(str(a, "config", "logAnalyticsWorkspaceResourceID")))})
 	}
-	return block(append(pairs,
-		pair{"Web app routing", onOff(p, "ingressProfile", "webAppRouting", "enabled")},
-		pair{"KEDA", onOff(p, "workloadAutoScalerProfile", "keda", "enabled")},
-		pair{"Vertical pod autoscaler", onOff(p, "workloadAutoScalerProfile", "verticalPodAutoscaler", "enabled")},
-		pair{"Service mesh", field(p, "serviceMeshProfile", "mode")},
-		pair{"Managed Prometheus", onOff(p, "azureMonitorProfile", "metrics", "enabled")},
-		pair{"Cost analysis", onOff(p, "metricsProfile", "costAnalysis", "enabled")},
-	))
+	fixed := []pair{
+		{"Web app routing", onOff(p, "ingressProfile", "webAppRouting", "enabled")},
+		{"KEDA", onOff(p, "workloadAutoScalerProfile", "keda", "enabled")},
+		{"Vertical pod autoscaler", onOff(p, "workloadAutoScalerProfile", "verticalPodAutoscaler", "enabled")},
+		{"Service mesh", field(p, "serviceMeshProfile", "mode")},
+		{"Managed Prometheus", onOff(p, "azureMonitorProfile", "metrics", "enabled")},
+		{"Cost analysis", onOff(p, "metricsProfile", "costAnalysis", "enabled")},
+	}
+	for i := range fixed {
+		fixed[i].value = switchText(fixed[i].value)
+	}
+	return sections(width, section{title: "Add-ons", lines: block(append(pairs, fixed...))})
 }

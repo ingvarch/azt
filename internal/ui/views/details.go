@@ -1,8 +1,6 @@
 package views
 
 import (
-	"bytes"
-	"encoding/json"
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
@@ -13,8 +11,14 @@ import (
 	"github.com/ingvarch/azt/internal/ui/data"
 )
 
-// tabGap is the number of cells between two tab names.
-const tabGap = 2
+const (
+	// margin is the empty cells left and right of the tab bar and the body.
+	margin = 1
+	// tabGap is the number of cells between two tabs.
+	tabGap = 1
+	// detailsHeader is the tab bar, its rule and the blank line for the refresh note.
+	detailsHeader = 3
+)
 
 type details struct {
 	loader
@@ -117,7 +121,10 @@ func (d details) scroll(top int) details {
 	return d
 }
 
-func (d details) bodyHeight() int { return max(d.height-1-lines(d.refreshing), 0) }
+func (d details) bodyHeight() int { return max(d.height-detailsHeader, 0) }
+
+// contentWidth is the width of the tab bar and the body between the margins.
+func (d details) contentWidth() int { return max(d.width-2*margin, 0) }
 
 // defs is the tabs of the loaded row's type; nil before the data is ready.
 func (d details) defs() []tabDef {
@@ -156,13 +163,18 @@ func (d details) step(delta int) details {
 	return d.selectTab(defs[(d.index()+delta+len(defs))%len(defs)].name)
 }
 
-// body is the lines of the current tab.
+// body is the lines of the current tab, each cut to the content width.
 func (d details) body() []string {
 	defs := d.defs()
 	if len(defs) == 0 {
 		return nil
 	}
-	return defs[d.index()].render(d.row, d.width)
+	width := d.contentWidth()
+	out := defs[d.index()].render(d.row, width)
+	for i, l := range out {
+		out[i] = cut(l, width)
+	}
+	return out
 }
 
 func (d details) Resize(width, height int) View {
@@ -177,47 +189,79 @@ func (d details) Render() string {
 	if s, ok := d.status(d.width, d.height); ok {
 		return s
 	}
-	out := []string{d.tabBar()}
+	note := ""
 	if d.refreshing {
-		out = append(out, faintStyle.Render(refreshingText))
+		note = cut(faintStyle.Render(refreshingText), d.contentWidth())
 	}
 	body := d.body()
+	out := []string{d.tabBar(), d.rule(), note}
 	out = append(out, body[d.top:min(d.top+d.bodyHeight(), len(body))]...)
+	pad := strings.Repeat(" ", margin)
+	for i, l := range out {
+		out[i] = pad + l
+	}
 	return clip(strings.Join(out, "\n"), d.width, d.height)
 }
 
-func (d details) tabBar() string {
-	defs := d.defs()
-	names := make([]string, len(defs))
-	for i, def := range defs {
-		names[i] = def.name
-		if i == d.index() {
-			names[i] = lipgloss.NewStyle().Reverse(true).Render(def.name)
-		}
-	}
-	return strings.Join(names, strings.Repeat(" ", tabGap))
+// tabSpan is the cells a tab takes on the tab bar, its padding included.
+type tabSpan struct {
+	name       string
+	start, end int
 }
 
-// tabAt returns the tab drawn at column x of the tab bar.
-func (d details) tabAt(x int) (string, bool) {
+// spans places the tabs from the left edge of the content.
+func (d details) spans() []tabSpan {
+	var out []tabSpan
 	start := 0
 	for _, def := range d.defs() {
-		end := start + lipgloss.Width(def.name)
-		if x >= start && x < end {
-			return def.name, true
-		}
+		end := start + lipgloss.Width(def.name) + 2
+		out = append(out, tabSpan{def.name, start, end})
 		start = end + tabGap
+	}
+	return out
+}
+
+func (d details) tabBar() string {
+	spans := d.spans()
+	names := make([]string, len(spans))
+	for i, s := range spans {
+		style := mutedStyle
+		if i == d.index() {
+			style = titleStyle
+		}
+		names[i] = style.Render(" " + s.name + " ")
+	}
+	return cut(strings.Join(names, strings.Repeat(" ", tabGap)), d.contentWidth())
+}
+
+// rule is a line under the tab bar: heavy under the current tab, light elsewhere.
+func (d details) rule() string {
+	width := d.contentWidth()
+	cur := d.spans()[d.index()]
+	start, end := min(cur.start, width), min(cur.end, width)
+	return mutedStyle.Render(strings.Repeat("─", start)) +
+		accentStyle.Render(strings.Repeat("━", end-start)) +
+		mutedStyle.Render(strings.Repeat("─", width-end))
+}
+
+// tabAt returns the tab drawn at column x of the content.
+func (d details) tabAt(x int) (string, bool) {
+	for _, s := range d.spans() {
+		if x >= s.start && x < s.end {
+			return s.name, true
+		}
 	}
 	return "", false
 }
 
-// Click selects the tab under x on the tab bar.
+// Click selects the tab under x on the tab bar or its rule.
 func (d details) Click(x, y int) (View, tea.Cmd, bool) {
-	if y != 0 {
+	if y != 0 && y != 1 {
 		return d, nil, false
 	}
+	x -= margin
 	name, ok := d.tabAt(x)
-	if !ok {
+	if !ok || x >= d.contentWidth() {
 		return d, nil, false
 	}
 	return d.selectTab(name), nil, true
@@ -233,13 +277,3 @@ func (d details) Spec() Spec {
 }
 
 func (details) Open() (View, bool) { return nil, false }
-
-// indentJSON encodes v with two-space indents and keeps &, < and > as they are.
-func indentJSON(v any) (string, error) {
-	var b bytes.Buffer
-	enc := json.NewEncoder(&b)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", "  ")
-	err := enc.Encode(v)
-	return strings.TrimSuffix(b.String(), "\n"), err
-}

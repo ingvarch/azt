@@ -88,33 +88,38 @@ func TestDetailsTabKeysBeforeData(t *testing.T) {
 	}
 }
 
-func firstBody(v View) string { return plainLines(v.Render())[1] }
+// firstBody is the first line of the body: the title of a box, or the text
+// of a line inside it.
+func firstBody(v View) string {
+	return strings.TrimSpace(strings.Trim(plainLines(v.Render())[3], " │"))
+}
 
 func TestDetailsScrollKeys(t *testing.T) {
-	// Networking has 13 lines; a 6-line pane shows 5 of them.
+	// The Networking box has 15 lines, 13 of them text; a 6-line pane shows 3 of
+	// them below the tab bar, its rule and the blank line.
 	open := func() View { return openedAt(t, "aks", "Networking", 80, 6) }
 	for _, c := range []struct {
 		name string
 		keys []string
 		want string
 	}{
-		{"start", nil, "Network plugin"},
-		{"j", []string{"j"}, "Network policy"},
-		{"down", []string{"down"}, "Network policy"},
-		{"j j k", []string{"j", "j", "k"}, "Network policy"},
-		{"up at the start", []string{"up"}, "Network plugin"},
-		{"k at the start", []string{"k"}, "Network plugin"},
-		{"pgdown", []string{"pgdown"}, "DNS service IP"},
-		{"f", []string{"f"}, "DNS service IP"},
-		{"end", []string{"end"}, "IP families"},
-		{"G", []string{"G"}, "IP families"},
-		{"past the end", []string{"G", "j", "j", "pgdown"}, "IP families"},
-		{"1000 downs", append(make([]string, 0), repeat("j", 1000)...), "IP families"},
-		{"pgup", []string{"G", "pgup"}, "Pod CIDR"},
-		{"b", []string{"G", "b"}, "Pod CIDR"},
-		{"home", []string{"G", "home"}, "Network plugin"},
-		{"g", []string{"G", "g"}, "Network plugin"},
-		{"pgup at the start", []string{"b"}, "Network plugin"},
+		{"start", nil, "╭ Networking"},
+		{"j", []string{"j"}, "Network plugin"},
+		{"down", []string{"down"}, "Network plugin"},
+		{"j j k", []string{"j", "j", "k"}, "Network plugin"},
+		{"up at the start", []string{"up"}, "╭ Networking"},
+		{"k at the start", []string{"k"}, "╭ Networking"},
+		{"pgdown", []string{"pgdown"}, "Dataplane"},
+		{"f", []string{"f"}, "Dataplane"},
+		{"end", []string{"end"}, "API server"},
+		{"G", []string{"G"}, "API server"},
+		{"past the end", []string{"G", "j", "j", "pgdown"}, "API server"},
+		{"1000 downs", append(make([]string, 0), repeat("j", 1000)...), "API server"},
+		{"pgup", []string{"G", "pgup"}, "IP families"},
+		{"b", []string{"G", "b"}, "IP families"},
+		{"home", []string{"G", "home"}, "╭ Networking"},
+		{"g", []string{"G", "g"}, "╭ Networking"},
+		{"pgup at the start", []string{"b"}, "╭ Networking"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			v := open()
@@ -124,7 +129,7 @@ func TestDetailsScrollKeys(t *testing.T) {
 			if got := firstBody(v); !strings.HasPrefix(got, c.want) {
 				t.Errorf("first body line = %q, want %q", got, c.want)
 			}
-			if got := plainLines(v.Render())[0]; !strings.HasPrefix(got, "Overview") {
+			if got := plainLines(v.Render())[0]; !strings.Contains(got, "Overview") {
 				t.Errorf("tab bar scrolled away: %q", got)
 			}
 		})
@@ -143,12 +148,12 @@ func TestDetailsScrollResetsOnTabSwitch(t *testing.T) {
 	v := openedAt(t, "aks", "Networking", 80, 6)
 	v, _ = press(v, key("G"))
 	v, _ = press(v, keyTab)
-	if got := firstBody(v); !strings.HasPrefix(got, "Identity ") {
+	if got := firstBody(v); !strings.HasPrefix(got, "╭ Identity") {
 		t.Errorf("after tab: %q", got)
 	}
 	v, _ = press(v, key("G"))
 	v, _ = press(v, keyShiftTab)
-	if got := firstBody(v); !strings.HasPrefix(got, "Network plugin") {
+	if got := firstBody(v); !strings.HasPrefix(got, "╭ Networking") {
 		t.Errorf("after shift+tab: %q", got)
 	}
 }
@@ -157,7 +162,7 @@ func TestDetailsScrollFollowsResize(t *testing.T) {
 	v := openedAt(t, "aks", "Networking", 80, 6)
 	v, _ = press(v, key("G"))
 	v = v.Resize(80, 30)
-	if got := firstBody(v); !strings.HasPrefix(got, "Network plugin") {
+	if got := firstBody(v); !strings.HasPrefix(got, "╭ Networking") {
 		t.Errorf("after growing: %q", got)
 	}
 }
@@ -167,12 +172,12 @@ func TestDetailsScrollWhileRefreshing(t *testing.T) {
 	v, _ = press(v, key("G"))
 	v, _ = press(v, keyR)
 	got := plainLines(v.Render())
-	if got[1] != refreshingText || len(got) > 6 {
+	if got[2] != " "+refreshingText || len(got) != 6 {
 		t.Errorf("render:\n%s", strings.Join(got, "\n"))
 	}
 	v, _ = press(v, key("G"))
 	got = plainLines(v.Render())
-	if !strings.HasPrefix(got[len(got)-1], "Private FQDN") {
+	if !strings.HasPrefix(got[len(got)-1], " ╰") {
 		t.Errorf("last line at the end = %q", got[len(got)-1])
 	}
 }
@@ -186,29 +191,45 @@ func TestDetailsKeepsTabOnRefreshResult(t *testing.T) {
 }
 
 func TestDetailsClickSelectsTab(t *testing.T) {
-	// Overview 0-7, Node pools 10-19, Networking 22-31, Identity 34-41, Add-ons 44-50, JSON 53-56.
+	// Padded names, after a one-cell margin: Overview 1-10, Node pools 12-23,
+	// Networking 25-36, Identity 38-47, Add-ons 49-57, JSON 59-64.
 	for _, c := range []struct {
 		name string
 		x, y int
 		want string
 		hit  bool
 	}{
-		{"first tab", 0, 0, "", true},
-		{"end of the first tab", 7, 0, "", true},
-		{"gap", 8, 0, "Networking", false},
-		{"second gap cell", 9, 0, "Networking", false},
-		{"second tab", 10, 0, "Node pools", true},
-		{"end of the second tab", 19, 0, "Node pools", true},
+		{"margin", 0, 0, "Networking", false},
+		{"left padding of the first tab", 1, 0, "", true},
+		{"name of the first tab", 5, 0, "", true},
+		{"right padding of the first tab", 10, 0, "", true},
+		{"gap", 11, 0, "Networking", false},
+		{"left padding of the second tab", 12, 0, "Node pools", true},
+		{"right padding of the second tab", 23, 0, "Node pools", true},
+		{"second gap", 24, 0, "Networking", false},
 		{"third tab", 25, 0, "Networking", true},
-		{"identity", 34, 0, "Identity", true},
-		{"add-ons", 50, 0, "Add-ons", true},
-		{"json", 53, 0, "JSON", true},
-		{"end of json", 56, 0, "JSON", true},
-		{"after the last tab", 57, 0, "Networking", false},
+		{"end of the third tab", 36, 0, "Networking", true},
+		{"identity", 38, 0, "Identity", true},
+		{"end of identity", 47, 0, "Identity", true},
+		{"gap before add-ons", 48, 0, "Networking", false},
+		{"add-ons", 49, 0, "Add-ons", true},
+		{"end of add-ons", 57, 0, "Add-ons", true},
+		{"gap before json", 58, 0, "Networking", false},
+		{"json", 59, 0, "JSON", true},
+		{"end of json", 64, 0, "JSON", true},
+		{"after the last tab", 65, 0, "Networking", false},
 		{"far right", 79, 0, "Networking", false},
-		{"body line", 12, 1, "Networking", false},
+		{"rule under the first tab", 1, 1, "", true},
+		{"rule under the end of the first tab", 10, 1, "", true},
+		{"rule in a gap", 11, 1, "Networking", false},
+		{"rule under json", 64, 1, "JSON", true},
+		{"rule after the last tab", 65, 1, "Networking", false},
+		{"rule in the margin", 0, 1, "Networking", false},
+		{"blank line", 12, 2, "Networking", false},
+		{"first body line", 12, 3, "Networking", false},
 		{"below", 12, 5, "Networking", false},
-		{"negative", -1, 0, "Networking", false},
+		{"negative x", -1, 0, "Networking", false},
+		{"negative y", 12, -1, "Networking", false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			v := openedAt(t, "aks", "Networking", 80, 6)
@@ -226,19 +247,33 @@ func TestDetailsClickSelectsTab(t *testing.T) {
 	}
 }
 
+func TestDetailsClickIgnoresCutOffTabs(t *testing.T) {
+	for _, c := range []struct{ width, x int }{{13, 12}, {26, 25}} {
+		for y := range 2 {
+			v := openedAt(t, "aks", "Overview", c.width, 6)
+			next, _, hit := v.(Clicker).Click(c.x, y)
+			if hit || tabOf(next) != "" {
+				t.Errorf("width %d click (%d,%d): hit %v, tab %q", c.width, c.x, y, hit, tabOf(next))
+			}
+		}
+	}
+}
+
 func TestDetailsClickResetsScroll(t *testing.T) {
 	v := openedAt(t, "aks", "Networking", 80, 6)
 	v, _ = press(v, key("G"))
-	v, _, _ = v.(Clicker).Click(34, 0)
-	if got := firstBody(v); !strings.HasPrefix(got, "Identity ") {
+	v, _, _ = v.(Clicker).Click(38, 0)
+	if got := firstBody(v); !strings.HasPrefix(got, "╭ Identity") {
 		t.Errorf("first body line = %q", got)
 	}
 }
 
 func TestDetailsClickBeforeData(t *testing.T) {
 	v := NewDetails("s1", azure.Resource{ID: "/r/x"}).Resize(80, 6)
-	if _, _, hit := v.(Clicker).Click(3, 0); hit {
-		t.Error("click hit before the data arrived")
+	for _, y := range []int{0, 1} {
+		if _, _, hit := v.(Clicker).Click(3, y); hit {
+			t.Error("click hit before the data arrived")
+		}
 	}
 	failed := deliver(t, NewDetails("s1", azure.Resource{ID: "/r/x"}).Resize(80, 6), nil, errTest)
 	if _, _, hit := failed.(Clicker).Click(3, 0); hit {
@@ -252,7 +287,10 @@ func TestDetailsClickOnGenericTabs(t *testing.T) {
 	if !hit || tabOf(next) != "JSON" {
 		t.Errorf("hit = %v, tab = %q", hit, tabOf(next))
 	}
-	if _, _, hit := v.(Clicker).Click(14, 0); hit {
+	if _, _, hit := v.(Clicker).Click(17, 1); !hit {
+		t.Error("no hit on the rule under the last generic tab")
+	}
+	if _, _, hit := v.(Clicker).Click(18, 0); hit {
 		t.Error("hit past the last generic tab")
 	}
 }
@@ -262,7 +300,7 @@ func TestNewDetailsAtOpensOnTab(t *testing.T) {
 	if got := tabOf(v); got != "Add-ons" {
 		t.Errorf("tab = %q", got)
 	}
-	if got := firstBody(v); !strings.HasPrefix(got, "azurepolicy") {
+	if got := firstBody(v); !strings.HasPrefix(got, "╭ Add-ons") {
 		t.Errorf("first body line = %q", got)
 	}
 	if got := tabOf(openedAt(t, "aks", "json", 80, 20)); got != "JSON" {
@@ -284,7 +322,7 @@ func TestNewDetailsAtFallsBackToTheFirstTab(t *testing.T) {
 		t.Errorf("tab after the data = %q, want the first", got)
 	}
 	got := plainLines(v.Render())
-	if got[0] != "Overview  JSON" || got[1] != "Essentials" {
+	if got[0] != "  Overview   JSON" || !strings.HasPrefix(got[3], " ╭ Essentials") {
 		t.Errorf("render:\n%s", strings.Join(got, "\n"))
 	}
 	v, _ = press(v, keyTab)
@@ -326,7 +364,7 @@ func TestBuildDetailsOnTab(t *testing.T) {
 		t.Errorf("Spec = %+v, want %+v", built.Spec(), v.Spec())
 	}
 	built = deliver(t, built.Resize(80, 10), fixture(t, "aks"), nil)
-	if got := firstBody(built); !strings.HasPrefix(got, "Identity ") {
+	if got := firstBody(built); !strings.HasPrefix(got, "╭ Identity") {
 		t.Errorf("first body line = %q", got)
 	}
 
@@ -335,7 +373,7 @@ func TestBuildDetailsOnTab(t *testing.T) {
 		t.Fatal(err)
 	}
 	first = deliver(t, first.Resize(80, 10), fixture(t, "aks"), nil)
-	if got := firstBody(first); got != "Essentials" {
+	if got := firstBody(first); !strings.HasPrefix(got, "╭ Essentials") {
 		t.Errorf("a spec without tab opens on %q", got)
 	}
 }
@@ -346,7 +384,7 @@ func TestDetailsRefreshToShorterRowClampsScroll(t *testing.T) {
 	v, _ = press(v, keyR)
 	v = deliver(t, v, map[string]any{"type": aksType}, nil)
 	got := plainLines(v.Render())
-	if !strings.HasPrefix(got[0], "Overview  Node pools") || got[1] != "{" || got[2] != `  "type": "`+aksType+`"` {
+	if !strings.Contains(got[0], "Overview   Node pools") || got[3] != " {" || got[4] != `   "type": "`+aksType+`"` {
 		t.Errorf("render:\n%s", strings.Join(got, "\n"))
 	}
 }

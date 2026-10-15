@@ -11,7 +11,8 @@ const overviewTab = "Overview"
 
 // tabDef is one tab of the details view and how it draws a row.
 type tabDef struct {
-	name   string
+	name string
+	// render draws the tab for a body width cells wide; details cuts longer lines.
 	render func(row map[string]any, width int) []string
 }
 
@@ -40,7 +41,8 @@ var boldStyle = lipgloss.NewStyle().Bold(true)
 
 type pair struct{ key, value string }
 
-// block lists pairs with the keys padded to the longest one.
+// block lists pairs with the muted keys padded to the longest one; a value
+// may carry its own styling.
 func block(pairs []pair) []string {
 	keyWidth := 0
 	for _, p := range pairs {
@@ -48,15 +50,9 @@ func block(pairs []pair) []string {
 	}
 	out := make([]string, len(pairs))
 	for i, p := range pairs {
-		out[i] = p.key + strings.Repeat(" ", keyWidth-lipgloss.Width(p.key)) + "  " + p.value
+		out[i] = mutedStyle.Render(p.key) + strings.Repeat(" ", keyWidth-lipgloss.Width(p.key)+2) + p.value
 	}
 	return out
-}
-
-// section is a bold title, the lines and a blank line.
-func section(title string, lines []string) []string {
-	out := append([]string{boldStyle.Render(title)}, lines...)
-	return append(out, "")
 }
 
 func subscription(row map[string]any) string {
@@ -76,9 +72,9 @@ func tagLines(row map[string]any) []string {
 	return lines
 }
 
-func genericOverview(row map[string]any, _ int) []string {
+func genericOverview(row map[string]any, width int) []string {
 	essentials := block([]pair{
-		{"Status", field(row, "properties", "provisioningState")},
+		{"Status", stateText(field(row, "properties", "provisioningState"))},
 		{"Resource group", field(row, "resourceGroup")},
 		{"Location", field(row, "location")},
 		{"Subscription", subscription(row)},
@@ -87,11 +83,8 @@ func genericOverview(row map[string]any, _ int) []string {
 		{"SKU", orDash(join(" ", str(row, "sku", "name"), str(row, "sku", "tier")))},
 		{"Zones", joined(row, "zones")},
 	})
-	return append(section("Essentials", essentials), section("Tags", tagLines(row))...)
+	return sections(width, section{title: "Essentials", lines: essentials}, section{title: "Tags", lines: tagLines(row)})
 }
 
 // jsonTab shows the row as JSON; Update has checked that it encodes.
-func jsonTab(row map[string]any, _ int) []string {
-	out, _ := indentJSON(row)
-	return strings.Split(out, "\n")
-}
+func jsonTab(row map[string]any, _ int) []string { return jsonLines(row) }

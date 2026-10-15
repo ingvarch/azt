@@ -347,15 +347,11 @@ func TestDetailsStates(t *testing.T) {
 
 func TestDetailsShowsIndentedJSON(t *testing.T) {
 	v := deliver(t, newDetailsAt("JSON").Resize(80, 10), detail, nil)
-	lines := strings.Split(v.Render(), "\n")
-	for i, l := range lines {
-		lines[i] = strings.TrimRight(l, " ")
-	}
-	got := strings.Join(lines, "\n")
-	if !strings.Contains(got, "\n  \"id\": \"/r/web\",\n") {
+	got := strings.Join(plainLines(v.Render()), "\n")
+	if !strings.Contains(got, "\n   \"id\": \"/r/web\",\n") {
 		t.Errorf("top-level key is not indented by two spaces:\n%s", got)
 	}
-	if !strings.Contains(got, "\n    \"env\": \"prod\"") {
+	if !strings.Contains(got, "\n     \"env\": \"prod\"") {
 		t.Errorf("nested value is not indented by two spaces per level:\n%s", got)
 	}
 	if !strings.Contains(got, `"url": "https://x/?a=1&b=<2>"`) {
@@ -600,3 +596,50 @@ func TestResourcesOfType(t *testing.T) {
 }
 
 var errTest = errors.New("boom")
+
+func TestListsColorTheState(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		view  View
+		data  any
+		state string
+		fg    string
+	}{
+		{"subscription enabled", NewSubscriptions(), subs, "Enabled", fgGood},
+		{"subscription disabled", NewSubscriptions(), subs, "Disabled", fgBad},
+		{"group succeeded", NewResourceGroups(subs[0]), groups, "Succeeded", fgGood},
+		{"group deleting", NewResourceGroups(subs[0]), groups, "Deleting", fgWarn},
+		{"all groups deleting", NewAllResourceGroups(), allGroups, "Deleting", fgWarn},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			out := deliver(t, c.view.Resize(120, 10), c.data, nil).Render()
+			var line string
+			for _, l := range strings.Split(out, "\n") {
+				if strings.Contains(plain(l), c.state) {
+					line = l
+				}
+			}
+			if line == "" {
+				t.Fatalf("no line with %q:\n%s", c.state, out)
+			}
+			wantFg(t, line, "● "+c.state, c.fg)
+			wantFg(t, line, c.state, c.fg)
+		})
+	}
+}
+
+func TestListStateColumnKeepsItsPlace(t *testing.T) {
+	v := deliver(t, NewSubscriptions().Resize(120, 10), subs, nil)
+	header := plain(strings.Split(v.Render(), "\n")[0])
+	if i := strings.Index(header, "State"); i != 32+1+36+1 {
+		t.Errorf("State starts at %d in %q", i, header)
+	}
+}
+
+func TestListSelectedRowKeepsStateColor(t *testing.T) {
+	v := deliver(t, NewSubscriptions().Resize(120, 10), subs, nil)
+	line := strings.Split(v.Render(), "\n")[2]
+	if a := attrsOf(t, line, "Enabled"); !a.reverse || a.fg != fgGood {
+		t.Errorf("selected state = %+v, want reversed good", a)
+	}
+}
