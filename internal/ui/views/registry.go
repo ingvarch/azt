@@ -2,7 +2,6 @@ package views
 
 import (
 	"slices"
-	"strings"
 )
 
 // resourceKind describes how azt shows one kind of resource.
@@ -30,6 +29,7 @@ var kinds = []resourceKind{
 	{types: []string{"microsoft.network/virtualnetworks"}, command: "vnet", desc: "virtual networks in every subscription", tabs: vnetTabs, attention: vnetAttention},
 	{types: []string{"microsoft.managedidentity/userassignedidentities"}, command: "mi", desc: "managed identities in every subscription", tabs: miTabs},
 	{types: []string{"microsoft.containerregistry/registries"}, command: "acr", desc: "container registries in every subscription", tabs: acrTabs, attention: acrAttention},
+	{types: []string{"microsoft.network/networksecuritygroups"}, command: "nsg", desc: "network security groups in every subscription", tabs: nsgTabs, attention: nsgAttention},
 }
 
 // kindOf is the kind of a resource type; the zero kind for a type no kind lists.
@@ -37,7 +37,7 @@ func kindOf(resourceType string) resourceKind { return findKind(kinds, resourceT
 
 func findKind(list []resourceKind, resourceType string) resourceKind {
 	i := slices.IndexFunc(list, func(k resourceKind) bool {
-		return slices.ContainsFunc(k.types, func(t string) bool { return strings.EqualFold(t, resourceType) })
+		return containsFold(k.types, resourceType)
 	})
 	if i < 0 {
 		return resourceKind{}

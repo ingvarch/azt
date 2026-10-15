@@ -24,6 +24,8 @@ func TestParseCommand(t *testing.T) {
 		{in: "mi", kind: cmdView, title: "managedidentity/userassignedidentities"},
 		{in: "MI", kind: cmdView, title: "managedidentity/userassignedidentities"},
 		{in: "acr", kind: cmdView, title: "containerregistry/registries"},
+		{in: "nsg", kind: cmdView, title: "network/networksecuritygroups"},
+		{in: "NSG", kind: cmdView, title: "network/networksecuritygroups"},
 		{in: "type microsoft.cache/redis", kind: cmdView, title: "cache/redis"},
 		{in: "  type   microsoft.cache/redis  ", kind: cmdView, title: "cache/redis"},
 		{in: "VM", kind: cmdView, title: "compute/virtualmachines"},
@@ -74,6 +76,7 @@ func TestCommandTable(t *testing.T) {
 		{"vnet", "virtual networks in every subscription"},
 		{"mi", "managed identities in every subscription"},
 		{"acr", "container registries in every subscription"},
+		{"nsg", "network security groups in every subscription"},
 		{"type", "resources of any type: type <resource type>"},
 		{"help", "keys and commands"},
 		{"q", "quit"},
@@ -96,6 +99,7 @@ func TestMatchingCommands(t *testing.T) {
 		{"  v", []string{"vm", "vnet"}},
 		{"m", []string{"mi"}},
 		{"ac", []string{"acr"}},
+		{"ns", []string{"nsg"}},
 		{"zzz", nil},
 	}
 	for _, tt := range tests {

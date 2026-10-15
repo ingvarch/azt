@@ -141,3 +141,8 @@ func notSucceeded(state string) string {
 	}
 	return state
 }
+
+// containsFold reports whether list holds s, ignoring case.
+func containsFold(list []string, s string) bool {
+	return slices.ContainsFunc(list, func(x string) bool { return strings.EqualFold(x, s) })
+}

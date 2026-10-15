@@ -23,6 +23,7 @@ var (
 	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(accent)
 	goodStyle   = lipgloss.NewStyle().Foreground(good)
 	warnStyle   = lipgloss.NewStyle().Foreground(warn)
+	badStyle    = lipgloss.NewStyle().Foreground(bad)
 )
 
 // stateSeparator joins the parts of a combined status such as "Running · Succeeded".

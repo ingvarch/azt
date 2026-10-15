@@ -94,19 +94,30 @@ func (c colDef) text(elem any) string {
 	return c.format(dig(elem, c.path...))
 }
 
-// tableDef is a table of the elements of the list at path in the row. keep
-// drops elements, order sorts the kept ones (the list order without it), and
-// empty is the line shown when none is left ("none" without it).
+// tableDef is a table of the elements of the list at path in the row, or of
+// the list that list returns for it. keep drops elements, order sorts the kept
+// ones (the list order without it), and empty is the line shown when none is
+// left ("none" without it).
 type tableDef struct {
 	path  []string
+	list  func(row map[string]any) []any
 	cols  []colDef
 	keep  func(elem any) bool
 	order func(a, b any) int
 	empty string
 }
 
+// elems is a copy of the elements, so sorting leaves the row alone.
+// source is the list the table draws: list's result, or the list at path.
+func (t tableDef) source(row map[string]any) []any {
+	if t.list != nil {
+		return t.list(row)
+	}
+	return elems(dig(row, t.path...))
+}
+
 func (t tableDef) lines(row map[string]any) []string {
-	list := slices.Clone(elems(dig(row, t.path...)))
+	list := slices.Clone(t.source(row))
 	if t.keep != nil {
 		list = slices.DeleteFunc(list, func(e any) bool { return !t.keep(e) })
 	}

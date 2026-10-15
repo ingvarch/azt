@@ -1,0 +1,130 @@
+{
+  "id": "/subscriptions/s8/resourceGroups/rg-sec/providers/Microsoft.Network/networkSecurityGroups/nsg-web",
+  "name": "nsg-web",
+  "type": "microsoft.network/networksecuritygroups",
+  "location": "norwayeast",
+  "resourceGroup": "rg-sec",
+  "subscriptionId": "s8",
+  "subscription": "Prod",
+  "tags": {"owner": "secops"},
+  "properties": {
+    "provisioningState": "Succeeded",
+    "resourceGuid": "44444444-4444-4444-4444-444444444444",
+    "securityRules": [
+      {
+        "name": "web-https", "id": "/x/web-https", "etag": "W/\"a\"", "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+        "properties": {
+          "access": "Allow", "direction": "Inbound", "priority": 300, "protocol": "Tcp",
+          "sourcePortRange": "*", "sourceAddressPrefix": "10.1.0.0/16",
+          "destinationAddressPrefix": "10.2.0.0/24", "destinationPortRange": "443", "provisioningState": "Succeeded"
+        }
+      },
+      {
+        "name": "to-sql", "id": "/x/to-sql",
+        "properties": {
+          "access": "Allow", "direction": "Outbound", "priority": 150, "protocol": "Tcp",
+          "sourcePortRange": "*", "sourceAddressPrefix": "10.2.0.0/24",
+          "destinationAddressPrefix": "Sql", "destinationPortRange": "1433"
+        }
+      },
+      {
+        "name": "ops-ssh", "id": "/x/ops-ssh",
+        "properties": {
+          "access": "Allow", "direction": "Inbound", "priority": 120, "protocol": "Tcp",
+          "sourcePortRange": "*", "sourceAddressPrefixes": ["192.0.2.0/24", "198.51.100.7"],
+          "destinationAddressPrefix": "*", "destinationPortRanges": ["22", "2222"]
+        }
+      },
+      {
+        "name": "block-all-in", "id": "/x/block-all-in",
+        "properties": {
+          "access": "Deny", "direction": "Inbound", "priority": 4000, "protocol": "*",
+          "sourcePortRange": "*", "sourceAddressPrefix": "Internet",
+          "destinationAddressPrefix": "*", "destinationPortRange": "*"
+        }
+      },
+      {
+        "name": "to-dns", "id": "/x/to-dns",
+        "properties": {
+          "access": "Allow", "direction": "Outbound", "priority": 110, "protocol": "Udp",
+          "sourcePortRange": "*", "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "168.63.129.16", "destinationPortRange": "53"
+        }
+      },
+      {
+        "name": "open-rdp", "id": "/x/open-rdp",
+        "properties": {
+          "access": "Allow", "direction": "Inbound", "priority": 200, "protocol": "Tcp",
+          "sourcePortRange": "*", "sourceAddressPrefix": "Internet", "sourceAddressPrefixes": [],
+          "destinationAddressPrefixes": ["10.2.1.0/24", "10.2.2.0/24"], "destinationPortRange": "3389", "destinationPortRanges": []
+        }
+      },
+      {
+        "name": "web-http", "id": "/x/web-http",
+        "properties": {
+          "access": "Allow", "direction": "Inbound", "priority": 1000, "protocol": "Tcp",
+          "sourcePortRange": "*", "sourceAddressPrefix": "10.1.0.0/16",
+          "destinationAddressPrefix": "10.2.0.0/24", "destinationPortRange": "80"
+        }
+      }
+    ],
+    "defaultSecurityRules": [
+      {
+        "name": "AllowVnetOutBound", "id": "/x/d1", "type": "Microsoft.Network/networkSecurityGroups/defaultSecurityRules",
+        "properties": {
+          "description": "Allow outbound traffic from all VMs to all VMs in VNET",
+          "access": "Allow", "direction": "Outbound", "priority": 65000, "protocol": "*",
+          "sourcePortRange": "*", "sourceAddressPrefix": "VirtualNetwork",
+          "destinationAddressPrefix": "VirtualNetwork", "destinationPortRange": "*"
+        }
+      },
+      {
+        "name": "DenyAllInBound", "id": "/x/d2",
+        "properties": {
+          "access": "Deny", "direction": "Inbound", "priority": 65500, "protocol": "*",
+          "sourcePortRange": "*", "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*", "destinationPortRange": "*"
+        }
+      },
+      {
+        "name": "AllowVnetInBound", "id": "/x/d3",
+        "properties": {
+          "access": "Allow", "direction": "Inbound", "priority": 65000, "protocol": "*",
+          "sourcePortRange": "*", "sourceAddressPrefix": "VirtualNetwork",
+          "destinationAddressPrefix": "VirtualNetwork", "destinationPortRange": "*"
+        }
+      },
+      {
+        "name": "DenyAllOutBound", "id": "/x/d4",
+        "properties": {
+          "access": "Deny", "direction": "Outbound", "priority": 65500, "protocol": "*",
+          "sourcePortRange": "*", "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*", "destinationPortRange": "*"
+        }
+      },
+      {
+        "name": "AllowAzureLoadBalancerInBound", "id": "/x/d5",
+        "properties": {
+          "access": "Allow", "direction": "Inbound", "priority": 65001, "protocol": "Tcp",
+          "sourcePortRange": "*", "sourceAddressPrefix": "AzureLoadBalancer",
+          "destinationAddressPrefix": "*", "destinationPortRange": "8080"
+        }
+      },
+      {
+        "name": "AllowInternetOutBound", "id": "/x/d6",
+        "properties": {
+          "access": "Allow", "direction": "Outbound", "priority": 65001, "protocol": "Udp",
+          "sourcePortRange": "*", "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "Internet", "destinationPortRange": "*"
+        }
+      }
+    ],
+    "subnets": [
+      {"id": "/subscriptions/s8/resourceGroups/rg-net/providers/Microsoft.Network/virtualNetworks/vnet-hub/subnets/snet-web"},
+      {"id": "/subscriptions/s8/resourceGroups/rg-net/providers/Microsoft.Network/virtualNetworks/vnet-spoke/subnets/snet-db"}
+    ],
+    "networkInterfaces": [
+      {"id": "/subscriptions/s8/resourceGroups/rg-vm/providers/Microsoft.Network/networkInterfaces/nic-web-01"}
+    ]
+  }
+}

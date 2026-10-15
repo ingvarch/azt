@@ -389,3 +389,14 @@ func TestBoxDefTableIsCutByTheBox(t *testing.T) {
 		t.Errorf("row = %q, want it cut with an ellipsis", line)
 	}
 }
+
+func TestTableDefListReplacesPath(t *testing.T) {
+	list := func(row map[string]any) []any {
+		return []any{map[string]any{"n": str(row, "x") + "-1"}, map[string]any{"n": str(row, "x") + "-2"}}
+	}
+	cols := []colDef{{title: "N", path: []string{"n"}}}
+	row := map[string]any{"x": "a", "words": []any{"ignored"}}
+	wantLines(t, plainAll(tableDef{path: []string{"words"}, list: list, cols: cols}.lines(row)), []string{"N", "a-1", "a-2"})
+	wantLines(t, plainAll(tableDef{list: list, cols: cols, keep: func(e any) bool { return str(e, "n") != "a-1" }}.lines(row)), []string{"N", "a-2"})
+	wantLines(t, plainAll(tableDef{list: func(map[string]any) []any { return nil }, cols: cols, empty: "nothing"}.lines(row)), []string{"nothing"})
+}
