@@ -17,6 +17,9 @@ func fmtText(v any) string { return orDash(text(v)) }
 
 func fmtState(v any) string { return stateText(fmtText(v)) }
 
+// fmtYesNo draws a bool as "yes" or "no", dash when missing.
+func fmtYesNo(v any) string { return flagText("yes", "no", v) }
+
 func fmtOnOff(v any) string { return switchText(onOff(v)) }
 
 // fmtOnOffOr is fmtOnOff, with def for a missing or non-bool value.

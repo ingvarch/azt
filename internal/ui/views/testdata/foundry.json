@@ -1,0 +1,36 @@
+{
+  "id": "/subscriptions/s7/resourceGroups/rg-ai/providers/Microsoft.CognitiveServices/accounts/fa-orders",
+  "name": "fa-orders",
+  "type": "microsoft.cognitiveservices/accounts",
+  "location": "swedencentral",
+  "resourceGroup": "rg-ai",
+  "subscriptionId": "s7",
+  "subscription": "Prod",
+  "kind": "AIServices",
+  "sku": {"name": "S0"},
+  "identity": {"type": "SystemAssigned", "principalId": "p-1", "tenantId": "t-1"},
+  "tags": {"team": "ml"},
+  "properties": {
+    "provisioningState": "Succeeded",
+    "endpoint": "https://fa-orders.cognitiveservices.azure.com/",
+    "customSubDomainName": "fa-orders-sub",
+    "dateCreated": "2026-03-09T11:20:00.5Z",
+    "allowProjectManagement": true,
+    "associatedProjects": ["proj-alpha", "proj-beta"],
+    "defaultProject": "proj-beta",
+    "disableLocalAuth": true,
+    "publicNetworkAccess": "Enabled",
+    "networkAcls": {
+      "defaultAction": "Deny",
+      "ipRules": [{"value": "203.0.113.7"}],
+      "virtualNetworkRules": [{"id": "/subscriptions/s7/resourceGroups/rg-net/providers/Microsoft.Network/virtualNetworks/vn/subnets/sn"}]
+    },
+    "privateEndpointConnections": [{"name": "pe-orders"}],
+    "endpoints": {
+      "OpenAI Language Model Instance API": "https://fa-orders.openai.azure.com/",
+      "AI Foundry API": "https://fa-orders.services.ai.azure.com/",
+      "Azure AI Model Inference API": "https://fa-orders.services.ai.azure.com/models"
+    },
+    "internalId": "8d1f"
+  }
+}

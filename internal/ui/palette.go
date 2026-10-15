@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	paletteMaxWidth  = 64
+	paletteMaxWidth  = 68
 	paletteMinInner  = 10 // narrowest inner width a box is drawn at
 	paletteMinHeight = 3  // fewest inner rows a box is drawn with
 	paletteChrome    = 4  // border, input line and rule around the rows

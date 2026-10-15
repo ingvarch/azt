@@ -1,0 +1,21 @@
+{
+  "id": "/subscriptions/s7/resourceGroups/rg-ai/providers/Microsoft.CognitiveServices/accounts/fa-orders/projects/proj-beta",
+  "name": "fa-orders/proj-beta",
+  "type": "microsoft.cognitiveservices/accounts/projects",
+  "location": "swedencentral",
+  "resourceGroup": "rg-ai",
+  "subscriptionId": "s7",
+  "subscription": "Prod",
+  "kind": "AIServices",
+  "sku": null,
+  "identity": {"type": "SystemAssigned", "principalId": "p-2", "tenantId": "t-1"},
+  "tags": {"owner": "ml-team"},
+  "properties": {
+    "displayName": "Beta Project",
+    "description": "Beta project for the orders team",
+    "isDefault": true,
+    "provisioningState": "Succeeded",
+    "endpoints": {"AI Foundry API": "https://fa-orders.services.ai.azure.com/api/projects/proj-beta"},
+    "agentIdentity": {"agentIdentityId": "a-1"}
+  }
+}

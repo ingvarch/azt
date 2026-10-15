@@ -40,18 +40,20 @@ func TestUnknownTypeGetsGenericTabs(t *testing.T) {
 
 func TestTabsOfEveryKind(t *testing.T) {
 	for _, k := range kinds {
-		want := []string{"Overview", "JSON"}
-		switch k.command {
-		case "aks":
-			want = aksTabNames
-		case "vm":
-			want = []string{"Overview", "Disks", "Network", "JSON"}
-		case "vnet":
-			want = []string{"Overview", "Subnets", "Peerings", "JSON"}
-		case "nsg":
-			want = []string{"Overview", "Rules", "JSON"}
-		}
 		for _, typ := range k.types {
+			want := []string{"Overview", "JSON"}
+			switch {
+			case typ == foundryType:
+				want = []string{"Overview", "Endpoints", "JSON"}
+			case k.command == "aks":
+				want = aksTabNames
+			case k.command == "vm":
+				want = []string{"Overview", "Disks", "Network", "JSON"}
+			case k.command == "vnet":
+				want = []string{"Overview", "Subnets", "Peerings", "JSON"}
+			case k.command == "nsg":
+				want = []string{"Overview", "Rules", "JSON"}
+			}
 			if got := Tabs(typ); !reflect.DeepEqual(got, want) {
 				t.Errorf("Tabs(%q) = %v, want %v", typ, got, want)
 			}
@@ -82,6 +84,7 @@ func TestTypeCommands(t *testing.T) {
 		{"sql", "SQL servers in every subscription", []string{"microsoft.sql/servers"}},
 		{"pg", "PostgreSQL servers in every subscription", []string{"microsoft.dbforpostgresql/flexibleservers"}},
 		{"docdb", "DocumentDB clusters in every subscription", []string{"microsoft.documentdb/mongoclusters"}},
+		{"foundry", "AI Foundry resources and projects in every subscription", []string{"microsoft.cognitiveservices/accounts", "microsoft.cognitiveservices/accounts/projects"}},
 		{"storage", "storage accounts in every subscription", []string{"microsoft.storage/storageaccounts"}},
 		{"app", "web apps in every subscription", []string{"microsoft.web/sites"}},
 		{"vnet", "virtual networks in every subscription", []string{"microsoft.network/virtualnetworks"}},
