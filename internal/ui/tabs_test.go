@@ -296,58 +296,17 @@ func TestPlusFollowsNamedTabs(t *testing.T) {
 	}
 }
 
-func TestPressOnPlusOpensNamedTabAtTheEnd(t *testing.T) {
+func TestPressOnPlusOpensTheDialogOnly(t *testing.T) {
 	for _, l := range barLayouts {
 		for dx := range 3 {
 			h := l.build()
 			h.prefix("t")
 			h.prefix("p") // active is the first of two tabs
 			cmd := h.press(plusX(l.start, 2)+dx, 0)
-			if len(h.m.tabs) != 3 || h.m.active != 2 {
-				t.Fatalf("%s dx=%d: tabs %d, active %d", l.name, dx, len(h.m.tabs), h.m.active)
-			}
-			if cmd == nil || cmd() != "init-3" || h.recs[2].inits != 1 {
-				t.Errorf("%s dx=%d: the new view's Init did not run", l.name, dx)
-			}
-			if h.pane(h.focused()).rec.id != 3 {
-				t.Errorf("%s dx=%d: the active tab does not hold the new view", l.name, dx)
-			}
-			if v := h.pane(h.focused()); v.w != l.paneW || v.h != 26 {
-				t.Errorf("%s dx=%d: new view size = %dx%d, want %dx26", l.name, dx, v.w, v.h, l.paneW)
-			}
-			if h.m.mode != modeRename || h.m.input.Value() != "" {
-				t.Errorf("%s dx=%d: mode %v, input %q", l.name, dx, h.m.mode, h.m.input.Value())
+			if cmd != nil || len(h.m.tabs) != 2 || h.m.active != 0 || h.m.mode != modeTabDialog || !h.m.newTabDialog {
+				t.Errorf("%s dx=%d: cmd %v, tabs %d, active %d, mode %v", l.name, dx, cmd != nil, len(h.m.tabs), h.m.active, h.m.mode)
 			}
 		}
-	}
-}
-
-func TestPlusTabNameFlow(t *testing.T) {
-	tests := []struct {
-		name  string
-		typed string
-		end   string
-		label string
-	}{
-		{"typed name", " Prod ", "enter", "  2 Prod  "},
-		{"enter with nothing typed", "", "enter", "   2    "},
-		{"blank name", "   ", "enter", "   2    "},
-		{"esc", "", "esc", "   2    "},
-		{"esc after typing", "x", "esc", "   2    "},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := newHarness(100, 30)
-			h.press(plusX(0, 1), 0)
-			h.typ(tt.typed)
-			h.send(key(tt.end))
-			if h.m.mode != modeNormal || len(h.m.tabs) != 2 || h.m.active != 1 {
-				t.Fatalf("mode %v, tabs %d, active %d", h.m.mode, len(h.m.tabs), h.m.active)
-			}
-			if got := h.m.tabLabel(1); got != tt.label {
-				t.Errorf("label = %q, want %q", got, tt.label)
-			}
-		})
 	}
 }
 
@@ -368,6 +327,7 @@ func TestPressOnPlusIsIgnoredInOtherModes(t *testing.T) {
 		"help":   func(h *harness) { h.send(key("?")) },
 		"prefix": func(h *harness) { h.send(key("ctrl+w")) },
 		"rename": func(h *harness) { h.prefix(",") },
+		"dialog": func(h *harness) { h.press(plusX(0, 1), 0) },
 		"filter": func(h *harness) { h.send(key("/")) },
 	}
 	for name, do := range enter {

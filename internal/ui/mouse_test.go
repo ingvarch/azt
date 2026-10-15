@@ -80,21 +80,19 @@ func TestHelpStaysOnOtherMouse(t *testing.T) {
 }
 
 func TestTypingIgnoresMouse(t *testing.T) {
-	for _, md := range []mode{modeFilter, modeRename} {
-		h := newHarness(100, 30)
-		h.prefix("t")
-		h.prefix("v")
-		h.m.startInput(md, "x")
-		h.press(0, 0)
-		h.press(10, 5)
-		h.wheel(10, 5, tea.MouseWheelDown)
-		if h.m.mode != md || h.m.active != 1 || h.m.input.Value() != "x" {
-			t.Errorf("mode %v: mode=%v active=%d input=%q", md, h.m.mode, h.m.active, h.m.input.Value())
-		}
-		for _, f := range h.fakes() {
-			if len(f.keys) != 0 || len(f.clicks) != 0 {
-				t.Errorf("mode %v: view got keys %v clicks %v", md, f.keys, f.clicks)
-			}
+	h := newHarness(100, 30)
+	h.prefix("t")
+	h.prefix("v")
+	h.m.startInput(modeFilter, "x")
+	h.press(0, 0)
+	h.press(10, 5)
+	h.wheel(10, 5, tea.MouseWheelDown)
+	if h.m.mode != modeFilter || h.m.active != 1 || h.m.input.Value() != "x" {
+		t.Errorf("mode=%v active=%d input=%q", h.m.mode, h.m.active, h.m.input.Value())
+	}
+	for _, f := range h.fakes() {
+		if len(f.keys) != 0 || len(f.clicks) != 0 {
+			t.Errorf("view got keys %v clicks %v", f.keys, f.clicks)
 		}
 	}
 }

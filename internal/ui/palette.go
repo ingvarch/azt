@@ -168,9 +168,16 @@ func (m Model) paletteKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // paletteRect is the dialog box, a quarter down the window above the status
 // bar; false when the window is too small for one.
 func (m Model) paletteRect() (layout.Rect, bool) {
-	w := min(m.width-4, paletteMaxWidth)
-	h := min(m.height-4, max(len(m.palette.matches), 1)+paletteChrome)
-	if w-2 < paletteMinInner || h-2 < paletteMinHeight {
+	return m.dialogRect(paletteMaxWidth, max(len(m.palette.matches), 1)+paletteChrome, paletteMinInner)
+}
+
+// dialogRect places a dialog box at most maxW wide and h high, a quarter down
+// the window above the status bar; false when its inner width is under
+// minInner or its inner height under paletteMinHeight.
+func (m Model) dialogRect(maxW, h, minInner int) (layout.Rect, bool) {
+	w := min(m.width-4, maxW)
+	h = min(m.height-4, h)
+	if w-2 < minInner || h-2 < paletteMinHeight {
 		return layout.Rect{}, false
 	}
 	return layout.Rect{X: (m.width - w) / 2, Y: min(m.height/4, m.height-1-h), W: w, H: h}, true
