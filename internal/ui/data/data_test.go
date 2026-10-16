@@ -3,9 +3,12 @@ package data
 import (
 	"context"
 	"errors"
+	"net/url"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
@@ -163,11 +166,14 @@ func TestErrorDropsCachedEntry(t *testing.T) {
 }
 
 type fakeGraph struct {
+	mu       sync.Mutex // the monitoring reads run at the same time
 	rows     []map[string]any
 	requests []armresourcegraph.QueryRequest
 }
 
 func (g *fakeGraph) Resources(_ context.Context, q armresourcegraph.QueryRequest, _ *armresourcegraph.ClientResourcesOptions) (armresourcegraph.ClientResourcesResponse, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	g.requests = append(g.requests, q)
 	data := make([]any, len(g.rows))
 	for i, r := range g.rows {
@@ -176,6 +182,18 @@ func (g *fakeGraph) Resources(_ context.Context, q armresourcegraph.QueryRequest
 	return armresourcegraph.ClientResourcesResponse{
 		QueryResponse: armresourcegraph.QueryResponse{Data: data},
 	}, nil
+}
+
+type fakeARM struct {
+	mu    sync.Mutex
+	paths []string
+}
+
+func (a *fakeARM) Get(_ context.Context, path string, _ url.Values) ([]byte, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.paths = append(a.paths, path)
+	return []byte(`{"value":[]}`), nil
 }
 
 type fetcherCase struct {
@@ -248,7 +266,7 @@ func TestNewFetcherRoutesKinds(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			graph := &fakeGraph{rows: []map[string]any{tt.row}}
 
-			got, err := NewFetcher(context.Background(), graph)(tt.key)
+			got, err := NewFetcher(context.Background(), graph, &fakeARM{})(tt.key)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -270,8 +288,47 @@ func TestNewFetcherRoutesKinds(t *testing.T) {
 	}
 }
 
+func TestNewFetcherRoutesAKSMonitoring(t *testing.T) {
+	const id = "/subscriptions/s1/resourceGroups/rg/providers/Microsoft.ContainerService/managedClusters/aks1"
+	graph := &fakeGraph{}
+	arm := &fakeARM{}
+
+	got, err := NewFetcher(context.Background(), graph, arm)(Key{Kind: AKSMonitoring, Subscription: "s1", ID: id, Period: "7d"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	m, ok := got.(azure.Monitoring)
+	if !ok {
+		t.Fatalf("data is %T, want azure.Monitoring", got)
+	}
+	if m.Interval != 30*time.Minute {
+		t.Errorf("Interval = %v, want the 7d grain of 30m", m.Interval)
+	}
+	if len(arm.paths) != 6 {
+		t.Errorf("%d ARM requests, want 6", len(arm.paths))
+	}
+	for _, p := range arm.paths {
+		if !strings.HasPrefix(p, id+"/providers/Microsoft.Insights/") {
+			t.Errorf("ARM path = %s", p)
+		}
+	}
+	if len(graph.requests) != 2 {
+		t.Fatalf("%d graph queries, want 2", len(graph.requests))
+	}
+	for i, req := range graph.requests {
+		var subs []string
+		for _, s := range req.Subscriptions {
+			subs = append(subs, *s)
+		}
+		if !reflect.DeepEqual(subs, []string{"s1"}) {
+			t.Errorf("graph query %d scope = %v, want [s1]", i, subs)
+		}
+	}
+}
+
 func TestNewFetcherRejectsUnknownKind(t *testing.T) {
-	if _, err := NewFetcher(context.Background(), &fakeGraph{})(Key{Kind: Kind(99)}); err == nil {
+	if _, err := NewFetcher(context.Background(), &fakeGraph{}, &fakeARM{})(Key{Kind: Kind(99)}); err == nil {
 		t.Error("err = nil, want unknown kind error")
 	}
 }

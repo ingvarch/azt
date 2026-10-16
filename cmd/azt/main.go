@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
 
+	"github.com/ingvarch/azt/internal/azure"
 	"github.com/ingvarch/azt/internal/session"
 	"github.com/ingvarch/azt/internal/ui"
 	"github.com/ingvarch/azt/internal/ui/data"
@@ -54,11 +55,16 @@ func runUI() error {
 		return err
 	}
 
+	armClient, err := azure.NewARM(cred, nil)
+	if err != nil {
+		return err
+	}
+
 	// Cancels a request still running when the user quits.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	fetch := data.NewFetcher(ctx, graph)
+	fetch := data.NewFetcher(ctx, graph, armClient)
 	// Without a state directory azt still runs, but forgets the layout.
 	var m ui.Model
 	path, pathErr := session.DefaultPath()

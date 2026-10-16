@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -14,7 +15,8 @@ import (
 // Kind is the type of data a Key asks for.
 type Kind int
 
-// Subscriptions and the kinds after it each map to one Resource Graph query.
+// Subscriptions and the kinds up to ResourcesOfType each map to one Resource
+// Graph query; AKSMonitoring reads Azure Monitor and diagnostic settings too.
 const (
 	Subscriptions Kind = iota
 	ResourceGroups
@@ -22,6 +24,7 @@ const (
 	Details
 	AllResourceGroups
 	ResourcesOfType
+	AKSMonitoring
 )
 
 // Key identifies one piece of data; unused fields stay empty.
@@ -31,6 +34,8 @@ type Key struct {
 	Group, ID    string
 	// Type is one resource type or several joined by ","; a type never holds a comma.
 	Type string
+	// Period is one of azure.Periods; only the monitoring kinds use it.
+	Period string
 }
 
 // FetchMsg is sent by a view that needs data.
@@ -98,8 +103,8 @@ func (c *Cache) Store(msg ResultMsg) {
 	c.data[msg.Key] = msg.Data
 }
 
-// NewFetcher reads each kind of data through graph.
-func NewFetcher(ctx context.Context, graph azure.ResourceGraph) Fetcher {
+// NewFetcher reads each kind of data through graph and arm.
+func NewFetcher(ctx context.Context, graph azure.ResourceGraph, arm azure.ARM) Fetcher {
 	return func(k Key) (any, error) {
 		switch k.Kind {
 		case Subscriptions:
@@ -114,6 +119,8 @@ func NewFetcher(ctx context.Context, graph azure.ResourceGraph) Fetcher {
 			return azure.ResourcesOfType(ctx, graph, strings.Split(k.Type, ","))
 		case Details:
 			return azure.ResourceDetails(ctx, graph, k.Subscription, k.ID)
+		case AKSMonitoring:
+			return azure.AKSMonitoring(ctx, graph, arm, k.Subscription, k.ID, k.Period, time.Now()), nil
 		}
 		return nil, fmt.Errorf("unknown data kind %d", k.Kind)
 	}
