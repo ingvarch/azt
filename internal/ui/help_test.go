@@ -12,7 +12,7 @@ import (
 
 func TestHelpListsResourceTabKeys(t *testing.T) {
 	for _, line := range helpLines() {
-		if strings.Contains(line, "tab / shift+tab") && strings.Contains(line, "next / previous tab of a resource") {
+		if strings.Contains(line, "tab / shift-tab") && strings.Contains(line, "next / previous tab of a resource") {
 			return
 		}
 	}

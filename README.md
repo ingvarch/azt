@@ -25,7 +25,7 @@ Tabs, split panes and one session for every subscription you can see.
   control plane did over the last 24 hours, 7 or 30 days on the Monitoring
   tab; `p` switches the period.
 - Splits the screen into panes and keeps several tabs, the way vim does with
-  `ctrl+w`. Each pane has its own path; a split copies it.
+  `ctrl-w`. Each pane has its own path; a split copies it.
 - Shows an explorer tree of subscriptions, resource groups and resource types
   with counts.
 - Filters any list as you type with `/`.
@@ -90,12 +90,12 @@ Press `?` for help, `:` for a command, `/` to filter and `q` to quit.
 | `/` | filter the list |
 | `:` | command: `subs`, `rg`, `vm`, `aks`, `kv`, `sql`, `pg`, `docdb`, `foundry`, `afd`, `storage`, `app`, `vnet`, `mi`, `acr`, `nsg`, `dns`, `type <type>`, `help`, `q` |
 | `r` | refresh |
-| `ctrl+w v` / `ctrl+w s` | split into left and right / top and bottom |
-| `ctrl+w h j k l`, `ctrl+w` arrows | move to the neighbor pane or the explorer |
-| `ctrl+w q`, `ctrl+w z`, `ctrl+w =` | close, zoom, equalize panes |
-| `ctrl+w t`, `ctrl+w n p 1-9`, `ctrl+w ,` | new tab, switch tabs, rename the tab |
-| `ctrl+w e` | show or hide the explorer |
-| `ctrl+w < >`, `ctrl+w =` | with the explorer focused: make it narrower or wider, or reset it to the default width |
+| `ctrl-w v` / `ctrl-w s` | split into left and right / top and bottom |
+| `ctrl-w h j k l`, `ctrl-w` arrows | move to the neighbor pane or the explorer |
+| `ctrl-w q`, `ctrl-w z`, `ctrl-w =` | close, zoom, equalize panes |
+| `ctrl-w t`, `ctrl-w n p 1-9`, `ctrl-w ,` | new tab, switch tabs, rename the tab |
+| `ctrl-w e` | show or hide the explorer |
+| `ctrl-w < >`, `ctrl-w =` | with the explorer focused: make it narrower or wider, or reset it to the default width |
 | `?` | every key |
 
 While azt runs, the terminal's own text selection needs Shift (Option in

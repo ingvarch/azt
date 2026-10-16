@@ -28,3 +28,13 @@ func TestReadmeCommandRowListsEveryTypeCommand(t *testing.T) {
 		}
 	}
 }
+
+func TestReadmeWritesCtrlDash(t *testing.T) {
+	raw, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "ctrl+") {
+		t.Error("README writes ctrl+ instead of ctrl-")
+	}
+}

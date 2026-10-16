@@ -26,9 +26,9 @@ const (
 	minSidebarWidth     = 20
 	sidebarResizeStep   = 4
 
-	sidebarHints       = "j/k move  l expand  h collapse  r refresh  enter open  ^w l panes  ^w e hide  : command  ? help  q quit"
+	sidebarHints       = "enter open  l/h expand/collapse  r refresh  ctrl-w l panes  ? help  q quit"
 	sidebarPrefixHints = "l/→ panes  e hide  </> width  = default width  t tab  n/p/1-9 switch  , rename  ? help  esc cancel"
-	normalHints        = "enter open  esc back  / filter  : command  r refresh  ? help  ^w v/s split  ^w hjkl/←↓↑→ focus  ^w t tab  q quit"
+	normalHints        = "enter open  / filter  : command  r refresh  ctrl-w layout  ? help  q quit"
 	pathSep            = " › "
 	pathCut            = "… › "
 	prefixHints        = "v/s split  hjkl/←↓↑→ focus  q close  z zoom  = equal  <>+- resize  t tab  n/p/1-9 switch  e explorer  , rename  ? help  esc cancel"
@@ -771,9 +771,9 @@ func (m Model) statusBar() string {
 	case modeFilter:
 		bar = m.inputLine("/") + "  " + hintStyle.Render(filterHints)
 	case modePalette:
-		bar = hintStyle.Render(paletteHints)
+		bar = " " + hintStyle.Render(paletteHints)
 	case modeTabDialog:
-		bar = hintStyle.Render(dialogHints)
+		bar = " " + hintStyle.Render(dialogHints)
 	default:
 		bar = m.modeBar()
 	}
@@ -800,25 +800,23 @@ func (m Model) sizedInput(width int) textinput.Model {
 	return in
 }
 
-// modeBar is the status bar outside the input modes: badge, path or notice, hints.
-// modeBar is the badge, a notice when there is one, and the hints; the pane
-// border already shows the path.
+// modeBar is the status bar outside the input modes: the prefix badge, a notice
+// when there is one, and the hints; the pane border already shows the path.
 func (m Model) modeBar() string {
-	badge, hints := " NORMAL ", normalHints
+	lead, hints := " ", normalHints
 	if m.sidebarFocused {
 		hints = sidebarHints
 	}
-	switch {
-	case m.mode == modePrefix && m.sidebarFocused:
-		badge, hints = " CTRL-W ", sidebarPrefixHints
-	case m.mode == modePrefix:
-		badge, hints = " CTRL-W ", prefixHints
+	if m.mode == modePrefix {
+		lead, hints = reverseStyle.Render(" CTRL-W ")+"  ", prefixHints
+		if m.sidebarFocused {
+			hints = sidebarPrefixHints
+		}
 	}
-	bar := reverseStyle.Render(badge)
 	if m.notice != "" {
-		bar += " " + errorStyle.Render(m.notice)
+		lead += errorStyle.Render(m.notice) + "  "
 	}
-	return bar + "  " + hintStyle.Render(hints)
+	return lead + hintStyle.Render(hints)
 }
 
 func titles(stack []views.View) []string {

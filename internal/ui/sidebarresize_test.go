@@ -381,7 +381,7 @@ func TestSidebarWidthHintsAndHelp(t *testing.T) {
 			t.Errorf("hints lack %q: %q", want, sidebarPrefixHints)
 		}
 	}
-	for _, keys := range []string{"ctrl+w < >", "ctrl+w ="} {
+	for _, keys := range []string{"ctrl-w < >", "ctrl-w ="} {
 		if !helpHasKey("Explorer", keys) {
 			t.Errorf("Explorer help lacks %q", keys)
 		}

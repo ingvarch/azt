@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	dialogHints    = "enter save  ctrl+c clear  esc cancel"
+	dialogHints    = "enter save  ctrl-c clear  esc cancel"
 	dialogMaxWidth = 56
 	dialogHeight   = 5 // border, field, blank line, buttons, border
 	dialogGap      = "  "
@@ -23,7 +23,7 @@ var dialogButtons = [...]struct {
 	primary    bool
 }{
 	{" ↵ save ", "enter", true},
-	{" ^c clear ", "ctrl+c", false},
+	{" ctrl-c clear ", "ctrl+c", false},
 	{" esc cancel ", "esc", false},
 }
 

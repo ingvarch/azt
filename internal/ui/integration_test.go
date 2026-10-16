@@ -217,7 +217,7 @@ func TestPaletteFilterRenameHelp(t *testing.T) {
 	s.want(t, "rename", " 1 Work ")
 
 	s.press("?")
-	s.want(t, "help", "┌ Help ", "Layout (ctrl+w)")
+	s.want(t, "help", "┌ Help ", "Layout (ctrl-w)")
 	s.press("x")
 	if f := s.frame(); strings.Contains(f, "┌ Help ") {
 		t.Errorf("help stayed open:\n%s", f)

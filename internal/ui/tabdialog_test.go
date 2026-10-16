@@ -17,13 +17,13 @@ var dialogLayouts = []struct {
 	save, clear, cancel int
 	plus                int
 }{
-	{"explorer shown", func() *harness { return newSidebarHarness(100, 30) }, 22, 7, 56, 33, 43, 55, defaultSidebarWidth + 9},
-	{"explorer hidden", func() *harness { return newHarness(100, 30) }, 22, 7, 56, 33, 43, 55, 9},
-	{"odd width", func() *harness { return newHarness(41, 30) }, 2, 7, 37, 3, 13, 25, 9},
-	{"short window", func() *harness { return newHarness(100, 9) }, 22, 2, 56, 33, 43, 55, 9},
+	{"explorer shown", func() *harness { return newSidebarHarness(100, 30) }, 22, 7, 56, 31, 41, 57, defaultSidebarWidth + 9},
+	{"explorer hidden", func() *harness { return newHarness(100, 30) }, 22, 7, 56, 31, 41, 57, 9},
+	{"odd width", func() *harness { return newHarness(45, 30) }, 2, 7, 41, 3, 13, 29, 9},
+	{"short window", func() *harness { return newHarness(100, 9) }, 22, 2, 56, 31, 41, 57, 9},
 }
 
-const buttonsText = " ↵ save " + "  " + " ^c clear " + "  " + " esc cancel "
+const buttonsText = " ↵ save " + "  " + " ctrl-c clear " + "  " + " esc cancel "
 
 // cells is n cells of line from column x.
 func cells(line string, x, n int) string {
@@ -47,13 +47,13 @@ func TestPlusOpensTheNewTabDialog(t *testing.T) {
 				t.Fatalf("mode %v, tabs %d, input %q", h.m.mode, len(h.m.tabs), h.m.input.Value())
 			}
 			inner := l.w - 2
-			pad := (inner - 34) / 2
+			pad := (inner - 38) / 2
 			lines := h.frameLines()
 			want := []string{
 				"┌ New tab " + strings.Repeat("─", inner-len([]rune(" New tab "))) + "┐",
 				"│ 2" + strings.Repeat(" ", inner-2) + "│",
 				"│" + strings.Repeat(" ", inner) + "│",
-				"│" + strings.Repeat(" ", pad) + buttonsText + strings.Repeat(" ", inner-pad-34) + "│",
+				"│" + strings.Repeat(" ", pad) + buttonsText + strings.Repeat(" ", inner-pad-38) + "│",
 				"└" + strings.Repeat("─", inner) + "┘",
 			}
 			for i, w := range want {
@@ -291,7 +291,7 @@ func TestDialogStatusBarShowsTheHints(t *testing.T) {
 		h := newHarness(100, 30)
 		open(h)
 		got := strings.TrimRight(h.status(), " ")
-		if got != "enter save  ctrl+c clear  esc cancel" {
+		if got != " enter save  ctrl-c clear  esc cancel" {
 			t.Errorf("%s: status = %q", name, got)
 		}
 	}
@@ -307,8 +307,8 @@ func TestCtrlCQuitsOutsideTheDialog(t *testing.T) {
 }
 
 func TestHelpSaysWhatCtrlCDoes(t *testing.T) {
-	if !helpHasLine("Panes", "ctrl+c", "quit; clears the field in a tab dialog") {
-		t.Errorf("help lacks the ctrl+c line:\n%s", strings.Join(helpLines(), "\n"))
+	if !helpHasLine("Panes", "ctrl-c", "quit; clears the field in a tab dialog") {
+		t.Errorf("help lacks the ctrl-c line:\n%s", strings.Join(helpLines(), "\n"))
 	}
 }
 
@@ -346,13 +346,13 @@ func TestPressOnTheButtons(t *testing.T) {
 						h.typ("x")
 						return h, h.press(start+dx*(w-1), l.y+3)
 					}
-					h, cmd := press(l.save, 8)
+					h, cmd := press(l.save, lipgloss.Width(dialogButtons[0].label))
 					checkSavePress(t, h, cmd, name)
-					h, cmd = press(l.clear, 10)
+					h, cmd = press(l.clear, lipgloss.Width(dialogButtons[1].label))
 					if cmd != nil || h.m.mode != modeTabDialog || h.m.input.Value() != "" {
 						t.Errorf("clear: mode %v, input %q", h.m.mode, h.m.input.Value())
 					}
-					h, cmd = press(l.cancel, 12)
+					h, cmd = press(l.cancel, lipgloss.Width(dialogButtons[2].label))
 					want := o.name
 					if cmd != nil || h.m.mode != modeNormal || len(h.m.tabs) != 1 || h.m.tabs[0].name != want {
 						t.Errorf("cancel: mode %v, tabs %d, name %q", h.m.mode, len(h.m.tabs), h.m.tabs[0].name)
@@ -465,12 +465,12 @@ func checkShadedButtons(t *testing.T, line string, save, wipe, cancel int) {
 			t.Errorf("save x=%d: %+v, want bold, reverse, 94 on the bar shade", x, c)
 		}
 	}
-	for _, x := range []int{wipe, wipe + 9, cancel, cancel + 11} {
+	for _, x := range []int{wipe, wipe + 13, cancel, cancel + 11} {
 		if c := cellAt(t, line, x); c.bg != tab || !c.flags["1"] || c.flags["7"] || c.flags["2"] {
 			t.Errorf("x=%d: %+v, want bold on the tab shade", x, c)
 		}
 	}
-	for _, x := range []int{save + 8, save + 9, wipe + 10} {
+	for _, x := range []int{save + 8, save + 9, wipe + 14} {
 		if c := cellAt(t, line, x); c.bg != "" {
 			t.Errorf("gap x=%d: background %q, want none", x, c.bg)
 		}
@@ -534,7 +534,7 @@ func TestDialogHasNoShadeBeforeTheBackgroundArrives(t *testing.T) {
 }
 
 func TestDialogIsNotDrawnInASmallWindow(t *testing.T) {
-	for _, s := range [][2]int{{39, 30}, {100, 8}, {20, 6}, {5, 3}, {1, 1}} {
+	for _, s := range [][2]int{{43, 30}, {100, 8}, {20, 6}, {5, 3}, {1, 1}} {
 		for _, title := range []string{"New tab", "Rename tab"} {
 			h := newHarness(s[0], s[1])
 			if title == "New tab" {
@@ -551,7 +551,7 @@ func TestDialogIsNotDrawnInASmallWindow(t *testing.T) {
 			}
 		}
 	}
-	for _, s := range [][2]int{{40, 30}, {100, 9}} {
+	for _, s := range [][2]int{{44, 30}, {100, 9}} {
 		h := newHarness(s[0], s[1])
 		h.prefix(",")
 		if f := h.frame(); !strings.Contains(f, "┌ Rename tab ") || !strings.Contains(f, " esc cancel ") {
@@ -561,7 +561,7 @@ func TestDialogIsNotDrawnInASmallWindow(t *testing.T) {
 }
 
 func TestDialogFitsTheWindowWithLongText(t *testing.T) {
-	for _, s := range [][2]int{{40, 9}, {100, 30}, {41, 12}} {
+	for _, s := range [][2]int{{44, 9}, {100, 30}, {45, 12}} {
 		h := newHarness(s[0], s[1])
 		h.prefix(",")
 		h.typ(strings.Repeat("abcdefghij", 12))

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -307,8 +308,8 @@ func TestPaletteErrorShowsUntilNextKey(t *testing.T) {
 			t.Errorf("%s: notice is not red: %q", in, lines[len(lines)-1])
 		}
 		h.send(key("x"))
-		if strings.Contains(h.status(), msg) || !strings.Contains(h.status(), "NORMAL") {
-			t.Errorf("%s: notice stayed after a key: %q", in, h.status())
+		if s := h.status(); strings.Contains(s, msg) || !strings.Contains(s, normalHints) {
+			t.Errorf("%s: after a key the bar is not back to the hints: %q", in, s)
 		}
 	}
 }
@@ -343,7 +344,7 @@ func TestHelpOpensFromAllPlaces(t *testing.T) {
 			t.Errorf("%s: mode = %v", name, h.m.mode)
 			continue
 		}
-		wantIn(t, name+" frame", h.frame(), "┌ Help ", "Panes", "Layout (ctrl+w)", "Explorer", "Commands")
+		wantIn(t, name+" frame", h.frame(), "┌ Help ", "Panes", "Layout (ctrl-w)", "Explorer", "Commands")
 	}
 }
 
@@ -503,8 +504,8 @@ func TestInputStatusFitsNarrowWindow(t *testing.T) {
 
 func TestHintsText(t *testing.T) {
 	want := map[string]string{
-		normalHints:        "enter open  esc back  / filter  : command  r refresh  ? help  ^w v/s split  ^w hjkl/←↓↑→ focus  ^w t tab  q quit",
-		sidebarHints:       "j/k move  l expand  h collapse  r refresh  enter open  ^w l panes  ^w e hide  : command  ? help  q quit",
+		normalHints:        "enter open  / filter  : command  r refresh  ctrl-w layout  ? help  q quit",
+		sidebarHints:       "enter open  l/h expand/collapse  r refresh  ctrl-w l panes  ? help  q quit",
 		prefixHints:        "v/s split  hjkl/←↓↑→ focus  q close  z zoom  = equal  <>+- resize  t tab  n/p/1-9 switch  e explorer  , rename  ? help  esc cancel",
 		sidebarPrefixHints: "l/→ panes  e hide  </> width  = default width  t tab  n/p/1-9 switch  , rename  ? help  esc cancel",
 	}
@@ -565,7 +566,7 @@ func TestPasteGoesToInput(t *testing.T) {
 
 func TestHelpListsEveryKey(t *testing.T) {
 	text := strings.Join(helpLines(), "\n")
-	for _, want := range []string{"ctrl+c", "this help", "command"} {
+	for _, want := range []string{"ctrl-c", "this help", "command"} {
 		wantIn(t, "help", text, want)
 	}
 	for _, section := range []struct{ title, key string }{
@@ -623,11 +624,96 @@ func TestCtrlVDoesNotReadClipboard(t *testing.T) {
 func TestStatusBarShowsNoPath(t *testing.T) {
 	h := newSidebarHarness(140, 30)
 	h.loadSubs()
-	if got := h.status(); strings.Contains(got, "Fake1") || !strings.Contains(got, "NORMAL") {
-		t.Errorf("pane focus: status = %q, want the badge and no path", got)
+	if got := h.status(); strings.Contains(got, "Fake1") || strings.Contains(got, "NORMAL") || !strings.Contains(got, normalHints) {
+		t.Errorf("pane focus: status = %q, want the hints, no badge and no path", got)
 	}
 	h.prefix("h")
 	if got := h.status(); strings.Contains(got, "Explorer") || !strings.Contains(got, sidebarHints) {
 		t.Errorf("explorer focus: status = %q, want the explorer hints and no title", got)
+	}
+}
+
+func TestNormalStatusBarHasNoBadge(t *testing.T) {
+	for name, h := range map[string]*harness{"pane": newHarness(140, 30), "explorer": newSidebarHarness(140, 30)} {
+		if name == "explorer" {
+			h.loadSubs()
+			h.prefix("h")
+		}
+		got := h.status()
+		if strings.Contains(got, "NORMAL") || !strings.HasPrefix(got, " ") || strings.HasPrefix(got, "  ") {
+			t.Errorf("%s: status = %q, want one space and no badge", name, got)
+		}
+	}
+	h := newHarness(140, 30)
+	h.m.notice = "boom"
+	if got := h.status(); !strings.HasPrefix(got, " boom  ") || !strings.Contains(got, normalHints) {
+		t.Errorf("notice: status = %q", got)
+	}
+}
+
+// The hint-only bars start at the same cell as the normal hints.
+func TestDialogAndPaletteHintsStartLikeTheNormalOnes(t *testing.T) {
+	h := newHarness(140, 30)
+	h.send(key(":"))
+	if got := h.status(); !strings.HasPrefix(got, " "+paletteHints) {
+		t.Errorf("palette: status = %q", got)
+	}
+	h.send(key("esc"))
+	h.prefix(",")
+	if got := h.status(); !strings.HasPrefix(got, " "+dialogHints) {
+		t.Errorf("dialog: status = %q", got)
+	}
+}
+
+func TestPrefixStatusBarKeepsTheBadge(t *testing.T) {
+	for name, h := range map[string]*harness{"pane": newHarness(140, 30), "explorer": newSidebarHarness(140, 30)} {
+		want := prefixHints
+		if name == "explorer" {
+			h.prefix("h")
+			want = sidebarPrefixHints
+		}
+		h.send(key("ctrl+w"))
+		if got := h.status(); !strings.Contains(got, "CTRL-W") || !strings.Contains(got, want) {
+			t.Errorf("%s: status = %q", name, got)
+		}
+	}
+}
+
+var caret = regexp.MustCompile(`\^[a-zA-Z]`)
+
+func TestKeysReadAsCtrlDash(t *testing.T) {
+	texts := map[string]string{
+		"normal":         normalHints,
+		"sidebar":        sidebarHints,
+		"prefix":         prefixHints,
+		"sidebar prefix": sidebarPrefixHints,
+		"filter":         filterHints,
+		"palette":        paletteHints,
+		"dialog":         dialogHints,
+		"help":           strings.Join(helpLines(), "\n"),
+	}
+	for _, b := range dialogButtons {
+		texts["button "+b.key] = b.label
+	}
+	for name, text := range texts {
+		if caret.MatchString(text) {
+			t.Errorf("%s has ^ before a key letter: %q", name, text)
+		}
+	}
+	for name, text := range texts {
+		for _, plus := range []string{"ctrl+", "shift+"} {
+			if strings.Contains(text, plus) {
+				t.Errorf("%s writes %s instead of a dash: %q", name, plus, text)
+			}
+		}
+	}
+}
+
+// The status bar starts with one space; the hints must fit an 80-column terminal.
+func TestHintsFitEightyColumns(t *testing.T) {
+	for name, hints := range map[string]string{"pane": normalHints, "explorer": sidebarHints} {
+		if w := 1 + lipgloss.Width(hints); w > 80 {
+			t.Errorf("%s hints take %d cells: %q", name, w, hints)
+		}
 	}
 }
