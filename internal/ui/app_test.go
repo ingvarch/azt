@@ -699,6 +699,47 @@ func (s stub) Title() string                        { return s.title }
 func (s stub) Open() (views.View, bool)             { return nil, false }
 func (s stub) Spec() views.Spec                     { return views.Spec{Kind: "stub"} }
 
+// counted is a stub that reports a row count.
+type counted struct {
+	stub
+	n  int
+	ok bool
+}
+
+func (c counted) Count() (int, bool) { return c.n, c.ok }
+
+func TestPaneBorderShowsCountAfterLastSegment(t *testing.T) {
+	top := func(c counted, w int) string {
+		stack := []views.View{counted{stub: stub{title: "Subscriptions"}, n: 1, ok: true}, c}
+		out := renderPane(stack, layout.Rect{W: w, H: 3}, true)
+		return strings.SplitN(sgr.ReplaceAllString(out, ""), "\n", 2)[0]
+	}
+	c := counted{stub: stub{title: "AKS clusters"}, n: 2, ok: true}
+	if got, want := top(c, 40), "┌ Subscriptions › AKS clusters [2] ────┐"; got != want {
+		t.Errorf("top border = %q, want %q", got, want)
+	}
+	c.ok = false
+	if got, want := top(c, 40), "┌ Subscriptions › AKS clusters ────────┐"; got != want {
+		t.Errorf("loading top border = %q, want %q", got, want)
+	}
+	c.ok = true
+	if got, want := top(c, 28), "┌ … › AKS clusters [2] ────┐"; got != want {
+		t.Errorf("narrow top border = %q, want %q", got, want)
+	}
+	// When only the last segment fits, it is cut and the count stays whole.
+	deep := []views.View{stub{title: "Subscriptions"}, stub{title: "Dev"}, counted{stub: stub{title: "Virtual machines"}, n: 123, ok: true}}
+	border := func(w int) string {
+		return strings.SplitN(sgr.ReplaceAllString(renderPane(deep, layout.Rect{W: w, H: 3}, true), ""), "\n", 2)[0]
+	}
+	if got, want := border(24), "┌ Virtual machin [123] ┐"; got != want {
+		t.Errorf("cut top border = %q, want %q", got, want)
+	}
+	// Without room for a name, the count is left out rather than cut.
+	if got, want := border(8), "┌ Virt ┐"; got != want {
+		t.Errorf("tiny top border = %q, want %q", got, want)
+	}
+}
+
 func TestRenderPaneClipsTitleAndBody(t *testing.T) {
 	long := strings.Repeat("x", 50)
 	v := stub{title: long, body: long + "\n" + long + "\n" + long}

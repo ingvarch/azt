@@ -32,11 +32,11 @@ func TestTypeExpandsWithoutFetchAndSortsResources(t *testing.T) {
 	assertLines(t, m,
 		"▾ Dev",
 		"  ▾ rg-a",
-		"    ▾ containerservice/managedclusters 3",
+		"    ▾ AKS clusters 3",
 		"      ▸ alpha",
 		"      ▸ Beta",
 		"      ▸ Gamma",
-		"    ▸ sql/servers 1",
+		"    ▸ SQL servers 1",
 		"  ▸ rg-b",
 		"▸ Prod",
 	)
@@ -47,7 +47,7 @@ func TestResourceExpandsIntoTabs(t *testing.T) {
 	assertLines(t, m,
 		"▾ Dev",
 		"  ▾ rg-a",
-		"    ▾ containerservice/managedclusters 3",
+		"    ▾ AKS clusters 3",
 		"      ▾ alpha",
 		"          Overview",
 		"          Node pools",
@@ -58,7 +58,7 @@ func TestResourceExpandsIntoTabs(t *testing.T) {
 		"          JSON",
 		"      ▸ Beta",
 		"      ▸ Gamma",
-		"    ▸ sql/servers 1",
+		"    ▸ SQL servers 1",
 		"  ▸ rg-b",
 		"▸ Prod",
 	)
@@ -67,8 +67,8 @@ func TestResourceExpandsIntoTabs(t *testing.T) {
 	assertLines(t, m,
 		"▾ Dev",
 		"  ▾ rg-a",
-		"    ▸ containerservice/managedclusters 3",
-		"    ▾ sql/servers 1",
+		"    ▸ AKS clusters 3",
+		"    ▾ SQL servers 1",
 		"      ▾ db1",
 		"          Overview",
 		"          JSON",
@@ -80,7 +80,7 @@ func TestResourceExpandsIntoTabs(t *testing.T) {
 func TestStackOfResourceAndTab(t *testing.T) {
 	m := press(aksModel(), key('l'), keyDown)
 	keyDetails := data.Key{Kind: data.Details, Subscription: "id-1", ID: "/aks-a"}
-	head := []string{"Subscriptions", "Dev", "rg-a", "containerservice/managedclusters", "alpha"}
+	head := []string{"Subscriptions", "Dev", "rg-a", "AKS clusters", "alpha"}
 	keys := []data.Key{keySubs, keyGroups, keyRes, keyRes, keyDetails}
 
 	check := func(name string, m Model, titles []string) {
@@ -174,9 +174,9 @@ func TestKeysOnResourceLevels(t *testing.T) {
 	m = press(m, keyLeft)
 	assertRow(t, m, 3, "      ▸ alpha")
 	m = press(m, keyLeft)
-	assertRow(t, m, 2, "    ▾ containerservice/managedclusters 3")
+	assertRow(t, m, 2, "    ▾ AKS clusters 3")
 	m = press(m, keyLeft)
-	assertRow(t, m, 2, "    ▸ containerservice/managedclusters 3")
+	assertRow(t, m, 2, "    ▸ AKS clusters 3")
 }
 
 func TestLeftOnTabMovesToResource(t *testing.T) {
@@ -193,7 +193,7 @@ func TestClickMarkersOnResourceLevels(t *testing.T) {
 	if got := fetches(cmd); len(got) != 0 {
 		t.Errorf("type marker asks for %v", got)
 	}
-	assertRow(t, m, 2, "    ▾ containerservice/managedclusters 3")
+	assertRow(t, m, 2, "    ▾ AKS clusters 3")
 
 	m, cmd = click(m, 7, 3) // resource marker, second cell
 	if got := fetches(cmd); len(got) != 0 {

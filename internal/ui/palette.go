@@ -185,7 +185,7 @@ func (m Model) dialogRect(maxW, h, minInner int) (layout.Rect, bool) {
 
 // paletteBox draws the dialog in r.
 func (m Model) paletteBox(r layout.Rect) string {
-	return renderBox([]string{"Command"}, m.palette.body(r.W-2, r.H-2), r, true)
+	return renderBox([]string{"Command"}, "", m.palette.body(r.W-2, r.H-2), r, true)
 }
 
 // body is the input line, a rule and as many rows as fit in height, scrolled

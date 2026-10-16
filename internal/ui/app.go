@@ -689,7 +689,7 @@ func (m Model) frame() string {
 	}
 	if m.mode == modeHelp {
 		if r := m.helpRect(); drawn(r) {
-			box := renderBox([]string{"Help"}, strings.Join(helpLines(), "\n"), r, true)
+			box := renderBox([]string{"Help"}, "", strings.Join(helpLines(), "\n"), r, true)
 			comp.AddLayers(lipgloss.NewLayer(box).X(r.X).Y(r.Y))
 		}
 	}
@@ -847,14 +847,23 @@ func fitPath(path []string, width int) string {
 }
 
 // renderPane draws the top view of stack inside a border, with the path of
-// the stack in the top border. The result is exactly r.W x r.H cells; r must
+// the stack in the top border, the last segment followed by the row count when
+// the view reports one. The result is exactly r.W x r.H cells; r must
 // be at least 2x2.
 func renderPane(stack []views.View, r layout.Rect, focused bool) string {
-	return renderBox(titles(stack), stack[len(stack)-1].Render(), r, focused)
+	top := stack[len(stack)-1]
+	count := ""
+	if c, ok := top.(views.Counter); ok {
+		if n, ok := c.Count(); ok {
+			count = " [" + strconv.Itoa(n) + "]"
+		}
+	}
+	return renderBox(titles(stack), count, top.Render(), r, focused)
 }
 
-// renderBox draws body inside a border, with path in the top border.
-func renderBox(path []string, body string, r layout.Rect, focused bool) string {
+// renderBox draws body inside a border, with path and then tail in the top
+// border. The path is cut to keep tail whole; without room for both, tail is left out.
+func renderBox(path []string, tail, body string, r layout.Rect, focused bool) string {
 	color := borderColor
 	title := lipgloss.NewStyle()
 	if focused {
@@ -866,7 +875,11 @@ func renderBox(path []string, body string, r layout.Rect, focused bool) string {
 	inner := r.W - 2
 	label := ""
 	if inner > 0 {
-		label = title.MaxWidth(inner).Render(" " + fitPath(path, inner-2) + " ")
+		room := inner - 2 - lipgloss.Width(tail)
+		if room < 1 {
+			room, tail = inner-2, ""
+		}
+		label = title.MaxWidth(inner).Render(" " + fitPath(path, room) + tail + " ")
 	}
 	top := edge.Render(border.TopLeft) + label +
 		edge.Render(strings.Repeat(border.Top, inner-lipgloss.Width(label))+border.TopRight)
