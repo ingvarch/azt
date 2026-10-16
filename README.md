@@ -20,7 +20,9 @@ Tabs, split panes and one session for every subscription you can see.
   DocumentDB cluster, AI Foundry resource and project, storage account, web
   app, virtual network, managed identity, container registry, network
   security group, DNS zone or private DNS zone across all your subscriptions
-  in one table: `:vm`, `:aks`, `:kv` and the other commands.
+  in one table: `:vm`, `:aks`, `:kv` and the other commands. `:vm` shows each
+  VM's status, size, OS and IPs; `:aks` shows each cluster's status,
+  Kubernetes version, nodes, tier and auto-upgrade channel.
 - Shows how an AKS cluster's monitoring is set up and how its nodes, pods and
   control plane did over the last 24 hours, 7 or 30 days on the Monitoring
   tab; `p` switches the period.

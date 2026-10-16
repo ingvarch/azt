@@ -15,7 +15,7 @@ import (
 // Kind is the type of data a Key asks for.
 type Kind int
 
-// Subscriptions and the kinds up to ResourcesOfType each map to one Resource
+// Subscriptions and the kinds up to AKSClusters each map to one Resource
 // Graph query; AKSMonitoring reads Azure Monitor and diagnostic settings too.
 const (
 	Subscriptions Kind = iota
@@ -24,6 +24,8 @@ const (
 	Details
 	AllResourceGroups
 	ResourcesOfType
+	VirtualMachines
+	AKSClusters
 	AKSMonitoring
 )
 
@@ -117,6 +119,10 @@ func NewFetcher(ctx context.Context, graph azure.ResourceGraph, arm azure.ARM) F
 			return azure.AllResourceGroups(ctx, graph)
 		case ResourcesOfType:
 			return azure.ResourcesOfType(ctx, graph, strings.Split(k.Type, ","))
+		case VirtualMachines:
+			return azure.VirtualMachines(ctx, graph)
+		case AKSClusters:
+			return azure.AKSClusters(ctx, graph)
 		case Details:
 			return azure.ResourceDetails(ctx, graph, k.Subscription, k.ID)
 		case AKSMonitoring:

@@ -2,6 +2,7 @@ package views
 
 import (
 	"slices"
+	"strings"
 )
 
 // resourceKind describes how azt shows one kind of resource.
@@ -19,11 +20,14 @@ type resourceKind struct {
 	attention func(row map[string]any) []alert
 }
 
-const aksType = "microsoft.containerservice/managedclusters"
+const (
+	vmType  = "microsoft.compute/virtualmachines"
+	aksType = "microsoft.containerservice/managedclusters"
+)
 
 // kinds lists the kinds in the order of the palette; a type belongs to the first kind that lists it.
 var kinds = []resourceKind{
-	{name: "Virtual machines", types: []string{"microsoft.compute/virtualmachines"}, command: "vm", desc: "virtual machines in every subscription", tabs: vmTabs, attention: vmAttention},
+	{name: "Virtual machines", types: []string{vmType}, command: "vm", desc: "virtual machines in every subscription", tabs: vmTabs, attention: vmAttention},
 	{name: "AKS clusters", types: []string{aksType}, command: "aks", desc: "AKS clusters in every subscription", tabs: aksTabs, attention: aksAttention},
 	{name: "Key vaults", types: []string{"microsoft.keyvault/vaults"}, command: "kv", desc: "key vaults in every subscription", tabs: kvTabs, attention: kvAttention},
 	{name: "SQL servers", types: []string{"microsoft.sql/servers"}, command: "sql", desc: "SQL servers in every subscription"},
@@ -40,6 +44,24 @@ var kinds = []resourceKind{
 	{name: "Network security groups", types: []string{"microsoft.network/networksecuritygroups"}, command: "nsg", desc: "network security groups in every subscription", tabs: nsgTabs, attention: nsgAttention},
 	{name: "DNS zones", types: []string{"microsoft.network/dnszones"}, command: "dns", desc: "public and private DNS zones in every subscription", tabs: dnsTabs, attention: dnsAttention},
 	{name: "Private DNS zones", types: []string{"microsoft.network/privatednszones"}, command: "dns", tabs: pdnsTabs, attention: pdnsAttention},
+}
+
+// kindLists are the lists with columns of their own, by resource type; every
+// other type opens NewResourcesByType.
+var kindLists = map[string]func() View{
+	vmType:  NewVirtualMachines,
+	aksType: NewAKSClusters,
+}
+
+// NewListOfTypes lists the resources of the given types in every subscription:
+// the list of the kind when one type has its own, else NewResourcesByType.
+func NewListOfTypes(resourceTypes ...string) View {
+	if len(resourceTypes) == 1 {
+		if list, ok := kindLists[strings.ToLower(resourceTypes[0])]; ok {
+			return list()
+		}
+	}
+	return NewResourcesByType(resourceTypes...)
 }
 
 // kindOf is the kind of a resource type; the zero kind for a type no kind lists.

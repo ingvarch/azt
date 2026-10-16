@@ -2,7 +2,11 @@ package ui
 
 import (
 	"slices"
+	"strings"
 	"testing"
+
+	"github.com/ingvarch/azt/internal/azure"
+	"github.com/ingvarch/azt/internal/ui/data"
 )
 
 func TestParseCommand(t *testing.T) {
@@ -166,4 +170,36 @@ func allNames() []string {
 		names = append(names, c.name)
 	}
 	return names
+}
+
+// header is the column titles a command's view draws once the data for key has arrived.
+func header(t *testing.T, input string, key data.Key, rows any) string {
+	t.Helper()
+	c, err := parseCommand(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _ := c.view.Resize(200, 10).Update(data.ResultMsg{Key: key, Data: rows})
+	first, _, _ := strings.Cut(v.Render(), "\n")
+	return first
+}
+
+func TestParseCommandOpensTheListsOfAKind(t *testing.T) {
+	if got := header(t, "vm", data.Key{Kind: data.VirtualMachines}, []azure.VM{{}}); !strings.Contains(got, "Public IP") {
+		t.Errorf("vm header = %q, want the VM columns", got)
+	}
+	if got := header(t, "aks", data.Key{Kind: data.AKSClusters}, []azure.Cluster{{}}); !strings.Contains(got, "Auto-upgrade") {
+		t.Errorf("aks header = %q, want the cluster columns", got)
+	}
+	if got := header(t, "type microsoft.compute/virtualmachines", data.Key{Kind: data.VirtualMachines}, []azure.VM{{}}); !strings.Contains(got, "Public IP") {
+		t.Errorf("type header = %q, want the VM columns", got)
+	}
+}
+
+func TestParseCommandOpensTheGenericListForOtherTypes(t *testing.T) {
+	key := data.Key{Kind: data.ResourcesOfType, Type: "microsoft.web/sites"}
+	got := header(t, "app", key, []azure.Resource{{}})
+	if !strings.Contains(got, "Resource group") || strings.Contains(got, "Size") {
+		t.Errorf("app header = %q, want the generic columns", got)
+	}
 }

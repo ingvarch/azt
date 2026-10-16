@@ -30,7 +30,12 @@ var vmEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{
 
 // vmPower is the power state word of a row, such as "Running", or "".
 func vmPower(row map[string]any) string {
-	code := strings.TrimPrefix(str(row, "properties", "extended", "instanceView", "powerState", "code"), "PowerState/")
+	return powerWord(str(row, "properties", "extended", "instanceView", "powerState", "code"))
+}
+
+// powerWord is a power state code such as "PowerState/running" as the word "Running".
+func powerWord(code string) string {
+	code = strings.TrimPrefix(code, "PowerState/")
 	if code == "" {
 		return ""
 	}
