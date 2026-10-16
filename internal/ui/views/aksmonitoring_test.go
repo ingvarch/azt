@@ -790,6 +790,7 @@ func TestMonitoringFiringLinesUp(t *testing.T) {
 }
 
 func TestMonitoringFiringKeepsTheTimeWithALongRule(t *testing.T) {
+	localZone(t, time.FixedZone("T", 2*3600))
 	m := monitoringFixture()
 	m.Alerts = monOK([]azure.Alert{
 		{Rule: "node-cpu-high", Severity: "Sev1", Condition: "Fired", Started: monStarted},
