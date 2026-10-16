@@ -1,8 +1,8 @@
 package views
 
 var miTabs = []tabDef{
-	{overviewTab, boxesTab(miEssentials)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(miEssentials)},
+	{name: "JSON", render: jsonTab},
 }
 
 var miEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{

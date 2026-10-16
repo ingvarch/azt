@@ -3,8 +3,8 @@ package views
 import "strings"
 
 var storageTabs = []tabDef{
-	{overviewTab, boxesTab(storageEssentials, storageEndpoints, storageSecurity, storageFeatures, storageNetwork)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(storageEssentials, storageEndpoints, storageSecurity, storageFeatures, storageNetwork)},
+	{name: "JSON", render: jsonTab},
 }
 
 var storageEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{

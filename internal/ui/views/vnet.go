@@ -6,10 +6,10 @@ import (
 )
 
 var vnetTabs = []tabDef{
-	{overviewTab, boxesTab(vnetEssentials)},
-	{"Subnets", boxesTab(vnetSubnets)},
-	{"Peerings", boxesTab(vnetPeerings)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(vnetEssentials)},
+	{name: "Subnets", render: boxesTab(vnetSubnets)},
+	{name: "Peerings", render: boxesTab(vnetPeerings)},
+	{name: "JSON", render: jsonTab},
 }
 
 var vnetEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{

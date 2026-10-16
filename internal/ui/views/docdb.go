@@ -6,8 +6,8 @@ import (
 )
 
 var docdbTabs = []tabDef{
-	{overviewTab, boxesTab(docdbEssentials, docdbNodeGroups, docdbNetwork)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(docdbEssentials, docdbNodeGroups, docdbNetwork)},
+	{name: "JSON", render: jsonTab},
 }
 
 var docdbEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{

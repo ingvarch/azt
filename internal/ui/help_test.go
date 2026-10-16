@@ -19,6 +19,15 @@ func TestHelpListsResourceTabKeys(t *testing.T) {
 	t.Errorf("help lacks the tab keys:\n%s", strings.Join(helpLines(), "\n"))
 }
 
+func TestHelpListsPeriodKey(t *testing.T) {
+	for _, line := range helpLines() {
+		if strings.HasPrefix(strings.TrimSpace(line), "p ") && strings.Contains(line, "period of the Monitoring tab") {
+			return
+		}
+	}
+	t.Errorf("help lacks the period key:\n%s", strings.Join(helpLines(), "\n"))
+}
+
 func TestHelpListsEveryTypeCommand(t *testing.T) {
 	var commands []string
 	for _, s := range helpSections {

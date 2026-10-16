@@ -9,9 +9,9 @@ import (
 )
 
 var nsgTabs = []tabDef{
-	{overviewTab, boxesTab(nsgEssentials, nsgAttached)},
-	{"Rules", boxesTab(nsgInbound, nsgOutbound, nsgDefaults)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(nsgEssentials, nsgAttached)},
+	{name: "Rules", render: boxesTab(nsgInbound, nsgOutbound, nsgDefaults)},
+	{name: "JSON", render: jsonTab},
 }
 
 var nsgEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{

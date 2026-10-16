@@ -27,8 +27,18 @@ type details struct {
 	// tab is the requested tab; current resolves it against the loaded type.
 	tab           string
 	row           map[string]any
+	period        string // one of azure.Periods, for the tabs that load data
+	keyed         *keyedTab
 	top           int // first visible body line
 	width, height int
+}
+
+// keyedTab is the data the current tab loads, when it has a key.
+type keyedTab struct {
+	key data.Key
+	res tabData
+	// refreshing is set from "r" until the next result for key.
+	refreshing bool
 }
 
 // NewDetails shows one resource as tabs, opened on the first one.
@@ -44,6 +54,7 @@ func NewDetailsAt(subscriptionID string, r azure.Resource, tab string) View {
 		title:  r.Name,
 		spec:   Spec{Kind: "details", Subscription: subscriptionID, ResourceID: r.ID, ResourceName: r.Name},
 		tab:    tab,
+		period: azure.Periods[0],
 	}
 }
 
@@ -54,6 +65,11 @@ func (d details) Init() tea.Cmd { return d.init() }
 func (d details) Update(msg tea.Msg) (View, tea.Cmd) {
 	switch msg := msg.(type) {
 	case data.ResultMsg:
+		if k := d.keyed; k != nil && msg.Key == k.key {
+			d.keyed = &keyedTab{key: k.key, res: tabData{data: msg.Data, err: msg.Err, period: k.res.period}}
+			return d.scroll(d.top), nil
+		}
+		wasReady := d.ready()
 		res, ok := d.result(msg)
 		if !ok {
 			return d, nil
@@ -61,7 +77,11 @@ func (d details) Update(msg tea.Msg) (View, tea.Cmd) {
 		if d.err == nil {
 			d.row, d.err = parseRow(res)
 		}
-		return d.scroll(d.top), nil
+		var cmd tea.Cmd
+		if !wasReady && d.ready() {
+			d, cmd = d.loadTab()
+		}
+		return d.scroll(d.top), cmd
 	case spinner.TickMsg:
 		cmd := d.tick(msg)
 		return d, cmd
@@ -81,6 +101,12 @@ func parseRow(res any) (map[string]any, error) {
 func (d details) press(k string) (View, tea.Cmd) {
 	if k == "r" {
 		cmd := d.refresh()
+		if d.keyed != nil {
+			keyed := *d.keyed
+			keyed.refreshing = true
+			d.keyed = &keyed
+			cmd = tea.Batch(cmd, data.Refresh(d.keyed.key))
+		}
 		return d, cmd
 	}
 	if !d.ready() {
@@ -88,9 +114,11 @@ func (d details) press(k string) (View, tea.Cmd) {
 	}
 	switch k {
 	case "tab", "]":
-		return d.step(1), nil
+		return d.step(1)
 	case "shift+tab", "[":
-		return d.step(-1), nil
+		return d.step(-1)
+	case "p":
+		return d.nextPeriod()
 	}
 	return d.scroll(d.scrollTarget(k)), nil
 }
@@ -152,15 +180,44 @@ func (d details) current() string {
 	return d.tab
 }
 
-func (d details) selectTab(name string) details {
+// selectTab opens the named tab at its top; a tab that was not current starts loading its data.
+func (d details) selectTab(name string) (details, tea.Cmd) {
+	changed := !strings.EqualFold(name, d.current())
 	d.tab = name
-	return d.scroll(0)
+	var cmd tea.Cmd
+	if changed {
+		d, cmd = d.loadTab()
+	}
+	return d.scroll(0), cmd
 }
 
 // step moves to the next (delta 1) or previous (delta -1) tab, wrapping.
-func (d details) step(delta int) details {
+func (d details) step(delta int) (details, tea.Cmd) {
 	defs := d.defs()
 	return d.selectTab(defs[(d.index()+delta+len(defs))%len(defs)].name)
+}
+
+// nextPeriod steps the period of a tab that loads data; other tabs ignore it.
+func (d details) nextPeriod() (details, tea.Cmd) {
+	if d.keyed == nil {
+		return d, nil
+	}
+	d.period = azure.NextPeriod(d.period)
+	d, cmd := d.loadTab()
+	return d.scroll(d.top), cmd
+}
+
+// loadTab asks for the data of the current tab and shows it as loading; a tab
+// without a key keeps none.
+func (d details) loadTab() (details, tea.Cmd) {
+	def := d.defs()[d.index()]
+	if def.key == nil {
+		d.keyed = nil
+		return d, nil
+	}
+	key := def.key(d.row, d.period)
+	d.keyed = &keyedTab{key: key, res: tabData{loading: true, period: d.period}}
+	return d, data.Fetch(key)
 }
 
 // body is the lines of the current tab, each cut to the content width.
@@ -170,7 +227,13 @@ func (d details) body() []string {
 		return nil
 	}
 	width := d.contentWidth()
-	out := defs[d.index()].render(d.row, width)
+	def := defs[d.index()]
+	var out []string
+	if def.draw != nil {
+		out = def.draw(d.row, d.keyed.res, width)
+	} else {
+		out = def.render(d.row, width)
+	}
 	for i, l := range out {
 		out[i] = cut(l, width)
 	}
@@ -190,7 +253,7 @@ func (d details) Render() string {
 		return s
 	}
 	note := ""
-	if d.refreshing {
+	if d.refreshing || (d.keyed != nil && d.keyed.refreshing) {
 		note = cut(faintStyle.Render(refreshingText), d.contentWidth())
 	}
 	body := d.body()
@@ -264,7 +327,8 @@ func (d details) Click(x, y int) (View, tea.Cmd, bool) {
 	if !ok || x >= d.contentWidth() {
 		return d, nil, false
 	}
-	return d.selectTab(name), nil, true
+	next, cmd := d.selectTab(name)
+	return next, cmd, true
 }
 
 // Spec keeps the current tab unless it is the first.

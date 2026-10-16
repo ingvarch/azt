@@ -7,8 +7,8 @@ import (
 )
 
 var pgTabs = []tabDef{
-	{overviewTab, boxesTab(pgEssentials, pgStorage, pgAvailability, pgNetwork)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(pgEssentials, pgStorage, pgAvailability, pgNetwork)},
+	{name: "JSON", render: jsonTab},
 }
 
 var pgEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{

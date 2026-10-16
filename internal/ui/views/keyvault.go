@@ -3,8 +3,8 @@ package views
 import "fmt"
 
 var kvTabs = []tabDef{
-	{overviewTab, boxesTab(kvEssentials, kvAccess, kvProtection, kvNetwork)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(kvEssentials, kvAccess, kvProtection, kvNetwork)},
+	{name: "JSON", render: jsonTab},
 }
 
 var kvEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{

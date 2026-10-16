@@ -3,8 +3,8 @@ package views
 import "strconv"
 
 var afdTabs = []tabDef{
-	{overviewTab, boxesTab(afdEssentials)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(afdEssentials)},
+	{name: "JSON", render: jsonTab},
 }
 
 var afdEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{

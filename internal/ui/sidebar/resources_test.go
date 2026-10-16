@@ -54,6 +54,7 @@ func TestResourceExpandsIntoTabs(t *testing.T) {
 		"          Networking",
 		"          Identity",
 		"          Add-ons",
+		"          Monitoring",
 		"          JSON",
 		"      ▸ Beta",
 		"      ▸ Gamma",
@@ -165,7 +166,7 @@ func TestKeysOnResourceLevels(t *testing.T) {
 	assertRow(t, m, 4, "          Overview")
 
 	m = press(m, keyLeft)
-	if got := lines(m); len(got) != 15 {
+	if got := lines(m); len(got) != 16 {
 		t.Errorf("h on a tab changed the rows: %v", got)
 	}
 	assertRow(t, m, 3, "      ▾ alpha")
@@ -204,7 +205,7 @@ func TestClickMarkersOnResourceLevels(t *testing.T) {
 	m, _ = click(m, 8, 5) // a tab: only selects
 	assertRow(t, m, 3, "      ▾ alpha")
 	m, _ = click(m, 9, 5)
-	if got := len(lines(m)); got != 15 {
+	if got := len(lines(m)); got != 16 {
 		t.Errorf("clicking a tab changed the rows (%d)", got)
 	}
 
@@ -227,7 +228,7 @@ func TestRefreshOnResourceLevels(t *testing.T) {
 }
 
 func TestTabsOfTwoResourcesHaveOwnNodes(t *testing.T) {
-	downs := []tea.KeyPressMsg{keyDown, keyDown, keyDown, keyDown, keyDown, keyDown, keyDown}
+	downs := []tea.KeyPressMsg{keyDown, keyDown, keyDown, keyDown, keyDown, keyDown, keyDown, keyDown}
 	m := press(aksModel(), key('l'), keyDown, key('l')) // alpha expanded
 	m = press(m, downs...)                              // on Beta
 	m = press(m, key('l'), keyDown)                     // Beta / Overview

@@ -6,10 +6,10 @@ import (
 )
 
 var vmTabs = []tabDef{
-	{overviewTab, boxesTab(vmEssentials, vmSecurity)},
-	{"Disks", boxesTab(vmOSDisk, vmDataDisks)},
-	{"Network", boxesTab(vmInterfaces)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(vmEssentials, vmSecurity)},
+	{name: "Disks", render: boxesTab(vmOSDisk, vmDataDisks)},
+	{name: "Network", render: boxesTab(vmInterfaces)},
+	{name: "JSON", render: jsonTab},
 }
 
 var vmEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{
