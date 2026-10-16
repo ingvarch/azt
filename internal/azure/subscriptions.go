@@ -1,4 +1,4 @@
-// Package azure reads Azure resources through Azure Resource Graph.
+// Package azure reads Azure through Resource Graph queries and Resource Manager GET requests.
 package azure
 
 import (
