@@ -201,7 +201,7 @@ func TestPaletteViewCommands(t *testing.T) {
 	tests := []struct{ in, title string }{
 		{"subs", "Subscriptions"},
 		{"rg", "Resource groups"},
-		{"vm", "compute/virtualmachines"},
+		{"vm", "Virtual machines"},
 		{"type microsoft.cache/redis", "cache/redis"},
 	}
 	for _, tt := range tests {

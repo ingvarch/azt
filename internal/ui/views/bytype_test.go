@@ -27,7 +27,7 @@ func TestResourcesByTypeSeveralTypes(t *testing.T) {
 	if got, want := v.Spec(), (Spec{Kind: "resourcesByType", Type: dnsTypes}); got != want {
 		t.Errorf("Spec = %+v, want %+v", got, want)
 	}
-	if got, want := v.Title(), "network/dnszones, network/privatednszones"; got != want {
+	if got, want := v.Title(), "DNS zones"; got != want {
 		t.Errorf("Title = %q, want %q", got, want)
 	}
 }
@@ -60,7 +60,7 @@ func TestResourcesByTypeOneTypeHasNoTypeColumn(t *testing.T) {
 	if got, want := v.Spec(), (Spec{Kind: "resourcesByType", Type: dnsType}); got != want {
 		t.Errorf("Spec = %+v, want %+v", got, want)
 	}
-	if got, want := v.Title(), "network/dnszones"; got != want {
+	if got, want := v.Title(), "DNS zones"; got != want {
 		t.Errorf("Title = %q, want %q", got, want)
 	}
 	header, _, _ := strings.Cut(deliver(t, v.Resize(140, 20), zones, nil).Render(), "\n")
@@ -74,8 +74,8 @@ func TestBuildResourcesByTypeSplitsTypes(t *testing.T) {
 		spec  Spec
 		title string
 	}{
-		{Spec{Kind: "resourcesByType", Type: dnsTypes}, "network/dnszones, network/privatednszones"},
-		{Spec{Kind: "resourcesByType", Type: dnsType}, "network/dnszones"},
+		{Spec{Kind: "resourcesByType", Type: dnsTypes}, "DNS zones"},
+		{Spec{Kind: "resourcesByType", Type: dnsType}, "DNS zones"},
 	} {
 		v, err := Build(tt.spec)
 		if err != nil {

@@ -27,6 +27,12 @@ type Filterer interface {
 	SetFilter(query string) View
 }
 
+// Counter is a View that reports its number of rows once its data has loaded.
+type Counter interface {
+	View
+	Count() (n int, ok bool)
+}
+
 // Clicker is a View that reacts to a mouse click.
 type Clicker interface {
 	View

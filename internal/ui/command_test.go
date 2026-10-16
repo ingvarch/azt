@@ -14,27 +14,27 @@ func TestParseCommand(t *testing.T) {
 	}{
 		{in: "subs", kind: cmdView, title: "Subscriptions"},
 		{in: "rg", kind: cmdView, title: "Resource groups"},
-		{in: "vm", kind: cmdView, title: "compute/virtualmachines"},
-		{in: "aks", kind: cmdView, title: "containerservice/managedclusters"},
-		{in: "kv", kind: cmdView, title: "keyvault/vaults"},
-		{in: "sql", kind: cmdView, title: "sql/servers"},
-		{in: "pg", kind: cmdView, title: "dbforpostgresql/flexibleservers"},
-		{in: "PG", kind: cmdView, title: "dbforpostgresql/flexibleservers"},
-		{in: "docdb", kind: cmdView, title: "documentdb/mongoclusters"},
-		{in: "storage", kind: cmdView, title: "storage/storageaccounts"},
-		{in: "app", kind: cmdView, title: "web/sites"},
-		{in: "vnet", kind: cmdView, title: "network/virtualnetworks"},
-		{in: "mi", kind: cmdView, title: "managedidentity/userassignedidentities"},
-		{in: "MI", kind: cmdView, title: "managedidentity/userassignedidentities"},
-		{in: "acr", kind: cmdView, title: "containerregistry/registries"},
-		{in: "nsg", kind: cmdView, title: "network/networksecuritygroups"},
-		{in: "NSG", kind: cmdView, title: "network/networksecuritygroups"},
-		{in: "dns", kind: cmdView, title: "network/dnszones, network/privatednszones"},
+		{in: "vm", kind: cmdView, title: "Virtual machines"},
+		{in: "aks", kind: cmdView, title: "AKS clusters"},
+		{in: "kv", kind: cmdView, title: "Key vaults"},
+		{in: "sql", kind: cmdView, title: "SQL servers"},
+		{in: "pg", kind: cmdView, title: "PostgreSQL servers"},
+		{in: "PG", kind: cmdView, title: "PostgreSQL servers"},
+		{in: "docdb", kind: cmdView, title: "DocumentDB clusters"},
+		{in: "storage", kind: cmdView, title: "Storage accounts"},
+		{in: "app", kind: cmdView, title: "Web apps"},
+		{in: "vnet", kind: cmdView, title: "Virtual networks"},
+		{in: "mi", kind: cmdView, title: "Managed identities"},
+		{in: "MI", kind: cmdView, title: "Managed identities"},
+		{in: "acr", kind: cmdView, title: "Container registries"},
+		{in: "nsg", kind: cmdView, title: "Network security groups"},
+		{in: "NSG", kind: cmdView, title: "Network security groups"},
+		{in: "dns", kind: cmdView, title: "DNS zones"},
 		{in: "pdns", err: "unknown command: pdns"},
 		{in: "PDNS", err: "unknown command: PDNS"},
-		{in: "type microsoft.cache/redis", kind: cmdView, title: "cache/redis"},
-		{in: "  type   microsoft.cache/redis  ", kind: cmdView, title: "cache/redis"},
-		{in: "VM", kind: cmdView, title: "compute/virtualmachines"},
+		{in: "type microsoft.web/serverfarms", kind: cmdView, title: "web/serverfarms"},
+		{in: "  type   microsoft.web/serverfarms  ", kind: cmdView, title: "web/serverfarms"},
+		{in: "VM", kind: cmdView, title: "Virtual machines"},
 		{in: "type", err: "usage: type <resource type>"},
 		{in: "type  ", err: "usage: type <resource type>"},
 		{in: "help", kind: cmdHelp},
@@ -74,7 +74,7 @@ func TestParseCommandFoundry(t *testing.T) {
 	if err != nil || c.kind != cmdView {
 		t.Fatalf("parseCommand(Foundry) = %+v, %v", c, err)
 	}
-	if got, want := c.view.Title(), "cognitiveservices/accounts, cognitiveservices/accounts/projects"; got != want {
+	if got, want := c.view.Title(), "AI Foundry"; got != want {
 		t.Errorf("title = %q, want %q", got, want)
 	}
 	if _, err := parseCommand("ai"); err == nil || err.Error() != "unknown command: ai" {

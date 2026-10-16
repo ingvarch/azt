@@ -177,8 +177,8 @@ func TestSubscriptionsRecoverAfterError(t *testing.T) {
 	if got := lines(m); strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("rows after recovery:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
-	if got := selectedTitle(t, m); got != "sql/servers" {
-		t.Errorf("selected %q after recovery, want sql/servers", got)
+	if got := selectedTitle(t, m); got != "SQL servers" {
+		t.Errorf("selected %q after recovery, want SQL servers", got)
 	}
 }
 
@@ -206,13 +206,24 @@ func TestTypesWithSameShortTypeKeepOrder(t *testing.T) {
 	}
 }
 
+func TestTypeRowsUseKindNamesAndSortByThem(t *testing.T) {
+	m := result(full(), keyRes, []azure.Resource{
+		{ID: "/1", Type: "microsoft.compute/virtualmachines"},
+		{ID: "/2", Type: "Microsoft.KeyVault/vaults"},
+		{ID: "/3", Type: "microsoft.foo/bar"},
+		{ID: "/4", Type: "microsoft.compute/virtualmachines"},
+	}, nil)
+	assertLines(t, m, "▾ Dev", "  ▾ rg-a",
+		"    ▸ foo/bar 1", "    ▸ Key vaults 1", "    ▸ Virtual machines 2", "  ▸ rg-b", "▸ Prod")
+}
+
 func TestRows(t *testing.T) {
 	assertLines(t, full(),
 		"▾ Dev",
 		"  ▾ rg-a",
-		"    ▸ keyvault/vaults 1",
-		"    ▸ sql/servers 3",
-		"    ▸ web/sites 2",
+		"    ▸ Key vaults 1",
+		"    ▸ SQL servers 3",
+		"    ▸ Web apps 2",
 		"  ▸ rg-b",
 		"▸ Prod",
 	)
@@ -242,9 +253,9 @@ func TestSubscriptionsKeepOrderAndState(t *testing.T) {
 		"▸ Prod",
 		"▾ Dev",
 		"  ▾ rg-a",
-		"    ▸ keyvault/vaults 1",
-		"    ▸ sql/servers 3",
-		"    ▸ web/sites 2",
+		"    ▸ Key vaults 1",
+		"    ▸ SQL servers 3",
+		"    ▸ Web apps 2",
 		"  ▸ rg-b",
 		"▸ Test",
 	)
@@ -255,9 +266,9 @@ func TestSubscriptionRenameKeepsStateAndUpdatesStack(t *testing.T) {
 	assertLines(t, m,
 		"▾ Renamed",
 		"  ▾ rg-a",
-		"    ▸ keyvault/vaults 1",
-		"    ▸ sql/servers 3",
-		"    ▸ web/sites 2",
+		"    ▸ Key vaults 1",
+		"    ▸ SQL servers 3",
+		"    ▸ Web apps 2",
 		"  ▸ rg-b",
 		"▸ Prod",
 	)
@@ -278,9 +289,9 @@ func TestGroupsKeepExpandedState(t *testing.T) {
 		"▾ Dev",
 		"  ▸ rg-c",
 		"  ▾ rg-a",
-		"    ▸ keyvault/vaults 1",
-		"    ▸ sql/servers 3",
-		"    ▸ web/sites 2",
+		"    ▸ Key vaults 1",
+		"    ▸ SQL servers 3",
+		"    ▸ Web apps 2",
 		"▸ Prod",
 	)
 }
@@ -361,14 +372,14 @@ func TestRightOnExpandedMovesToFirstChild(t *testing.T) {
 	}
 
 	m = press(m, keyRight)
-	if got := selectedTitle(t, m); got != "keyvault/vaults" {
-		t.Errorf("selected %q, want keyvault/vaults", got)
+	if got := selectedTitle(t, m); got != "Key vaults" {
+		t.Errorf("selected %q, want Key vaults", got)
 	}
 	m, cmd = send(m, keyRight)
-	if got := selectedTitle(t, m); got != "keyvault/vaults" || len(fetches(cmd)) != 0 {
+	if got := selectedTitle(t, m); got != "Key vaults" || len(fetches(cmd)) != 0 {
 		t.Errorf("l on a collapsed type: selected %q, fetches %v", got, fetches(cmd))
 	}
-	if got := lines(m)[2]; got != "    ▾ keyvault/vaults 1" {
+	if got := lines(m)[2]; got != "    ▾ Key vaults 1" {
 		t.Errorf("l on a type left it as %q, want it expanded", got)
 	}
 	m = press(m, keyRight)
@@ -472,9 +483,9 @@ func TestSelectionClampsWhenLastNodeDisappears(t *testing.T) {
 	assertLines(t, m,
 		"▾ Dev",
 		"  ▾ rg-a",
-		"    ▸ keyvault/vaults 1",
-		"    ▸ sql/servers 3",
-		"    ▸ web/sites 2",
+		"    ▸ Key vaults 1",
+		"    ▸ SQL servers 3",
+		"    ▸ Web apps 2",
 		"  ▸ rg-b",
 	)
 	if got := selectedTitle(t, m); got != "rg-b" {
@@ -563,7 +574,7 @@ func TestScrollKeepsSelectionVisible(t *testing.T) {
 		}
 	}
 	check("start", "▾ Dev")
-	for _, want := range []string{"  ▾ rg-a", "    ▸ keyvault/vaults 1", "    ▸ sql/servers 3", "    ▸ web/sites 2"} {
+	for _, want := range []string{"  ▾ rg-a", "    ▸ Key vaults 1", "    ▸ SQL servers 3", "    ▸ Web apps 2"} {
 		m = press(m, keyDown)
 		check("down", want)
 	}
@@ -586,7 +597,7 @@ func TestScrollKeepsSelectionVisible(t *testing.T) {
 func TestResizeKeepsSelectionVisible(t *testing.T) {
 	m := press(sized(full(), 40, 20), keyDown, keyDown, keyDown, keyDown)
 	m = sized(m, 40, 2)
-	if got := lines(m); !slices.Contains(got, "    ▸ sql/servers 3") {
+	if got := lines(m); !slices.Contains(got, "    ▸ SQL servers 3") {
 		t.Errorf("rows %q lack the selected row after a resize", got)
 	}
 }
@@ -641,7 +652,7 @@ func TestStack(t *testing.T) {
 	}{
 		{"subscription", 0, want{[]string{"Subscriptions", "Dev"}, []data.Key{keySubs, keyGroups}}},
 		{"group", 1, want{[]string{"Subscriptions", "Dev", "rg-a"}, []data.Key{keySubs, keyGroups, keyRes}}},
-		{"type", 3, want{[]string{"Subscriptions", "Dev", "rg-a", "sql/servers"}, []data.Key{keySubs, keyGroups, keyRes, keyRes}}},
+		{"type", 3, want{[]string{"Subscriptions", "Dev", "rg-a", "SQL servers"}, []data.Key{keySubs, keyGroups, keyRes, keyRes}}},
 	}
 	for _, c := range cases {
 		m := full()
@@ -692,7 +703,7 @@ func TestScrollBackWhenRowsDisappearBelow(t *testing.T) {
 	m := sized(full(), 40, 3)
 	m = press(m, keyDown, keyDown, keyDown, keyDown, keyDown, keyDown, keyUp, keyUp)
 	m = result(m, keyGroups, groups[:1], nil)
-	assertLines(t, m, "    ▸ sql/servers 3", "    ▸ web/sites 2", "▸ Prod")
+	assertLines(t, m, "    ▸ SQL servers 3", "    ▸ Web apps 2", "▸ Prod")
 }
 
 func TestUpdateLeavesEarlierModelUnchanged(t *testing.T) {
@@ -733,13 +744,20 @@ func TestRefresh(t *testing.T) {
 
 func TestTypesSortIgnoringCase(t *testing.T) {
 	m := full()
-	m = result(m, keyRes, []azure.Resource{{ID: "/1", Type: "Microsoft.Web/sites"}, {ID: "/2", Type: "microsoft.sql/servers"}}, nil)
+	m = result(m, keyRes, []azure.Resource{{ID: "/1", Type: "Microsoft.Web/sites"}, {ID: "/2", Type: "microsoft.alpha/x"}}, nil)
 	assertLines(t, m,
 		"▾ Dev",
 		"  ▾ rg-a",
-		"    ▸ sql/servers 1",
-		"    ▸ Web/sites 1",
+		"    ▸ alpha/x 1",
+		"    ▸ Web apps 1",
 		"  ▸ rg-b",
 		"▸ Prod",
 	)
+}
+
+func TestLongTypeNameKeepsCount(t *testing.T) {
+	m := sized(explorer([]azure.Resource{{ID: "/1", Type: "Microsoft.Cdn/profiles"}, {ID: "/2", Type: "Microsoft.Cdn/profiles"}}), 30, 20)
+	if got, want := lines(m)[2], "    ▸ Front Door and CDN pr… 2"; got != want {
+		t.Errorf("row = %q, want %q: the name cut with … and the count kept", got, want)
+	}
 }

@@ -89,7 +89,7 @@ func TestDialogEnterRunsTheOfferedCommand(t *testing.T) {
 	if h.m.mode != modeNormal {
 		t.Errorf("mode = %v", h.m.mode)
 	}
-	if got := h.stackTitles(); len(got) != 2 || got[1] != "storage/storageaccounts" {
+	if got := h.stackTitles(); len(got) != 2 || got[1] != "Storage accounts" {
 		t.Errorf("stack = %v", got)
 	}
 	if cmd == nil {
@@ -173,7 +173,7 @@ func TestDialogTabCompletesAndKeepsOpen(t *testing.T) {
 	}
 	h.typ("microsoft.web/sites")
 	h.send(key("enter"))
-	if got := h.stackTitles(); len(got) != 2 || got[1] != "web/sites" {
+	if got := h.stackTitles(); len(got) != 2 || got[1] != "Web apps" {
 		t.Errorf("stack = %v", got)
 	}
 }

@@ -11,6 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/ingvarch/azt/internal/azure"
 	"github.com/ingvarch/azt/internal/ui/data"
@@ -31,6 +32,7 @@ type node struct {
 	kind     kind
 	id       string
 	label    string
+	count    string   // shown after the label; kept when the label is cut
 	key      data.Key // data behind the children; empty below groups
 	sub      azure.Subscription
 	group    azure.ResourceGroup
@@ -62,6 +64,7 @@ func cloneAll(nodes []*node) []*node {
 type row struct {
 	id   string
 	text string
+	tail string  // drawn after text, which is cut to leave room for it
 	path []*node // from the top-level node down to the row's node or, for a status row, its parent
 	n    *node
 }
@@ -147,7 +150,11 @@ func (m Model) Render() string {
 		if r.id == m.sel {
 			style = style.Reverse(m.focused).Bold(!m.focused)
 		}
-		out[i] = style.Render(r.text)
+		text := r.text
+		if r.tail != "" {
+			text = ansi.Truncate(text, max(m.width-lipgloss.Width(r.tail), 1), "…") + r.tail
+		}
+		out[i] = style.Render(text)
 	}
 	return strings.Join(out, "\n")
 }
@@ -212,7 +219,7 @@ func appendRows(rows []row, parents []*node, n *node) []row {
 			marker = "▾ "
 		}
 	}
-	rows = append(rows, row{id: n.id, text: line(depth, marker, n.label), path: path, n: n})
+	rows = append(rows, row{id: n.id, text: line(depth, marker, n.label), tail: n.count, path: path, n: n})
 	if !n.expanded {
 		return rows
 	}
@@ -358,7 +365,7 @@ func keepExpanded(fresh, old []*node) []*node {
 	return fresh
 }
 
-// typeNodes groups resources by type, ignoring case, sorted by short type;
+// typeNodes groups resources by type, ignoring case, sorted by kind name;
 // each type holds its resources sorted by name.
 func typeNodes(parent *node, resources []azure.Resource) []*node {
 	types := map[string]*node{}
@@ -371,7 +378,8 @@ func typeNodes(parent *node, resources []azure.Resource) []*node {
 	}
 	nodes := slices.Collect(maps.Values(types))
 	for _, n := range nodes {
-		n.label = views.ShortType(n.typ) + " " + strconv.Itoa(len(n.children))
+		n.label = views.KindName(n.typ)
+		n.count = " " + strconv.Itoa(len(n.children))
 		slices.SortFunc(n.children, func(a, b *node) int {
 			return cmp.Or(
 				cmp.Compare(strings.ToLower(a.label), strings.ToLower(b.label)),
@@ -382,7 +390,7 @@ func typeNodes(parent *node, resources []azure.Resource) []*node {
 	}
 	slices.SortFunc(nodes, func(a, b *node) int {
 		return cmp.Or(
-			cmp.Compare(strings.ToLower(views.ShortType(a.typ)), strings.ToLower(views.ShortType(b.typ))),
+			cmp.Compare(strings.ToLower(views.KindName(a.typ)), strings.ToLower(views.KindName(b.typ))),
 			cmp.Compare(strings.ToLower(a.typ), strings.ToLower(b.typ)),
 		)
 	})

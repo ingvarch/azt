@@ -47,6 +47,9 @@ func newList[T any](cfg listConfig[T]) View {
 
 func (l list[T]) Title() string { return l.cfg.title }
 
+// Count is the number of items after keep; false while loading or after an error.
+func (l list[T]) Count() (int, bool) { return len(l.items), l.ready() }
+
 func (l list[T]) Init() tea.Cmd { return l.init() }
 
 func (l list[T]) Update(msg tea.Msg) (View, tea.Cmd) {
@@ -216,7 +219,7 @@ func NewResources(subscriptionID string, group azure.ResourceGroup) View {
 func NewResourcesOfType(subscriptionID string, group azure.ResourceGroup, resourceType string) View {
 	cfg := resourcesConfig(subscriptionID, group)
 	cfg.spec.Kind, cfg.spec.Type = "resourcesOfType", resourceType
-	cfg.title = ShortType(resourceType)
+	cfg.title = KindName(resourceType)
 	cfg.empty = "No resources of this type in this resource group."
 	cfg.keep = func(r azure.Resource) bool { return strings.EqualFold(r.Type, resourceType) }
 	return newList(cfg)
@@ -271,10 +274,6 @@ func NewAllResourceGroups() View {
 // With several types the list adds a Type column.
 func NewResourcesByType(resourceTypes ...string) View {
 	joined := strings.Join(resourceTypes, ",")
-	short := make([]string, len(resourceTypes))
-	for i, t := range resourceTypes {
-		short[i] = ShortType(t)
-	}
 	several := len(resourceTypes) > 1
 	empty := "No resources of this type."
 	columns := []column{
@@ -290,7 +289,7 @@ func NewResourcesByType(resourceTypes ...string) View {
 	return newList(listConfig[azure.Resource]{
 		key:     data.Key{Kind: data.ResourcesOfType, Type: joined},
 		spec:    Spec{Kind: "resourcesByType", Type: joined},
-		title:   strings.Join(short, ", "),
+		title:   KindName(resourceTypes[0]),
 		noun:    "resources",
 		empty:   empty,
 		columns: columns,

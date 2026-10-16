@@ -152,12 +152,12 @@ func TestSidebarOpensFilteredResources(t *testing.T) {
 
 	s.press("j")
 	s.press("l")
-	s.want(t, "group expanded", "▾ rg-a", "sql/servers 1", "web/sites 2")
+	s.want(t, "group expanded", "▾ rg-a", "SQL servers 1", "Web apps 2")
 
 	s.press("j")
 	s.press("j")
 	s.press("enter")
-	s.want(t, "type opened", "Subscriptions › Dev › rg-a › web/sites", "web-app", "web-api")
+	s.want(t, "type opened", "Subscriptions › Dev › rg-a › Web apps [2]", "web-app", "web-api")
 	if f := s.frame(); strings.Contains(f, "sql-db") {
 		t.Errorf("pane lists another type:\n%s", f)
 	}
@@ -187,7 +187,7 @@ func TestPaletteFilterRenameHelp(t *testing.T) {
 	s.press(":")
 	s.typ("vm")
 	s.press("enter")
-	s.want(t, ":vm", "compute/virtualmachines", "vm-web", "vm-db", "vm-cache", "Dev", "Prod")
+	s.want(t, ":vm", "Virtual machines", "vm-web", "vm-db", "vm-cache", "Dev", "Prod")
 
 	s.press("esc")
 	s.want(t, "back", "Subscription ID", "sub-1")
@@ -256,7 +256,7 @@ func TestCommandDialogTypedCommandShowsTheViews(t *testing.T) {
 	s.press(":")
 	s.typ("vm")
 	s.press("enter")
-	s.want(t, ":vm", "compute/virtualmachines", "vm-web", "vm-db", "vm-cache")
+	s.want(t, ":vm", "Virtual machines", "vm-web", "vm-db", "vm-cache")
 }
 
 func TestMouseSessionRoundTrip(t *testing.T) {

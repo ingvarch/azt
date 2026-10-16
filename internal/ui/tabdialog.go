@@ -135,7 +135,7 @@ func (m Model) tabDialogBox(r layout.Rect) string {
 	}
 	inner := r.W - 2
 	body := []string{m.dialogField(inner), "", m.dialogButtonLine(r)}
-	return renderBox([]string{title}, strings.Join(body, "\n"), r, true)
+	return renderBox([]string{title}, "", strings.Join(body, "\n"), r, true)
 }
 
 // dialogField is the field line: a space and the input, as wide as the box.

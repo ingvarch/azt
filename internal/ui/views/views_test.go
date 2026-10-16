@@ -123,7 +123,7 @@ var lists = []struct {
 	},
 	{
 		"resources by type", func() View { return NewResourcesByType("microsoft.web/sites") },
-		data.Key{Kind: data.ResourcesOfType, Type: "microsoft.web/sites"}, "web/sites", "resources",
+		data.Key{Kind: data.ResourcesOfType, Type: "microsoft.web/sites"}, "Web apps", "resources",
 		"No resources of this type.",
 		tenantResources, []string{"Resource group", "Subscription", "web-app", "rg-a", "Dev", "api-app", "Prod"},
 	},
@@ -559,7 +559,7 @@ func TestResourcesOfType(t *testing.T) {
 	newOfType := func() View { return NewResourcesOfType("id-1", groups[1], "microsoft.web/sites") }
 
 	v := newOfType()
-	if got, want := v.Title(), "web/sites"; got != want {
+	if got, want := v.Title(), "Web apps"; got != want {
 		t.Errorf("Title() = %q, want %q", got, want)
 	}
 	if got, want := fetchKey(t, v), fetchKey(t, NewResources("id-1", groups[1])); got != want {
@@ -648,5 +648,34 @@ func TestListSelectedRowIsOneColor(t *testing.T) {
 		if a := attrsOf(t, line, sub); !a.reverse || a.fg != "" {
 			t.Errorf("%q on the selected row = %+v, want reversed in the row's own colors", sub, a)
 		}
+	}
+}
+
+func TestListCount(t *testing.T) {
+	count := func(v View) (int, bool) { return v.(Counter).Count() }
+	if _, ok := count(NewSubscriptions()); ok {
+		t.Error("Count() ok while loading")
+	}
+
+	v := deliver(t, NewSubscriptions(), subs, nil)
+	if n, ok := count(v); !ok || n != len(subs) {
+		t.Errorf("Count() = %d, %v, want %d, true", n, ok, len(subs))
+	}
+	if n, _ := count(filtered(v, "zzz")); n != len(subs) {
+		t.Errorf("Count() = %d after a filter, want %d", n, len(subs))
+	}
+
+	all := []azure.Resource{
+		{ID: "/r/web", Name: "web-app", Type: "microsoft.web/sites"},
+		{ID: "/r/kv", Name: "kv-prod", Type: "microsoft.keyvault/vaults"},
+		{ID: "/r/api", Name: "api-app", Type: "Microsoft.Web/Sites"},
+	}
+	ofType := deliver(t, NewResourcesOfType("id-1", groups[1], "microsoft.web/sites"), all, nil)
+	if n, ok := count(ofType); !ok || n != 2 {
+		t.Errorf("Count() = %d, %v after keep, want 2, true", n, ok)
+	}
+
+	if _, ok := count(deliver(t, NewSubscriptions(), nil, errTest)); ok {
+		t.Error("Count() ok after an error")
 	}
 }

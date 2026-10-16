@@ -22,9 +22,9 @@ func click(m Model, x, y int) (Model, tea.Cmd) {
 var fullRows = []string{
 	"▾ Dev",
 	"  ▾ rg-a",
-	"    ▸ keyvault/vaults 1",
-	"    ▸ sql/servers 3",
-	"    ▸ web/sites 2",
+	"    ▸ Key vaults 1",
+	"    ▸ SQL servers 3",
+	"    ▸ Web apps 2",
 	"  ▸ rg-b",
 	"▸ Prod",
 }
@@ -39,8 +39,8 @@ func TestClickSelectsRow(t *testing.T) {
 	}{
 		{"subscription label", 4, 0, "Dev"},
 		{"group label", 5, 1, "rg-a"},
-		{"type label", 10, 3, "sql/servers"},
-		{"type indent", 0, 3, "sql/servers"},
+		{"type label", 10, 3, "SQL servers"},
+		{"type indent", 0, 3, "SQL servers"},
 		{"far right", 39, 6, "Prod"},
 	}
 	for _, tt := range tests {
@@ -188,17 +188,17 @@ func TestClickOutsideRowsChangesNothing(t *testing.T) {
 }
 
 func TestClickUsesScrollOffset(t *testing.T) {
-	m := press(sized(full(), 40, 3), keyDown, keyDown, keyDown, keyDown) // on sql/servers, rows 2..4 shown
+	m := press(sized(full(), 40, 3), keyDown, keyDown, keyDown, keyDown) // on SQL servers, rows 2..4 shown
 	if got := lines(m); !slices.Equal(got, fullRows[2:5]) {
 		t.Fatalf("setup: lines = %q", got)
 	}
-	m, _ = click(m, 8, 2) // web/sites
-	if got := selectedTitle(t, m); got != "web/sites" {
-		t.Errorf("selected %q, want web/sites", got)
+	m, _ = click(m, 8, 2) // Web apps
+	if got := selectedTitle(t, m); got != "Web apps" {
+		t.Errorf("selected %q, want Web apps", got)
 	}
 	m, _ = click(m, 8, 0)
-	if got := selectedTitle(t, m); got != "keyvault/vaults" {
-		t.Errorf("selected %q, want keyvault/vaults", got)
+	if got := selectedTitle(t, m); got != "Key vaults" {
+		t.Errorf("selected %q, want Key vaults", got)
 	}
 }
 
