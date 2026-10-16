@@ -2,11 +2,13 @@ package views
 
 import (
 	"errors"
+	"maps"
 	"math"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+	_ "time/tzdata"
 
 	"charm.land/lipgloss/v2"
 
@@ -76,29 +78,250 @@ func TestResampleEmptyPeriod(t *testing.T) {
 	}
 }
 
-func TestAxisLabel(t *testing.T) {
+// localZone sets time.Local to loc for the test.
+func localZone(t *testing.T, loc *time.Location) {
+	t.Helper()
 	prev := time.Local
-	time.Local = time.FixedZone("test", 2*3600)
+	time.Local = loc
 	t.Cleanup(func() { time.Local = prev })
-	m := azure.Monitoring{Start: chartStart, End: chartStart.Add(24 * time.Hour)}
+}
+
+func TestChartStep(t *testing.T) {
 	for _, c := range []struct {
 		period string
 		span   time.Duration
-		w, age int
-		want   string
+		w      int
+		want   time.Duration
 	}{
-		{"24h", 24 * time.Hour, 24, 0, "now"},
-		{"24h", 24 * time.Hour, 24, 23, "02:00"},
-		{"24h", 24 * time.Hour, 24, 12, "13:00"},
-		{"7d", 7 * 24 * time.Hour, 7, 0, "now"},
-		{"7d", 7 * 24 * time.Hour, 7, 6, "Oct 3"},
-		{"30d", 30 * 24 * time.Hour, 30, 15, "Oct 17"},
+		{"24h", chartDay, 40, 12 * time.Hour},
+		{"24h", chartDay, 95, 6 * time.Hour},
+		{"24h", chartDay, 140, 3 * time.Hour},
+		{"24h", chartDay, 96, 3 * time.Hour},
+		{"24h", chartDay, 5, 12 * time.Hour},
+		{"7d", 7 * chartDay, 40, 2 * chartDay},
+		{"7d", 7 * chartDay, 60, 2 * chartDay},
+		{"7d", 7 * chartDay, 80, chartDay},
+		{"7d", 7 * chartDay, 95, chartDay},
+		{"7d", 7 * chartDay, 140, chartDay},
+		{"30d", 30 * chartDay, 40, 14 * chartDay},
+		{"30d", 30 * chartDay, 95, 7 * chartDay},
+		{"30d", 30 * chartDay, 140, 7 * chartDay},
+		{"30d", 30 * chartDay, 5, 14 * chartDay},
 	} {
-		m.End = m.Start.Add(c.span)
-		if got := axisLabel(m, c.period, c.w)(c.age); got != c.want {
-			t.Errorf("%s age %d = %q, want %q", c.period, c.age, got, c.want)
+		if got := chartStep(c.period, c.span, c.w).span; got != c.want {
+			t.Errorf("%s at width %d: step %v, want %v", c.period, c.w, got, c.want)
 		}
 	}
+}
+
+func TestTickTimesDaySteps(t *testing.T) {
+	localZone(t, time.FixedZone("T", 2*3600))
+	start := time.Date(2026, 10, 1, 0, 0, 0, 0, time.Local)
+	end := time.Date(2026, 10, 31, 0, 0, 0, 0, time.Local)
+	days := func(step time.Duration, from, to time.Time) []int {
+		var out []int
+		for _, tk := range tickTimes(stepOf(t, step), from, to) {
+			if tk.Hour() != 0 || tk.Minute() != 0 {
+				t.Errorf("tick %v is not a local midnight", tk)
+			}
+			out = append(out, tk.Day())
+		}
+		return out
+	}
+	// 2026-10-01 is day 20727 since 1970: odd, so the even days are the 2nd, 4th, ...
+	if got, want := days(2*chartDay, start, start.AddDate(0, 0, 7)), []int{2, 4, 6}; !slices.Equal(got, want) {
+		t.Errorf("2 days = %v, want %v", got, want)
+	}
+	if got, want := days(7*chartDay, start, end), []int{5, 12, 19, 26}; !slices.Equal(got, want) {
+		t.Errorf("7 days = %v, want %v", got, want)
+	}
+	// ISO weeks 41 to 44 start on the 5th, 12th, 19th and 26th.
+	if got, want := days(14*chartDay, start, end), []int{12, 26}; !slices.Equal(got, want) {
+		t.Errorf("14 days = %v, want %v", got, want)
+	}
+}
+
+// stepOf is the step with the span.
+func stepOf(t *testing.T, span time.Duration) tickStep {
+	t.Helper()
+	for _, s := range slices.Concat(hourSteps, daySteps) {
+		if s.span == span {
+			return s
+		}
+	}
+	t.Fatalf("no step of %v", span)
+	return tickStep{}
+}
+
+// labelsAt is the non-empty labels of the chart by age.
+func labelsAt(label func(int) string, w int) map[int]string {
+	got := map[int]string{}
+	for age := range w {
+		if s := label(age); s != "" {
+			got[age] = s
+		}
+	}
+	return got
+}
+
+func wantLabels(t *testing.T, got, want map[int]string) {
+	t.Helper()
+	if !maps.Equal(got, want) {
+		t.Errorf("labels = %v, want %v", got, want)
+	}
+}
+
+func TestTickLabelHours(t *testing.T) {
+	localZone(t, time.FixedZone("T", 2*3600))
+	start := time.Date(2026, 10, 3, 13, 0, 0, 0, time.Local)
+	m := azure.Monitoring{Start: start, End: start.Add(24 * time.Hour)}
+	// Width 96 gives 3-hour ticks, four columns an hour: 15:00 is 2 hours in, column 8.
+	wantLabels(t, labelsAt(tickLabel(m, "24h", 96), 96), map[int]string{
+		0: "now", 3: "12:00", 15: "09:00", 27: "06:00", 39: "03:00", 51: "00:00", 63: "21:00", 75: "18:00", 87: "15:00",
+	})
+}
+
+func TestTickLabelNowTakesTheNewestColumn(t *testing.T) {
+	localZone(t, time.FixedZone("T", 2*3600))
+	start := time.Date(2026, 10, 3, 12, 10, 0, 0, time.Local)
+	m := azure.Monitoring{Start: start, End: start.Add(24 * time.Hour)}
+	// 12:00 tomorrow falls in the newest column, [11:55, 12:10).
+	got := labelsAt(tickLabel(m, "24h", 96), 96)
+	if got[0] != "now" {
+		t.Errorf("age 0 = %q, want now", got[0])
+	}
+	for age, s := range got {
+		if s == "12:00" {
+			t.Errorf("12:00 is labelled at age %d", age)
+		}
+	}
+}
+
+func TestTickLabelDays(t *testing.T) {
+	localZone(t, time.FixedZone("T", 2*3600))
+	start := time.Date(2026, 10, 3, 6, 0, 0, 0, time.Local)
+	m := azure.Monitoring{Start: start, End: start.Add(7 * 24 * time.Hour)}
+	// Width 84 gives 1-day ticks, 12 columns a day: Oct 4 midnight is 18 hours in, column 9.
+	wantLabels(t, labelsAt(tickLabel(m, "7d", 84), 84), map[int]string{
+		0: "now", 2: "Oct 10", 14: "Oct 9", 26: "Oct 8", 38: "Oct 7", 50: "Oct 6", 62: "Oct 5", 74: "Oct 4",
+	})
+}
+
+func TestTickLabelWeeks(t *testing.T) {
+	localZone(t, time.FixedZone("T", 2*3600))
+	start := time.Date(2026, 10, 1, 0, 0, 0, 0, time.Local)
+	m := azure.Monitoring{Start: start, End: start.AddDate(0, 0, 30)}
+	// Width 90 gives 7-day ticks, 3 columns a day: Monday Oct 5 is 4 days in, column 12.
+	wantLabels(t, labelsAt(tickLabel(m, "30d", 90), 90), map[int]string{
+		0: "now", 14: "Oct 26", 35: "Oct 19", 56: "Oct 12", 77: "Oct 5",
+	})
+}
+
+func TestTickTimesAcrossDaylightSaving(t *testing.T) {
+	stockholm, err := time.LoadLocation("Europe/Stockholm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	localZone(t, stockholm)
+	format := func(ticks []time.Time) []string {
+		var got []string
+		for _, tk := range ticks {
+			got = append(got, tk.Format("Jan 2 15:04"))
+		}
+		return got
+	}
+	// Clocks go back on Sunday 2026-10-25, so this day has 25 hours.
+	start := time.Date(2026, 10, 24, 20, 0, 0, 0, time.Local)
+	end := start.Add(24 * time.Hour)
+	got := format(tickTimes(stepOf(t, 6*time.Hour), start, end))
+	if want := []string{"Oct 25 00:00", "Oct 25 06:00", "Oct 25 12:00", "Oct 25 18:00"}; !slices.Equal(got, want) {
+		t.Errorf("autumn ticks = %v, want %v", got, want)
+	}
+	// Clocks go forward on Sunday 2026-03-29, so 03:00 does not exist.
+	start = time.Date(2026, 3, 28, 22, 0, 0, 0, time.Local)
+	end = start.Add(24 * time.Hour)
+	got = format(tickTimes(stepOf(t, 2*time.Hour), start, end))
+	want := []string{"Mar 28 22:00", "Mar 29 00:00", "Mar 29 04:00", "Mar 29 06:00", "Mar 29 08:00", "Mar 29 10:00", "Mar 29 12:00", "Mar 29 14:00", "Mar 29 16:00", "Mar 29 18:00", "Mar 29 20:00", "Mar 29 22:00"}
+	if !slices.Equal(got, want) {
+		t.Errorf("spring ticks = %v, want %v", got, want)
+	}
+	// Lord Howe Island jumps from 02:00 to 02:30 on 2026-10-04: 02:30 is not a round time.
+	lordHowe, err := time.LoadLocation("Australia/Lord_Howe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	localZone(t, lordHowe)
+	start = time.Date(2026, 10, 3, 20, 0, 0, 0, time.Local)
+	got = format(tickTimes(stepOf(t, 2*time.Hour), start, start.Add(12*time.Hour)))
+	want = []string{"Oct 3 20:00", "Oct 3 22:00", "Oct 4 00:00", "Oct 4 04:00", "Oct 4 06:00", "Oct 4 08:00"}
+	if !slices.Equal(got, want) {
+		t.Errorf("half-hour change ticks = %v, want %v", got, want)
+	}
+	// Midnights stay midnights after the change: a week across 2026-10-25 in Stockholm.
+	localZone(t, stockholm)
+	start = time.Date(2026, 10, 22, 17, 30, 0, 0, time.Local)
+	got = format(tickTimes(stepOf(t, chartDay), start, start.Add(7*chartDay)))
+	want = []string{"Oct 23 00:00", "Oct 24 00:00", "Oct 25 00:00", "Oct 26 00:00", "Oct 27 00:00", "Oct 28 00:00", "Oct 29 00:00"}
+	if !slices.Equal(got, want) {
+		t.Errorf("midnights across the change = %v, want %v", got, want)
+	}
+}
+
+func TestTickTimesSkipMissingMidnight(t *testing.T) {
+	havana, err := time.LoadLocation("America/Havana")
+	if err != nil {
+		t.Fatal(err)
+	}
+	localZone(t, havana)
+	// Clocks go forward at midnight on 2026-03-08, so that day has no midnight.
+	start := time.Date(2026, 3, 5, 12, 0, 0, 0, time.Local)
+	end := time.Date(2026, 3, 12, 12, 0, 0, 0, time.Local)
+	var got []string
+	for _, tk := range tickTimes(stepOf(t, chartDay), start, end) {
+		got = append(got, tk.Format("Jan 2 15:04"))
+	}
+	if want := []string{"Mar 6 00:00", "Mar 7 00:00", "Mar 9 00:00", "Mar 10 00:00", "Mar 11 00:00", "Mar 12 00:00"}; !slices.Equal(got, want) {
+		t.Errorf("midnights = %v, want %v", got, want)
+	}
+	got = nil
+	for _, tk := range tickTimes(stepOf(t, 6*time.Hour), start.AddDate(0, 0, 2), start.AddDate(0, 0, 4)) {
+		got = append(got, tk.Format("Jan 2 15:04"))
+	}
+	if want := []string{"Mar 7 12:00", "Mar 7 18:00", "Mar 8 06:00", "Mar 8 12:00", "Mar 8 18:00", "Mar 9 00:00", "Mar 9 06:00"}; !slices.Equal(got, want) {
+		t.Errorf("6-hour ticks = %v, want %v", got, want)
+	}
+}
+
+func TestTickTimesTwoWeeksAcrossTheYear(t *testing.T) {
+	localZone(t, time.FixedZone("T", 2*3600))
+	// 2026 has 53 ISO weeks; the ticks must stay 14 days apart into 2027.
+	ticks := tickTimes(stepOf(t, 14*chartDay), time.Date(2026, 11, 1, 0, 0, 0, 0, time.Local), time.Date(2027, 3, 1, 0, 0, 0, 0, time.Local))
+	if len(ticks) < 8 {
+		t.Fatalf("ticks = %v, want one every 14 days", ticks)
+	}
+	for i := 1; i < len(ticks); i++ {
+		if d := ticks[i].Sub(ticks[i-1]); d != 14*chartDay || !isMonday(ticks[i]) {
+			t.Errorf("ticks %v and %v are %v apart", ticks[i-1], ticks[i], d)
+		}
+	}
+}
+
+func TestTickLabelColumnsOfUTCStart(t *testing.T) {
+	localZone(t, time.FixedZone("W", -5*3600))
+	start := time.Date(2026, 10, 16, 1, 5, 0, 0, time.UTC)
+	m := azure.Monitoring{Start: start, End: start.Add(24 * time.Hour)}
+	// Width 140 gives 3-hour ticks; the columns are [Start+i*span/w, Start+(i+1)*span/w).
+	wantLabels(t, labelsAt(tickLabel(m, "24h", 140), 140), map[int]string{
+		0: "now", 12: "18:00", 29: "15:00", 47: "12:00", 64: "09:00", 82: "06:00", 99: "03:00", 117: "00:00", 134: "21:00",
+	})
+}
+
+func TestTickLabelUsesTheRealSpan(t *testing.T) {
+	localZone(t, time.FixedZone("T", 2*3600))
+	start := time.Date(2026, 10, 3, 13, 0, 0, 0, time.Local)
+	// 24h at width 96 gives 3-hour ticks, but a minute more makes them just under 12 columns apart.
+	m := azure.Monitoring{Start: start, End: start.Add(24*time.Hour + time.Minute)}
+	wantLabels(t, labelsAt(tickLabel(m, "24h", 96), 96), map[int]string{0: "now", 4: "12:00", 28: "06:00", 52: "00:00", 76: "18:00"})
 }
 
 func TestChartCeiling(t *testing.T) {
@@ -266,12 +489,17 @@ func TestChartGap(t *testing.T) {
 	m := chartMonitoring(poolSeries("system", hourly(avgs...)))
 	rows := monSection(t, monLines(aksRow, m), "Node CPU")
 	const labels = 5
+	axis := []rune(rows[chartHeight])
 	drawn := false
 	for _, r := range []int{1, 2, 4, 5} {
 		cells := []rune(rows[r])
 		for col := 30; col < 40; col++ {
-			if labels+col < len(cells) && cells[labels+col] != ' ' {
-				t.Errorf("row %d column %d = %q, want a gap", r, col, cells[labels+col])
+			want := ' '
+			if labels+col < len(axis) && axis[labels+col] == '┴' {
+				want = '│'
+			}
+			if labels+col < len(cells) && cells[labels+col] != want {
+				t.Errorf("row %d column %d = %q, want %q", r, col, cells[labels+col], want)
 			}
 		}
 		drawn = drawn || (labels+10 < len(cells) && cells[labels+10] != ' ')
@@ -287,5 +515,42 @@ func TestChartColors(t *testing.T) {
 	first, second := strings.Index(legend, "\x1b[34m■"), strings.Index(legend, "\x1b[35m■")
 	if first < 0 || second < first {
 		t.Errorf("legend colors are not blue then magenta in name order: %q", legend)
+	}
+}
+
+func TestChartLabelRow(t *testing.T) {
+	localZone(t, time.FixedZone("T", 2*3600))
+	start := time.Date(2026, 10, 3, 13, 0, 0, 0, time.Local)
+	m := azure.Monitoring{Start: start, End: start.Add(24 * time.Hour), Interval: time.Hour}
+	rows := plainAll(chartLines(m, "24h", []string{"a"}, [][]azure.Point{hourly(10, 20)}, 96))
+	axis, labels := []rune(rows[chartHeight]), []rune(rows[chartHeight+1])
+	if !strings.HasSuffix(strings.TrimRight(string(labels), " "), "now") {
+		t.Errorf("label row = %q, want it to end with now", string(labels))
+	}
+	for _, old := range []string{"13:00", "13:15", "01:00"} {
+		if strings.Contains(string(labels), old) {
+			t.Errorf("label row has %s: %q", old, string(labels))
+		}
+	}
+	marks := 0
+	// 12:00 is dropped: it touches now.
+	for _, text := range []string{"15:00", "18:00", "21:00", "00:00", "03:00", "06:00", "09:00"} {
+		at := strings.Index(string(labels), text)
+		if at < 0 {
+			t.Errorf("label row has no %s: %q", text, string(labels))
+			continue
+		}
+		at = len([]rune(string(labels)[:at]))
+		if !slices.Contains(axis[at:at+len(text)], '┴') {
+			t.Errorf("no ┴ under %s: %q", text, string(axis))
+		}
+	}
+	for _, r := range axis {
+		if r == '┴' {
+			marks++
+		}
+	}
+	if marks != 7 {
+		t.Errorf("axis has %d ┴, want 7: %q", marks, string(axis))
 	}
 }
