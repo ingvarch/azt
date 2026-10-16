@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ingvarch/azt/internal/azure"
+	"github.com/ingvarch/azt/internal/ui/data"
 )
 
 func specCases() map[string]View {
@@ -102,5 +103,28 @@ func TestBuildErrors(t *testing.T) {
 				t.Errorf("err = %v, want it to mention %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestBuildRestoresTheListsOfAKind(t *testing.T) {
+	tests := []struct {
+		spec Spec
+		want data.Key
+	}{
+		{Spec{Kind: "resourcesByType", Type: vmType, Filter: "run"}, data.Key{Kind: data.VirtualMachines}},
+		{Spec{Kind: "resourcesByType", Type: aksType}, data.Key{Kind: data.AKSClusters}},
+		{Spec{Kind: "resourcesByType", Type: "microsoft.web/sites"}, data.Key{Kind: data.ResourcesOfType, Type: "microsoft.web/sites"}},
+	}
+	for _, tt := range tests {
+		v, err := Build(tt.spec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := fetchKey(t, v); got != tt.want {
+			t.Errorf("Build(%+v) key = %+v, want %+v", tt.spec, got, tt.want)
+		}
+		if got := v.Spec(); got != tt.spec {
+			t.Errorf("Spec = %+v, want %+v", got, tt.spec)
+		}
 	}
 }

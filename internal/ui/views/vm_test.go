@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-const vmType = "microsoft.compute/virtualmachines"
-
 func TestVMOverview(t *testing.T) {
 	// Inner width 104: two columns of 50 and a gap of 4.
 	want := []string{

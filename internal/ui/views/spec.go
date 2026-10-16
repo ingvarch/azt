@@ -62,7 +62,7 @@ func build(s Spec) (View, error) {
 		if err := require(s, "type", s.Type); err != nil {
 			return nil, err
 		}
-		return NewResourcesByType(strings.Split(s.Type, ",")...), nil
+		return NewListOfTypes(strings.Split(s.Type, ",")...), nil
 	}
 	return nil, fmt.Errorf("unknown view kind %q", s.Kind)
 }

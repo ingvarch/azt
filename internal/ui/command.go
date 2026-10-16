@@ -62,7 +62,7 @@ func parseCommand(input string) (command, error) {
 	}
 	name := strings.ToLower(words[0])
 	if types, ok := typeCommand(name); ok {
-		return command{cmdView, views.NewResourcesByType(types...)}, nil
+		return command{cmdView, views.NewListOfTypes(types...)}, nil
 	}
 	switch name {
 	case "subs":
@@ -73,7 +73,7 @@ func parseCommand(input string) (command, error) {
 		if len(words) < 2 {
 			return command{}, errors.New("usage: type <resource type>")
 		}
-		return command{cmdView, views.NewResourcesByType(words[1])}, nil
+		return command{cmdView, views.NewListOfTypes(words[1])}, nil
 	case "help":
 		return command{kind: cmdHelp}, nil
 	case "q", "quit":

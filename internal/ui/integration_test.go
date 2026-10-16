@@ -39,14 +39,11 @@ func newScenario(t *testing.T) *scenario {
 				{ID: "/r/api", Name: "web-api", Type: "Microsoft.Web/sites", Location: "westeurope"},
 				{ID: "/r/sql", Name: "sql-db", Type: "microsoft.sql/servers", Location: "westeurope"},
 			}, nil
-		case data.ResourcesOfType:
-			if k.Type != "microsoft.compute/virtualmachines" {
-				t.Fatalf("unexpected type %q", k.Type)
-			}
-			return []azure.Resource{
-				{ID: "/v/web", Name: "vm-web", ResourceGroup: "rg-a", SubscriptionID: "sub-1", Subscription: "Dev", Location: "westeurope"},
-				{ID: "/v/db", Name: "vm-db", ResourceGroup: "rg-b", SubscriptionID: "sub-2", Subscription: "Prod", Location: "westeurope"},
-				{ID: "/v/cache", Name: "vm-cache", ResourceGroup: "rg-a", SubscriptionID: "sub-1", Subscription: "Dev", Location: "westeurope"},
+		case data.VirtualMachines:
+			return []azure.VM{
+				{Resource: azure.Resource{ID: "/v/web", Name: "vm-web", ResourceGroup: "rg-a", SubscriptionID: "sub-1", Subscription: "Dev", Location: "westeurope"}},
+				{Resource: azure.Resource{ID: "/v/db", Name: "vm-db", ResourceGroup: "rg-b", SubscriptionID: "sub-2", Subscription: "Prod", Location: "westeurope"}},
+				{Resource: azure.Resource{ID: "/v/cache", Name: "vm-cache", ResourceGroup: "rg-a", SubscriptionID: "sub-1", Subscription: "Dev", Location: "westeurope"}},
 			}, nil
 		case data.Details:
 			return map[string]any{"name": "web-app", "kind": "app,linux"}, nil

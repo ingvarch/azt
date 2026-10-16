@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/ingvarch/azt/internal/ui/data"
 )
 
 func TestKindOfIgnoresCase(t *testing.T) {
@@ -121,5 +123,23 @@ func TestTypeCommandsMergeKindsSharingACommand(t *testing.T) {
 	}
 	if got := typeCommands(list); !reflect.DeepEqual(got, want) {
 		t.Errorf("typeCommands = %v, want %v", got, want)
+	}
+}
+
+func TestNewListOfTypesOpensTheListOfAKind(t *testing.T) {
+	tests := []struct {
+		types []string
+		want  data.Key
+	}{
+		{[]string{vmType}, data.Key{Kind: data.VirtualMachines}},
+		{[]string{"Microsoft.Compute/VirtualMachines"}, data.Key{Kind: data.VirtualMachines}},
+		{[]string{aksType}, data.Key{Kind: data.AKSClusters}},
+		{[]string{"microsoft.web/sites"}, data.Key{Kind: data.ResourcesOfType, Type: "microsoft.web/sites"}},
+		{[]string{vmType, aksType}, data.Key{Kind: data.ResourcesOfType, Type: vmType + "," + aksType}},
+	}
+	for _, tt := range tests {
+		if got := fetchKey(t, NewListOfTypes(tt.types...)); got != tt.want {
+			t.Errorf("NewListOfTypes(%v) key = %+v, want %+v", tt.types, got, tt.want)
+		}
 	}
 }

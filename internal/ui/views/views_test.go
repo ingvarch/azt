@@ -127,6 +127,18 @@ var lists = []struct {
 		"No resources of this type.",
 		tenantResources, []string{"Resource group", "Subscription", "web-app", "rg-a", "Dev", "api-app", "Prod"},
 	},
+	{
+		"virtual machines", NewVirtualMachines,
+		data.Key{Kind: data.VirtualMachines}, "Virtual machines", "resources",
+		"No resources of this type.",
+		vmRows[:2], []string{"Private IP", "vm-web", "10.0.0.4", "Deallocated"},
+	},
+	{
+		"AKS clusters", NewAKSClusters,
+		data.Key{Kind: data.AKSClusters}, "AKS clusters", "resources",
+		"No resources of this type.",
+		clusterRows[:2], []string{"Auto-upgrade", "aks-prod", "1.30.4", "none"},
+	},
 }
 
 func TestListKeyAndTitle(t *testing.T) {
@@ -610,6 +622,10 @@ func TestListsColorTheState(t *testing.T) {
 		{"group succeeded", NewResourceGroups(subs[0]), groups, "Succeeded", fgGood},
 		{"group deleting", NewResourceGroups(subs[0]), groups, "Deleting", fgWarn},
 		{"all groups deleting", NewAllResourceGroups(), allGroups, "Deleting", fgWarn},
+		{"vm running", NewVirtualMachines(), vmRows[:2], "Running", fgGood},
+		{"vm deallocated", NewVirtualMachines(), vmRows[:2], "Deallocated", fgBad},
+		{"cluster running", NewAKSClusters(), clusterRows[:2], "Running", fgGood},
+		{"cluster stopped", NewAKSClusters(), clusterRows[:2], "Stopped", fgBad},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			v := deliver(t, c.view.Resize(120, 10), c.data, nil)

@@ -252,6 +252,20 @@ var fetcherCases = []fetcherCase{
 		wantQuery: "type in~ ('microsoft.network/dnszones', 'microsoft.network/privatednszones')",
 	},
 	{
+		name:      "virtual machines",
+		key:       Key{Kind: VirtualMachines},
+		row:       map[string]any{"id": "/v", "name": "v", "size": "Standard_B2s", "publicIp": "20.1.2.3"},
+		want:      []azure.VM{{Resource: azure.Resource{ID: "/v", Name: "v"}, Size: "Standard_B2s", PublicIP: "20.1.2.3"}},
+		wantQuery: "microsoft.compute/virtualmachines",
+	},
+	{
+		name:      "AKS clusters",
+		key:       Key{Kind: AKSClusters},
+		row:       map[string]any{"id": "/k", "name": "k", "pools": []any{map[string]any{"count": 3}}, "tier": "Standard"},
+		want:      []azure.Cluster{{Resource: azure.Resource{ID: "/k", Name: "k"}, Pools: []azure.Pool{{Count: 3}}, Tier: "Standard"}},
+		wantQuery: "microsoft.containerservice/managedclusters",
+	},
+	{
 		name:      "details",
 		key:       Key{Kind: Details, Subscription: "s1", ID: "/a"},
 		row:       map[string]any{"id": "/a"},
