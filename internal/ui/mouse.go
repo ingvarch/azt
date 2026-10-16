@@ -19,10 +19,11 @@ type target struct {
 	sidebar bool
 }
 
-// drag is a split whose boundary follows the pointer.
+// drag is a split, or the explorer, whose boundary follows the pointer.
 type drag struct {
-	path   layout.Path
-	orient layout.Orientation
+	path    layout.Path
+	orient  layout.Orientation
+	sidebar bool
 }
 
 // lastPress is the previous press inside a target, kept to spot a double press.
@@ -91,6 +92,10 @@ func (m *Model) leftPress(x, y int) tea.Cmd {
 			return nil
 		}
 	}
+	if m.onSidebarBorder(x, y) {
+		m.drag = &drag{sidebar: true}
+		return nil
+	}
 	tg, r, ok := m.hit(x, y)
 	if !ok {
 		return nil
@@ -146,8 +151,23 @@ func (m Model) canOpen(tg target) bool {
 	return ok
 }
 
+// onSidebarBorder reports whether (x, y) is on the explorer's right border
+// column or the first pane's left border column, as for a split boundary.
+func (m Model) onSidebarBorder(x, y int) bool {
+	if !m.sidebarDrawn() {
+		return false
+	}
+	area := m.paneArea()
+	return y >= area.Y && y < area.Y+area.H && (x == area.X-1 || x == area.X)
+}
+
 // dragTo moves the dragged boundary to the pointer.
 func (m *Model) dragTo(x, y int) {
+	if m.drag.sidebar {
+		m.setSidebarWidth(x + 1)
+		m.resizeViews()
+		return
+	}
 	t := &m.tabs[m.active]
 	area, ok := t.root.SplitArea(m.drag.path, m.paneArea())
 	if !ok {

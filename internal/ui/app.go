@@ -19,13 +19,15 @@ import (
 )
 
 const (
-	minPaneWidth  = 12
-	minPaneHeight = 4
-	resizeStep    = 0.05
-	sidebarWidth  = 32
+	minPaneWidth        = 12
+	minPaneHeight       = 4
+	resizeStep          = 0.05
+	defaultSidebarWidth = 32
+	minSidebarWidth     = 20
+	sidebarResizeStep   = 4
 
 	sidebarHints       = "j/k move  l expand  h collapse  r refresh  enter open  ^w l panes  ^w e hide  : command  ? help  q quit"
-	sidebarPrefixHints = "l/→ panes  e hide  t tab  n/p/1-9 switch  , rename  ? help  esc cancel"
+	sidebarPrefixHints = "l/→ panes  e hide  </> width  = default width  t tab  n/p/1-9 switch  , rename  ? help  esc cancel"
 	normalHints        = "enter open  esc back  / filter  : command  r refresh  ? help  ^w v/s split  ^w hjkl/←↓↑→ focus  ^w t tab  q quit"
 	pathSep            = " › "
 	pathCut            = "… › "
@@ -49,7 +51,7 @@ var (
 	// arrows after the prefix work like h, j, k, l.
 	arrows = map[string]string{"left": "h", "down": "j", "up": "k", "right": "l"}
 
-	sidebarPrefixKeys = []string{"l", "e", "t", ",", "?", "n", "p", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
+	sidebarPrefixKeys = []string{"l", "e", "<", ">", "=", "t", ",", "?", "n", "p", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
 
 	focusColor   = lipgloss.Color("12")
 	borderColor  = lipgloss.Color("8")
@@ -107,6 +109,7 @@ type Model struct {
 	sidebar        sidebar.Model
 	sidebarVisible bool
 	sidebarFocused bool
+	sidebarW       int
 }
 
 // New returns a model with one tab and one pane; newView makes each new view.
@@ -137,6 +140,7 @@ func newModel(newView func() views.View, fetch data.Fetcher) Model {
 
 		sidebar:        sidebar.New(),
 		sidebarVisible: true,
+		sidebarW:       defaultSidebarWidth,
 	}
 }
 
@@ -435,6 +439,10 @@ func (m Model) runPrefix(k string) (tea.Model, tea.Cmd) {
 		m.focusSidebar(false)
 		return m, nil
 	}
+	if m.sidebarFocused && m.sidebarResizeKey(k) {
+		m.resizeViews()
+		return m, nil
+	}
 	switch k {
 	case "v", "s", "h", "j", "k", "l", "q", "=", "<", ">", "+", "-":
 		t.zoomed = false
@@ -446,6 +454,24 @@ func (m Model) runPrefix(k string) (tea.Model, tea.Cmd) {
 	}
 	m.resizeViews()
 	return m, cmd
+}
+
+// sidebarResizeKey runs the prefix keys that resize the explorer; false when k is
+// not one of them.
+func (m *Model) sidebarResizeKey(k string) bool {
+	switch k {
+	case "<":
+		m.setSidebarWidth(m.sidebarWidth() - sidebarResizeStep)
+	case ">":
+		if m.sidebarWidth() < m.width-minPaneWidth {
+			m.setSidebarWidth(m.sidebarWidth() + sidebarResizeStep)
+		}
+	case "=":
+		m.sidebarW = defaultSidebarWidth
+	default:
+		return false
+	}
+	return true
 }
 
 // layoutAction runs the prefix keys that split, close, zoom or resize panes;
@@ -521,17 +547,34 @@ func (m *Model) tabAction(k string) tea.Cmd {
 }
 
 func (m Model) sidebarDrawn() bool {
-	return m.sidebarVisible && m.width >= sidebarWidth+minPaneWidth
+	return m.sidebarVisible && m.width >= minSidebarWidth+minPaneWidth
+}
+
+// sidebarWidth returns the drawn width of the explorer: the chosen one, cut
+// to leave minPaneWidth for the panes.
+func (m Model) sidebarWidth() int {
+	return m.clampSidebarWidth(m.sidebarW)
+}
+
+// clampSidebarWidth keeps w between minSidebarWidth and the room that leaves
+// minPaneWidth for the panes.
+func (m Model) clampSidebarWidth(w int) int {
+	return max(min(w, m.width-minPaneWidth), minSidebarWidth)
+}
+
+// setSidebarWidth chooses the width w, kept between the limits.
+func (m *Model) setSidebarWidth(w int) {
+	m.sidebarW = m.clampSidebarWidth(w)
 }
 
 func (m Model) sidebarRect() layout.Rect {
-	return layout.Rect{X: 0, Y: 0, W: sidebarWidth, H: max(m.height-1, 0)}
+	return layout.Rect{X: 0, Y: 0, W: m.sidebarWidth(), H: max(m.height-1, 0)}
 }
 
 func (m Model) paneArea() layout.Rect {
 	area := layout.Rect{X: 0, Y: 1, W: m.width, H: max(m.height-2, 0)}
 	if m.sidebarDrawn() {
-		area.X, area.W = sidebarWidth, m.width-sidebarWidth
+		area.X, area.W = m.sidebarWidth(), m.width-m.sidebarWidth()
 	}
 	return area
 }

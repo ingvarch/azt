@@ -30,6 +30,7 @@ func sample() Session {
 		}},
 		Active:         0,
 		SidebarVisible: true,
+		SidebarWidth:   40,
 	}
 }
 
@@ -173,9 +174,29 @@ func TestJSONNames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{`"version"`, `"tabs"`, `"active"`, `"sidebarVisible"`, `"zoomed"`, `"focus"`, `"layout"`, `"split"`, `"ratio"`, `"stack"`} {
+	for _, name := range []string{`"version"`, `"tabs"`, `"active"`, `"sidebarVisible"`, `"sidebarWidth"`, `"zoomed"`, `"focus"`, `"layout"`, `"split"`, `"ratio"`, `"stack"`} {
 		if !strings.Contains(string(b), name) {
 			t.Errorf("%s missing in %s", name, b)
 		}
+	}
+}
+
+func TestSidebarWidthIsOptionalInTheFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "session.json")
+	s := sample()
+	s.SidebarWidth = 0
+	if err := Save(path, s); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "sidebarWidth") {
+		t.Errorf("a zero width is written: %s", b)
+	}
+	got, err := Load(path)
+	if err != nil || got.SidebarWidth != 0 {
+		t.Errorf("got width %d, %v", got.SidebarWidth, err)
 	}
 }

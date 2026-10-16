@@ -337,7 +337,7 @@ func TestHelpOpensFromAllPlaces(t *testing.T) {
 		"sidebar prefix": func(h *harness) { h.prefix("h"); h.prefix("?") },
 	}
 	for name, open := range opens {
-		h := newSidebarHarness(140, 42)
+		h := newSidebarHarness(140, 44)
 		open(h)
 		if h.m.mode != modeHelp {
 			t.Errorf("%s: mode = %v", name, h.m.mode)
@@ -506,7 +506,7 @@ func TestHintsText(t *testing.T) {
 		normalHints:        "enter open  esc back  / filter  : command  r refresh  ? help  ^w v/s split  ^w hjkl/←↓↑→ focus  ^w t tab  q quit",
 		sidebarHints:       "j/k move  l expand  h collapse  r refresh  enter open  ^w l panes  ^w e hide  : command  ? help  q quit",
 		prefixHints:        "v/s split  hjkl/←↓↑→ focus  q close  z zoom  = equal  <>+- resize  t tab  n/p/1-9 switch  e explorer  , rename  ? help  esc cancel",
-		sidebarPrefixHints: "l/→ panes  e hide  t tab  n/p/1-9 switch  , rename  ? help  esc cancel",
+		sidebarPrefixHints: "l/→ panes  e hide  </> width  = default width  t tab  n/p/1-9 switch  , rename  ? help  esc cancel",
 	}
 	for got, w := range want {
 		if got != w {

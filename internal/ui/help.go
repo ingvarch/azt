@@ -47,6 +47,8 @@ var helpSections = []struct {
 		{"?", "this help"},
 		{"r", "refresh"},
 		{"ctrl+w l", "back to the panes"},
+		{"ctrl+w < >", "explorer narrower / wider"},
+		{"ctrl+w =", "explorer default width"},
 	}},
 	{"Commands", []helpEntry{
 		{":", "command dialog (↑ ↓ choose, tab completes)"},

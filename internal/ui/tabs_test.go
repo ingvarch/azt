@@ -29,9 +29,9 @@ var barLayouts = []struct {
 	start int // first column of the tab bar
 	paneW int // width of a pane view
 }{
-	{"explorer shown", func() *harness { return newSidebarHarness(100, 30) }, sidebarWidth, 100 - sidebarWidth - 2},
+	{"explorer shown", func() *harness { return newSidebarHarness(100, 30) }, defaultSidebarWidth, 100 - defaultSidebarWidth - 2},
 	{"explorer hidden", func() *harness { return newHarness(100, 30) }, 0, 98},
-	{"narrow window", func() *harness { return newSidebarHarness(sidebarWidth+minPaneWidth-1, 30) }, 0, sidebarWidth + minPaneWidth - 3},
+	{"narrow window", func() *harness { return newSidebarHarness(minSidebarWidth+minPaneWidth-1, 30) }, 0, minSidebarWidth + minPaneWidth - 3},
 }
 
 func TestTabBarStartsWhereThePanesStart(t *testing.T) {
@@ -73,7 +73,7 @@ func TestExplorerRunsFromLineZeroToTheLineAboveTheStatusBar(t *testing.T) {
 	if r := h.pane(0); r.h != 26 {
 		t.Errorf("pane inner height = %d, want 26", r.h)
 	}
-	if got := string([]rune(lines[1])[sidebarWidth]); got != "┌" {
+	if got := string([]rune(lines[1])[defaultSidebarWidth]); got != "┌" {
 		t.Errorf("pane does not start on line 1: %q", lines[1])
 	}
 }
@@ -177,7 +177,7 @@ func TestPressOnTabLabels(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(fmt.Sprint("explorer ", shown, ", ", tt.name), func(t *testing.T) {
 				h := newSidebarHarness(100, 30)
-				start := sidebarWidth
+				start := defaultSidebarWidth
 				if !shown {
 					h.prefix("e")
 					start = 0
@@ -203,7 +203,7 @@ func TestPressOnLineZeroOverExplorerGoesToExplorer(t *testing.T) {
 	if h.m.active != 0 || !h.m.sidebarFocused {
 		t.Errorf("active %d, sidebar focused %v", h.m.active, h.m.sidebarFocused)
 	}
-	h.press(sidebarWidth+9, 0)
+	h.press(defaultSidebarWidth+9, 0)
 	if h.m.active != 1 {
 		t.Errorf("active = %d, want 1", h.m.active)
 	}

@@ -14,7 +14,7 @@ import (
 
 // Session describes the layout of m: tabs, split trees, view stacks, focus.
 func (m Model) Session() session.Session {
-	s := session.Session{Version: session.Version, Active: m.active, SidebarVisible: m.sidebarVisible}
+	s := session.Session{Version: session.Version, Active: m.active, SidebarVisible: m.sidebarVisible, SidebarWidth: m.sidebarW}
 	for _, t := range m.tabs {
 		s.Tabs = append(s.Tabs, session.Tab{
 			Name:   t.name,
@@ -66,6 +66,9 @@ func Restore(s session.Session, newView func() views.View, fetch data.Fetcher) (
 	}
 	m.active = s.Active
 	m.sidebarVisible = s.SidebarVisible
+	if s.SidebarWidth != 0 {
+		m.sidebarW = max(s.SidebarWidth, minSidebarWidth)
+	}
 	return m, nil
 }
 
