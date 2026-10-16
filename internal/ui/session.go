@@ -17,10 +17,12 @@ func (m Model) Session() session.Session {
 	s := session.Session{Version: session.Version, Active: m.active, SidebarVisible: m.sidebarVisible, SidebarWidth: m.sidebarW}
 	for _, t := range m.tabs {
 		s.Tabs = append(s.Tabs, session.Tab{
-			Name:   t.name,
-			Zoomed: t.zoomed,
-			Focus:  slices.Index(t.root.Panes(), t.focus),
-			Layout: m.sessionNode(t.root),
+			Name:             t.name,
+			Zoomed:           t.zoomed,
+			Subscription:     t.scope.ID,
+			SubscriptionName: t.scope.Name,
+			Focus:            slices.Index(t.root.Panes(), t.focus),
+			Layout:           m.sessionNode(t.root),
 		})
 	}
 	return s
@@ -62,7 +64,9 @@ func Restore(s session.Session, newView func() views.View, fetch data.Fetcher) (
 		if t.Focus < 0 || t.Focus >= len(panes) {
 			return Model{}, fmt.Errorf("tab %d: focus %d out of range", i+1, t.Focus)
 		}
-		m.tabs = append(m.tabs, tab{root: root, focus: panes[t.Focus], zoomed: t.Zoomed, name: t.Name})
+		restored := tab{root: root, focus: panes[t.Focus], zoomed: t.Zoomed, name: t.Name, scope: views.ScopeMsg{ID: t.Subscription, Name: t.SubscriptionName}}
+		m.scopeViews(restored)
+		m.tabs = append(m.tabs, restored)
 	}
 	m.active = s.Active
 	m.sidebarVisible = s.SidebarVisible

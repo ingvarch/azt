@@ -40,3 +40,7 @@ type Clicker interface {
 	// whether they fell on a row.
 	Click(x, y int) (v View, cmd tea.Cmd, hit bool)
 }
+
+// ScopeMsg tells the views of a tab which subscription the tab shows; an empty ID means all.
+// Lists over rows of every subscription keep the rows of that subscription; other views ignore it.
+type ScopeMsg struct{ ID, Name string }

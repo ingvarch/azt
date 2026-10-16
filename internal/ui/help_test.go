@@ -51,3 +51,18 @@ func TestHelpLinesFitTheBox(t *testing.T) {
 		}
 	}
 }
+
+func TestHelpBoxFitsAStandardTerminal(t *testing.T) {
+	if w := helpMaxWidth + helpMargin; w > 80 {
+		t.Errorf("the help box needs %d columns, want at most 80", w)
+	}
+}
+
+func TestHelpListsTheSubscriptionKeys(t *testing.T) {
+	for _, line := range helpLines() {
+		if strings.HasPrefix(strings.TrimSpace(line), "0-9 ") && strings.Contains(line, "tab's subscription: 0 all, 1-9 as numbered in :subs") {
+			return
+		}
+	}
+	t.Errorf("help lacks the subscription keys:\n%s", strings.Join(helpLines(), "\n"))
+}

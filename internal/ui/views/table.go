@@ -19,6 +19,8 @@ type column struct {
 	width int
 	// state draws the cells of the column as states.
 	state bool
+	// fixed keeps the column at its content width: it takes no part of the spare room.
+	fixed bool
 }
 
 // table draws rows under a header; cursor is -1 without rows.
@@ -120,8 +122,9 @@ func titles(cols []column) []string {
 }
 
 // layout is the columns at the widths they are drawn: the spare room of the
-// table shared evenly, the first columns taking the remainder; a table that
-// does not fit gets its widest columns cut, see capWidths.
+// table shared evenly by the columns that are not fixed, the first of them
+// taking the remainder; a table that does not fit gets its widest columns cut,
+// see capWidths.
 func (t table) layout() []column {
 	cols := slices.Clone(t.cols)
 	if len(cols) == 0 {
@@ -132,11 +135,22 @@ func (t table) layout() []column {
 		capWidths(cols, t.width)
 		return cols
 	}
+	growing := 0
+	for _, c := range cols {
+		if !c.fixed {
+			growing++
+		}
+	}
+	n := 0
 	for i := range cols {
-		cols[i].width += spare / len(cols)
-		if i < spare%len(cols) {
+		if cols[i].fixed {
+			continue
+		}
+		cols[i].width += spare / growing
+		if n < spare%growing {
 			cols[i].width++
 		}
+		n++
 	}
 	return cols
 }

@@ -28,6 +28,9 @@ type Session struct {
 type Tab struct {
 	Name   string `json:"name,omitempty"`
 	Zoomed bool   `json:"zoomed,omitempty"`
+	// Subscription and SubscriptionName are the subscription the tab shows; empty for all.
+	Subscription     string `json:"subscription,omitempty"`
+	SubscriptionName string `json:"subscriptionName,omitempty"`
 	// Focus is the index of the focused pane in layout pane order.
 	Focus  int   `json:"focus,omitempty"`
 	Layout *Node `json:"layout"`

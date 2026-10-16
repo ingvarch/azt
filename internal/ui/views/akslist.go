@@ -26,8 +26,9 @@ func NewAKSClusters() View {
 			{title: "Subscription"},
 			{title: "Location"},
 		},
-		row:  clusterRow,
-		open: func(c azure.Cluster) View { return NewDetails(c.SubscriptionID, c.Resource) },
+		row:          clusterRow,
+		open:         func(c azure.Cluster) View { return NewDetails(c.SubscriptionID, c.Resource) },
+		subscription: func(r azure.Cluster) string { return r.SubscriptionID },
 	})
 }
 

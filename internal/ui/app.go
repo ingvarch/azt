@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/ingvarch/azt/internal/azure"
 	"github.com/ingvarch/azt/internal/layout"
 	"github.com/ingvarch/azt/internal/ui/data"
 	"github.com/ingvarch/azt/internal/ui/sidebar"
@@ -82,7 +83,8 @@ type tab struct {
 	root   *layout.Node
 	focus  layout.PaneID
 	zoomed bool
-	name   string // custom label; empty for the title of the focused view
+	name   string         // custom label; empty for the title of the focused view
+	scope  views.ScopeMsg // the subscription the tab shows; zero for all
 }
 
 // Model is the root model: tabs of split panes, each pane holding a stack of
@@ -163,8 +165,16 @@ func (m Model) top(id layout.PaneID) views.View {
 	return s[len(s)-1]
 }
 
-// Update routes keys, mouse and data messages to the prefix, sidebar or views.
+// Update routes keys, mouse and data messages to the prefix, sidebar or views,
+// and keeps the explorer on the subscription of the active tab.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	n := next.(Model)
+	n.sidebar = n.sidebar.SetScope(n.tabs[n.active].scope.ID)
+	return n, cmd
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		return m.key(msg)
@@ -217,7 +227,7 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case modeFilter:
 		return m.inputKey(msg)
 	}
-	if m.openOverlay(k) {
+	if m.openOverlay(k) || m.chooseSubscription(k) {
 		return m, nil
 	}
 	if m.sidebarFocused && k != "q" && k != "ctrl+w" {
@@ -254,6 +264,50 @@ func (m *Model) openOverlay(k string) bool {
 		return false
 	}
 	return true
+}
+
+// chooseSubscription sets the subscription of the active tab for the keys 0 (all)
+// and 1 to 9 (as numbered in :subs); false when k is not one of them.
+func (m *Model) chooseSubscription(k string) bool {
+	if len(k) != 1 || k[0] < '0' || k[0] > '9' {
+		return false
+	}
+	n := int(k[0] - '0')
+	if n == 0 {
+		m.setScope(views.ScopeMsg{})
+		return true
+	}
+	subsKey := data.Key{Kind: data.Subscriptions}
+	d, loaded := m.cache.Get(subsKey)
+	subs, _ := d.([]azure.Subscription)
+	switch {
+	case !loaded && m.cache.Failed(subsKey) && !m.cache.Loading(subsKey):
+		m.notice = "subscriptions failed to load"
+	case !loaded:
+		m.notice = "subscriptions are still loading"
+	case n > len(subs):
+		m.notice = "no subscription " + k
+	default:
+		m.setScope(views.ScopeMsg{ID: subs[n-1].ID, Name: subs[n-1].Name})
+	}
+	return true
+}
+
+// setScope sets the subscription of the active tab and tells its views.
+func (m *Model) setScope(s views.ScopeMsg) {
+	t := &m.tabs[m.active]
+	t.scope = s
+	m.scopeViews(*t)
+}
+
+// scopeViews sends the subscription of t to every view of its panes.
+func (m *Model) scopeViews(t tab) {
+	for _, id := range t.root.Panes() {
+		s := m.stacks[id]
+		for i, v := range s {
+			s[i], _ = v.Update(t.scope)
+		}
+	}
 }
 
 // startInput enters input mode md with the input set to text, cursor at the end.
@@ -394,8 +448,10 @@ func (m *Model) open(id layout.PaneID) tea.Cmd {
 	return m.push(id, next)
 }
 
-// push shows v on top of the stack of pane id, moves focus from the sidebar to the panes and starts v.
+// push shows v on top of the stack of pane id, gives it the subscription of the
+// active tab, moves focus from the sidebar to the panes and starts v.
 func (m *Model) push(id layout.PaneID, v views.View) tea.Cmd {
+	v, _ = v.Update(m.tabs[m.active].scope)
 	m.stacks[id] = append(m.stacks[id], v)
 	m.focusSidebar(false)
 	m.resizeViews()
@@ -730,8 +786,9 @@ func onBg(style lipgloss.Style, c color.Color) lipgloss.Style {
 	return style.Background(c)
 }
 
-// tabBar draws the tab labels and the plus button, one tabGap apart. With shades it
-// fills the line to the window edge; the canvas cuts it there.
+// tabBar draws the tab labels and the plus button, one tabGap apart, and the subscription
+// name of the active tab at the right end when there is room. With shades it fills the
+// line to the window edge; the canvas cuts it there.
 func (m Model) tabBar() string {
 	bar := onBg(lipgloss.NewStyle(), m.barShade)
 	var b strings.Builder
@@ -747,6 +804,13 @@ func (m Model) tabBar() string {
 	}
 	b.WriteString(bar.Render(tabGap))
 	b.WriteString(onBg(hintStyle, m.barShade).Render(plusLabel))
+	if name := m.tabs[m.active].scope.Name; name != "" {
+		if room := m.paneArea().W - lipgloss.Width(b.String()) - lipgloss.Width(name) - 1; room >= 1 {
+			b.WriteString(bar.Render(strings.Repeat(" ", room)))
+			b.WriteString(onBg(hintStyle, m.barShade).Render(name))
+			b.WriteString(bar.Render(" "))
+		}
+	}
 	if m.barShade != nil {
 		b.WriteString(bar.Render(strings.Repeat(" ", max(m.paneArea().W-lipgloss.Width(b.String()), 0))))
 	}

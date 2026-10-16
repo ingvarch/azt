@@ -71,11 +71,12 @@ type Cache struct {
 	fetch    Fetcher
 	data     map[Key]any
 	inFlight map[Key]bool
+	failed   map[Key]bool // the last fetch of the key failed
 }
 
 // NewCache returns an empty cache that loads missing keys with f.
 func NewCache(f Fetcher) *Cache {
-	return &Cache{fetch: f, data: map[Key]any{}, inFlight: map[Key]bool{}}
+	return &Cache{fetch: f, data: map[Key]any{}, inFlight: map[Key]bool{}, failed: map[Key]bool{}}
 }
 
 // Request answers from the cache or starts a fetch; it returns nil while a
@@ -95,9 +96,22 @@ func (c *Cache) Request(msg FetchMsg) tea.Cmd {
 	}
 }
 
+// Get returns the cached data for k.
+func (c *Cache) Get(k Key) (any, bool) {
+	d, ok := c.data[k]
+	return d, ok
+}
+
+// Loading reports whether a fetch for k is running.
+func (c *Cache) Loading(k Key) bool { return c.inFlight[k] }
+
+// Failed reports whether the last fetch for k failed.
+func (c *Cache) Failed(k Key) bool { return c.failed[k] }
+
 // Store records a fetch result; a failed fetch leaves nothing cached.
 func (c *Cache) Store(msg ResultMsg) {
 	delete(c.inFlight, msg.Key)
+	c.failed[msg.Key] = msg.Err != nil
 	if msg.Err != nil {
 		delete(c.data, msg.Key)
 		return

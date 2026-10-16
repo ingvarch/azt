@@ -18,7 +18,7 @@ func sample() Session {
 	return Session{
 		Version: Version,
 		Tabs: []Tab{{
-			Name: "work", Zoomed: true, Focus: 1,
+			Name: "work", Zoomed: true, Focus: 1, Subscription: "id-1", SubscriptionName: "Dev",
 			Layout: &Node{
 				Split: "h", Ratio: 0.3,
 				A: &Node{Stack: []views.Spec{{Kind: "subscriptions"}}},
@@ -198,5 +198,39 @@ func TestSidebarWidthIsOptionalInTheFile(t *testing.T) {
 	got, err := Load(path)
 	if err != nil || got.SidebarWidth != 0 {
 		t.Errorf("got width %d, %v", got.SidebarWidth, err)
+	}
+}
+
+func TestTabSubscriptionIsOptionalInTheFile(t *testing.T) {
+	tab := Tab{Layout: &Node{Stack: []views.Spec{{Kind: "subscriptions"}}}}
+	for _, c := range []struct {
+		name string
+		tab  Tab
+		want []string
+		not  []string
+	}{
+		{"all", tab, nil, []string{`"subscription"`, `"subscriptionName"`}},
+		{"one", Tab{Subscription: "id-1", SubscriptionName: "Dev", Layout: tab.Layout}, []string{`"subscription":"id-1"`, `"subscriptionName":"Dev"`}, nil},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			b, err := json.Marshal(c.tab)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, w := range c.want {
+				if !strings.Contains(string(b), w) {
+					t.Errorf("%s missing in %s", w, b)
+				}
+			}
+			for _, n := range c.not {
+				if strings.Contains(string(b), n) {
+					t.Errorf("%s written in %s", n, b)
+				}
+			}
+			var got Tab
+			if err := json.Unmarshal(b, &got); err != nil || !reflect.DeepEqual(got, c.tab) {
+				t.Errorf("got %+v, %v, want %+v", got, err, c.tab)
+			}
+		})
 	}
 }

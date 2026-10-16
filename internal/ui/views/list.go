@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
@@ -25,13 +26,20 @@ type listConfig[T any] struct {
 	open    func(T) View
 	// keep, when set, drops the items it rejects.
 	keep func(T) bool
+	// subscription, when set, gives the subscription ID of an item; the list then
+	// follows ScopeMsg and keeps the items of the scope's subscription.
+	subscription func(T) string
+	// numbered adds a first column with the position, 1 to 9, of the first nine items.
+	numbered bool
 }
 
 type list[T any] struct {
 	loader
 	cfg           listConfig[T]
-	items         []T // after cfg.keep
+	raw           []T // as loaded
+	items         []T // after cfg.keep and the scope
 	shown         []T // items that match filter
+	scope         ScopeMsg
 	filter        string
 	table         table
 	width, height int
@@ -41,13 +49,18 @@ func newList[T any](cfg listConfig[T]) View {
 	return list[T]{
 		loader: newLoader(cfg.key, cfg.noun),
 		cfg:    cfg,
-		table:  newTable(cfg.columns),
+		table:  newTable(configColumns(cfg)),
 	}
 }
 
-func (l list[T]) Title() string { return l.cfg.title }
+func (l list[T]) Title() string {
+	if l.scope.Name == "" {
+		return l.cfg.title
+	}
+	return l.cfg.title + " (" + l.scope.Name + ")"
+}
 
-// Count is the number of items after keep; false while loading or after an error.
+// Count is the number of items after keep and the scope; false while loading or after an error.
 func (l list[T]) Count() (int, bool) { return len(l.items), l.ready() }
 
 func (l list[T]) Init() tea.Cmd { return l.init() }
@@ -59,12 +72,18 @@ func (l list[T]) Update(msg tea.Msg) (View, tea.Cmd) {
 		if !ok {
 			return l, nil
 		}
-		l.items, _ = d.([]T)
-		if l.cfg.keep != nil {
-			l.items = slices.DeleteFunc(slices.Clone(l.items), func(it T) bool { return !l.cfg.keep(it) })
+		l.raw, _ = d.([]T)
+		l.refill()
+		return l.fit(), nil
+	case ScopeMsg:
+		if l.cfg.subscription == nil {
+			return l, nil
 		}
-		l.table.cols = listColumns(l.cfg.columns, mapRows(l.items, l.cfg.row))
-		l.applyFilter()
+		if msg != l.scope {
+			l.scope = msg
+			l.refill()
+			l.table.selectRow(0)
+		}
 		return l.fit(), nil
 	case spinner.TickMsg:
 		cmd := l.tick(msg)
@@ -110,15 +129,71 @@ func (l list[T]) SetFilter(query string) View {
 	return l.fit()
 }
 
+// refill recomputes the items, the column widths and the shown rows from the loaded items.
+func (l *list[T]) refill() {
+	l.items = slices.DeleteFunc(slices.Clone(l.raw), func(it T) bool { return !l.wanted(it) })
+	l.table.cols = listColumns(configColumns(l.cfg), l.rows())
+	l.applyFilter()
+}
+
+// wanted reports whether it passes keep and the scope.
+func (l list[T]) wanted(it T) bool {
+	if l.cfg.keep != nil && !l.cfg.keep(it) {
+		return false
+	}
+	return l.scope.ID == "" || l.cfg.subscription == nil || strings.EqualFold(l.cfg.subscription(it), l.scope.ID)
+}
+
 // applyFilter recomputes the shown items and the table rows from items and filter.
+// The filter does not match the row number.
 func (l *list[T]) applyFilter() {
 	query := strings.ToLower(l.filter)
-	l.shown = slices.DeleteFunc(slices.Clone(l.items), func(it T) bool {
-		return !slices.ContainsFunc(l.cfg.row(it), func(cell string) bool {
+	l.shown = nil
+	var rows [][]string
+	for i, it := range l.items {
+		cells := l.cells(i)
+		own := cells
+		if l.cfg.numbered {
+			own = cells[1:]
+		}
+		if slices.ContainsFunc(own, func(cell string) bool {
 			return strings.Contains(strings.ToLower(cell), query)
-		})
-	})
-	l.table.setRows(mapRows(l.shown, l.cfg.row))
+		}) {
+			l.shown = append(l.shown, it)
+			rows = append(rows, cells)
+		}
+	}
+	l.table.setRows(rows)
+}
+
+// cells is the table row of items[i].
+func (l list[T]) cells(i int) []string {
+	cells := l.cfg.row(l.items[i])
+	if !l.cfg.numbered {
+		return cells
+	}
+	number := ""
+	if i < 9 {
+		number = strconv.Itoa(i + 1)
+	}
+	return slices.Insert(cells, 0, number)
+}
+
+// rows is the table rows of all items.
+func (l list[T]) rows() [][]string {
+	rows := make([][]string, len(l.items))
+	for i := range l.items {
+		rows[i] = l.cells(i)
+	}
+	return rows
+}
+
+// configColumns is the columns of cfg, with the number column when it has one.
+func configColumns[T any](cfg listConfig[T]) []column {
+	if cfg.numbered {
+		return slices.Insert(slices.Clone(cfg.columns), 0, column{title: "#", fixed: true})
+	}
+	return cfg.columns
 }
 
 func (l list[T]) info() string {
@@ -186,8 +261,9 @@ func NewSubscriptions() View {
 			{title: "Subscription ID"},
 			{title: "State", state: true},
 		},
-		row:  func(s azure.Subscription) []string { return []string{s.Name, s.ID, s.State} },
-		open: NewResourceGroups,
+		row:      func(s azure.Subscription) []string { return []string{s.Name, s.ID, s.State} },
+		open:     NewResourceGroups,
+		numbered: true,
 	})
 }
 
@@ -265,8 +341,9 @@ func NewAllResourceGroups() View {
 			{title: "Location"},
 			{title: "State", state: true},
 		},
-		row:  func(g azure.ResourceGroup) []string { return []string{g.Name, g.Subscription, g.Location, g.State} },
-		open: func(g azure.ResourceGroup) View { return NewResources(g.SubscriptionID, g) },
+		row:          func(g azure.ResourceGroup) []string { return []string{g.Name, g.Subscription, g.Location, g.State} },
+		open:         func(g azure.ResourceGroup) View { return NewResources(g.SubscriptionID, g) },
+		subscription: func(g azure.ResourceGroup) string { return g.SubscriptionID },
 	})
 }
 
@@ -300,16 +377,9 @@ func NewResourcesByType(resourceTypes ...string) View {
 			}
 			return cells
 		},
-		open: func(r azure.Resource) View { return NewDetails(r.SubscriptionID, r) },
+		open:         func(r azure.Resource) View { return NewDetails(r.SubscriptionID, r) },
+		subscription: func(r azure.Resource) string { return r.SubscriptionID },
 	})
-}
-
-func mapRows[T any](items []T, row func(T) []string) [][]string {
-	rows := make([][]string, len(items))
-	for i, it := range items {
-		rows[i] = row(it)
-	}
-	return rows
 }
 
 // listColumnMax is the widest a list column is by its own content.

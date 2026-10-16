@@ -79,6 +79,7 @@ type Model struct {
 	idx, top      int
 	width, height int
 	focused       bool
+	scope         string // ID of the only subscription shown; empty for all
 }
 
 // New returns an empty explorer.
@@ -88,6 +89,16 @@ func New() Model { return Model{} }
 func (m Model) SetFocused(f bool) Model {
 	m.focused = f
 	return m
+}
+
+// SetScope shows only the subscription with the given ID, or all of them when it is empty.
+// The nodes of the hidden subscriptions keep their state.
+func (m Model) SetScope(id string) Model {
+	if id == m.scope {
+		return m
+	}
+	m.scope = id
+	return m.fix()
 }
 
 // Title is the pane border title.
@@ -143,6 +154,9 @@ func (m Model) Render() string {
 		return m.message("No subscriptions found.")
 	}
 	rows := m.rows()
+	if len(rows) == 0 {
+		return m.message("Subscription not found. Press 0 for all.")
+	}
 	rows = rows[m.top:min(m.top+m.height, len(rows))]
 	out := make([]string, len(rows))
 	for i, r := range rows {
@@ -204,7 +218,9 @@ func (m Model) rows() []row {
 	}
 	var rows []row
 	for _, n := range m.nodes {
-		rows = appendRows(rows, nil, n)
+		if m.scope == "" || n.sub.ID == m.scope {
+			rows = appendRows(rows, nil, n)
+		}
 	}
 	return rows
 }
