@@ -1,0 +1,27 @@
+{
+  "id": "/subscriptions/s7/resourceGroups/rg-edge/providers/Microsoft.Cdn/profiles/afd-shop",
+  "name": "afd-shop",
+  "type": "microsoft.cdn/profiles",
+  "kind": "frontdoor",
+  "location": "Global",
+  "resourceGroup": "rg-edge",
+  "subscriptionId": "s7",
+  "subscription": "Prod",
+  "identity": null,
+  "sku": {"name": "Premium_AzureFrontDoor"},
+  "zones": null,
+  "tags": {"team": "web"},
+  "properties": {
+    "frontDoorId": "6f1c2a9e-3b4d-4e58-9a07-c1d2e3f40b15",
+    "originResponseTimeoutSeconds": 45,
+    "provisioningState": "Succeeded",
+    "resourceState": "Active",
+    "logScrubbing": {
+      "state": "Enabled",
+      "scrubbingRules": [
+        {"matchVariable": "RequestIPAddress", "selectorMatchOperator": "EqualsAny", "state": "Enabled"},
+        {"matchVariable": "QueryStringArgNames", "selectorMatchOperator": "Equals", "selector": "token", "state": "Enabled"}
+      ]
+    }
+  }
+}

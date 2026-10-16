@@ -350,10 +350,10 @@ func TestDialogBoxGeometry(t *testing.T) {
 		bw   int
 		bh   int
 	}{
-		{100, 40, "", 68, 23},
+		{100, 40, "", 68, 24},
 		{100, 40, "st", 68, 5},
 		{100, 40, "zzz", 68, 5},
-		{50, 40, "", 46, 23},
+		{50, 40, "", 46, 24},
 		{100, 12, "", 68, 8},
 		{100, 20, "", 68, 16},
 	}
@@ -386,12 +386,13 @@ func TestDialogContent(t *testing.T) {
 	wantIn(t, "rule", lines[2], strings.Repeat("─", 66))
 	wantIn(t, "first row", lines[3], "  subs     subscriptions")
 	wantIn(t, "foundry row", lines[11], "  foundry  AI Foundry resources and projects in every subscription")
-	wantIn(t, "storage row", lines[12], "  storage  storage accounts in every subscription")
-	wantIn(t, "managed identities row", lines[15], "  mi       managed identities in every subscription")
-	wantIn(t, "registries row", lines[16], "  acr      container registries in every subscription")
-	wantIn(t, "groups row", lines[17], "  nsg      network security groups in every subscription")
-	wantIn(t, "dns row", lines[18], "  dns      public and private DNS zones in every subscription")
-	wantIn(t, "last row", lines[21], "  q        quit")
+	wantIn(t, "front door row", lines[12], "  afd      Front Door and CDN profiles in every subscription")
+	wantIn(t, "storage row", lines[13], "  storage  storage accounts in every subscription")
+	wantIn(t, "managed identities row", lines[16], "  mi       managed identities in every subscription")
+	wantIn(t, "registries row", lines[17], "  acr      container registries in every subscription")
+	wantIn(t, "groups row", lines[18], "  nsg      network security groups in every subscription")
+	wantIn(t, "dns row", lines[19], "  dns      public and private DNS zones in every subscription")
+	wantIn(t, "last row", lines[22], "  q        quit")
 	if strings.Contains(strings.Join(lines, ""), "pdns") {
 		t.Error("the dialog offers pdns")
 	}
@@ -461,7 +462,7 @@ func TestDialogRowsScrollToKeepTheOfferVisible(t *testing.T) {
 	if strings.Contains(got, "subs") {
 		t.Errorf("the window did not scroll:\n%s", got)
 	}
-	for range 18 {
+	for range 19 {
 		h.send(key("up"))
 	}
 	wantIn(t, "dialog", strings.Join(dialogLines(t, h), "\n"), "▌ subs")

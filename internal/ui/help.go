@@ -51,7 +51,7 @@ var helpSections = []struct {
 		{":", "command dialog (↑ ↓ choose, tab completes)"},
 		{"subs  rg", "all subscriptions, all resource groups"},
 		{"vm aks kv sql pg", "all resources of that type, in every subscription"},
-		{"docdb foundry", "DocumentDB clusters, AI Foundry resources and projects"},
+		{"docdb foundry afd", "DocumentDB clusters, AI Foundry, Front Door and CDN"},
 		{"storage app vnet", "storage accounts, web apps, virtual networks"},
 		{"mi acr", "managed identities, container registries"},
 		{"nsg dns", "network security groups, public and private DNS zones"},
