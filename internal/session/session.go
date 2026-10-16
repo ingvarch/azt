@@ -20,6 +20,8 @@ type Session struct {
 	Tabs           []Tab `json:"tabs"`
 	Active         int   `json:"active"`
 	SidebarVisible bool  `json:"sidebarVisible"`
+	// SidebarWidth is the explorer width in columns; 0 means the default.
+	SidebarWidth int `json:"sidebarWidth,omitempty"`
 }
 
 // Tab is one tab: its pane layout and view state.

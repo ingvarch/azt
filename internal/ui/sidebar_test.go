@@ -40,10 +40,10 @@ func TestSidebarShownAtStart(t *testing.T) {
 	if !strings.HasPrefix(lines[0], "┌ Explorer ") {
 		t.Errorf("top border = %q", lines[0])
 	}
-	if got := []rune(lines[1]); string(got[sidebarWidth-1:sidebarWidth+1]) != "│┌" {
-		t.Errorf("sidebar does not end at column %d: %q", sidebarWidth, lines[1])
+	if got := []rune(lines[1]); string(got[defaultSidebarWidth-1:defaultSidebarWidth+1]) != "│┌" {
+		t.Errorf("sidebar does not end at column %d: %q", defaultSidebarWidth, lines[1])
 	}
-	if got := []rune(lines[len(lines)-2]); got[0] != '└' || string(got[sidebarWidth-1:sidebarWidth+1]) != "┘└" {
+	if got := []rune(lines[len(lines)-2]); got[0] != '└' || string(got[defaultSidebarWidth-1:defaultSidebarWidth+1]) != "┘└" {
 		t.Errorf("sidebar bottom border does not line up with the panes: %q", lines[len(lines)-2])
 	}
 	if r := h.pane(0); r.w != 66 || r.h != 26 {
@@ -56,14 +56,14 @@ func TestSidebarShownAtStart(t *testing.T) {
 }
 
 func TestSidebarNotDrawnInNarrowWindow(t *testing.T) {
-	h := newSidebarHarness(sidebarWidth+minPaneWidth-1, 30)
+	h := newSidebarHarness(minSidebarWidth+minPaneWidth-1, 30)
 	if f := h.frame(); strings.Contains(f, "Explorer") {
 		t.Errorf("narrow frame shows the sidebar:\n%s", f)
 	}
-	if got := h.pane(0).w; got != sidebarWidth+minPaneWidth-3 {
+	if got := h.pane(0).w; got != minSidebarWidth+minPaneWidth-3 {
 		t.Errorf("pane inner width = %d, want the whole window", got)
 	}
-	h.send(tea.WindowSizeMsg{Width: sidebarWidth + minPaneWidth, Height: 30})
+	h.send(tea.WindowSizeMsg{Width: minSidebarWidth + minPaneWidth, Height: 30})
 	if f := h.frame(); !strings.Contains(f, "Explorer") {
 		t.Errorf("frame at the minimum width lacks the sidebar:\n%s", f)
 	}
@@ -344,7 +344,7 @@ func TestSidebarStatusBar(t *testing.T) {
 	h.send(key("ctrl+w"))
 	lines = strings.Split(h.frame(), "\n")
 	status = lines[len(lines)-1]
-	if !strings.Contains(status, "CTRL-W") || !strings.Contains(status, "l/→ panes  e hide  t tab  n/p/1-9 switch  , rename  ? help  esc cancel") {
+	if !strings.Contains(status, "CTRL-W") || !strings.Contains(status, "l/→ panes  e hide  </> width  = default width  t tab  n/p/1-9 switch  , rename  ? help  esc cancel") {
 		t.Errorf("prefix status = %q", status)
 	}
 	if strings.Contains(status, "v/s split") {

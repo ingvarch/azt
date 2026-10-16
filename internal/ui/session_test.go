@@ -86,6 +86,7 @@ func TestSessionOfNewModel(t *testing.T) {
 			Stack: []views.Spec{{Kind: "subscriptions"}},
 		}}},
 		SidebarVisible: true,
+		SidebarWidth:   defaultSidebarWidth,
 	}
 	if got := m.Session(); !reflect.DeepEqual(got, want) {
 		t.Errorf("Session = %+v, want %+v", got, want)

@@ -30,7 +30,7 @@ Tabs, split panes and one session for every subscription you can see.
   with counts.
 - Filters any list as you type with `/`.
 - Works with the mouse too: click to focus or select, double click to open,
-  drag a border to resize, scroll with the wheel.
+  drag a border to resize panes or the explorer, scroll with the wheel.
 - Restores the tabs, panes and their paths the next time you start it.
 
 azt reads through [Azure Resource Graph](https://learn.microsoft.com/azure/governance/resource-graph/overview),
@@ -95,6 +95,7 @@ Press `?` for help, `:` for a command, `/` to filter and `q` to quit.
 | `ctrl+w q`, `ctrl+w z`, `ctrl+w =` | close, zoom, equalize panes |
 | `ctrl+w t`, `ctrl+w n p 1-9`, `ctrl+w ,` | new tab, switch tabs, rename the tab |
 | `ctrl+w e` | show or hide the explorer |
+| `ctrl+w < >`, `ctrl+w =` | with the explorer focused: make it narrower or wider, or reset it to the default width |
 | `?` | every key |
 
 While azt runs, the terminal's own text selection needs Shift (Option in

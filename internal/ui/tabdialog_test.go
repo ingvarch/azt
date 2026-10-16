@@ -17,7 +17,7 @@ var dialogLayouts = []struct {
 	save, clear, cancel int
 	plus                int
 }{
-	{"explorer shown", func() *harness { return newSidebarHarness(100, 30) }, 22, 7, 56, 33, 43, 55, sidebarWidth + 9},
+	{"explorer shown", func() *harness { return newSidebarHarness(100, 30) }, 22, 7, 56, 33, 43, 55, defaultSidebarWidth + 9},
 	{"explorer hidden", func() *harness { return newHarness(100, 30) }, 22, 7, 56, 33, 43, 55, 9},
 	{"odd width", func() *harness { return newHarness(41, 30) }, 2, 7, 37, 3, 13, 25, 9},
 	{"short window", func() *harness { return newHarness(100, 9) }, 22, 2, 56, 33, 43, 55, 9},
