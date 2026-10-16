@@ -336,10 +336,8 @@ func TestSidebarStatusBar(t *testing.T) {
 	h.prefix("h")
 	lines := strings.Split(h.frame(), "\n")
 	status := lines[len(lines)-1]
-	for _, want := range []string{"NORMAL", "j/k move  l expand  h collapse  r refresh  enter open  ^w l panes  ^w e hide  : command  ? help  q quit"} {
-		if !strings.Contains(status, want) {
-			t.Errorf("status %q lacks %q", status, want)
-		}
+	if !strings.Contains(status, sidebarHints) {
+		t.Errorf("status %q lacks %q", status, sidebarHints)
 	}
 	h.send(key("ctrl+w"))
 	lines = strings.Split(h.frame(), "\n")
@@ -400,7 +398,7 @@ func TestFrameFitsWithSidebar(t *testing.T) {
 				t.Errorf("%s %v: width = %d", name, s, got)
 			}
 			status := f[strings.LastIndex(f, "\n")+1:]
-			if s[0] >= 8 && !strings.Contains(status, "NORMAL") && !strings.Contains(status, "CTRL-W") {
+			if s[0] >= 8 && !strings.Contains(status, "enter") && !strings.Contains(status, "CTRL-W") {
 				t.Errorf("%s %v: last line %q is not the status bar", name, s, status)
 			}
 		}

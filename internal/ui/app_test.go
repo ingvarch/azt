@@ -551,7 +551,7 @@ func TestTabBarAndStatusBar(t *testing.T) {
 		t.Errorf("tab bar = %q", lines[0])
 	}
 	status := lines[len(lines)-1]
-	for _, want := range []string{"NORMAL", "^w v/s split", "q quit"} {
+	for _, want := range []string{"ctrl-w layout", "q quit"} {
 		if !strings.Contains(status, want) {
 			t.Errorf("status %q lacks %q", status, want)
 		}
@@ -570,8 +570,8 @@ func TestPrefixStatus(t *testing.T) {
 	}
 	h.send(key("v"))
 	lines = strings.Split(h.frame(), "\n")
-	if !strings.Contains(lines[len(lines)-1], "NORMAL") {
-		t.Error("badge did not return to NORMAL")
+	if got := lines[len(lines)-1]; strings.Contains(got, "CTRL-W") || !strings.Contains(got, normalHints) {
+		t.Errorf("status %q did not return to the normal hints", got)
 	}
 }
 
@@ -771,7 +771,6 @@ func TestStyles(t *testing.T) {
 	}{
 		{"focused border", lines[1], strings.TrimSuffix(lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Render("┌"), "\x1b[m")},
 		{"focused title", lines[1], strings.TrimSuffix(lipgloss.NewStyle().Bold(true).Render(" Fake1 "), "\x1b[m")},
-		{"normal badge", lines[len(lines)-1], lipgloss.NewStyle().Reverse(true).Render(" NORMAL ")},
 	}
 	h.send(key("ctrl+w"))
 	lines = strings.Split(h.raw(), "\n")
