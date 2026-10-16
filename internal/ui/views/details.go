@@ -266,48 +266,95 @@ func (d details) Render() string {
 	return clip(strings.Join(out, "\n"), d.width, d.height)
 }
 
-// tabSpan is the cells a tab takes on the tab bar, its padding included.
+// tabSpan is the cells a tab or a scroll marker takes on the tab bar, a tab's
+// padding included. A marker has mark set; name is the tab a click selects.
 type tabSpan struct {
-	name       string
+	name, mark string
 	start, end int
 }
 
-// spans places the tabs from the left edge of the content.
+// spans places the tabs from the left edge of the content. When they do not
+// fit, it places a window of whole tabs that holds the current one, with a
+// marker for the tabs hidden on each side.
 func (d details) spans() []tabSpan {
-	var out []tabSpan
-	start := 0
-	for _, def := range d.defs() {
-		end := start + lipgloss.Width(def.name) + 2
-		out = append(out, tabSpan{def.name, start, end})
-		start = end + tabGap
+	defs, width, cur := d.defs(), d.contentWidth(), d.index()
+	if len(defs) == 0 {
+		return nil
+	}
+	size := func(i int) int { return lipgloss.Width(defs[i].name) + 2 }
+	marker := func(mark string, x, i int) tabSpan { return tabSpan{defs[i].name, mark, x, x + 1} }
+	// window starts at tab first and takes the tabs after the current one that fit.
+	window := func(first int) ([]tabSpan, bool) {
+		var out []tabSpan
+		x, last := 0, first-1
+		if first > 0 {
+			out, x = append(out, marker("‹", 0, first-1)), 1+tabGap
+		}
+		for i := first; i < len(defs); i++ {
+			end := x + size(i)
+			if i < len(defs)-1 {
+				end += tabGap + 1 // room for ›
+			}
+			if end > width {
+				if i <= cur {
+					return nil, false
+				}
+				break
+			}
+			out = append(out, tabSpan{defs[i].name, "", x, x + size(i)})
+			x, last = x+size(i)+tabGap, i
+		}
+		if last < len(defs)-1 {
+			out = append(out, marker("›", x, last+1))
+		}
+		return out, true
+	}
+	for first := 0; first <= cur; first++ {
+		if out, ok := window(first); ok {
+			return out
+		}
+	}
+	out := []tabSpan{{defs[cur].name, "", 0, size(cur)}}
+	if x := size(cur) + tabGap; cur < len(defs)-1 && x+1 <= width {
+		out = append(out, marker("›", x, cur+1))
 	}
 	return out
 }
 
 func (d details) tabBar() string {
-	spans := d.spans()
-	names := make([]string, len(spans))
-	for i, s := range spans {
-		style := mutedStyle
-		if i == d.index() {
-			style = titleStyle
+	var b strings.Builder
+	pos, cur := 0, d.current()
+	for _, s := range d.spans() {
+		b.WriteString(strings.Repeat(" ", s.start-pos))
+		pos = s.end
+		switch {
+		case s.mark != "":
+			b.WriteString(mutedStyle.Render(s.mark))
+		case s.name == cur:
+			b.WriteString(titleStyle.Render(" " + s.name + " "))
+		default:
+			b.WriteString(mutedStyle.Render(" " + s.name + " "))
 		}
-		names[i] = style.Render(" " + s.name + " ")
 	}
-	return cut(strings.Join(names, strings.Repeat(" ", tabGap)), d.contentWidth())
+	return cut(b.String(), d.contentWidth())
 }
 
 // rule is a line under the tab bar: heavy under the current tab, light elsewhere.
 func (d details) rule() string {
 	width := d.contentWidth()
-	cur := d.spans()[d.index()]
-	start, end := min(cur.start, width), min(cur.end, width)
+	var start, end int
+	cur := d.current()
+	for _, s := range d.spans() {
+		if s.name == cur {
+			start, end = min(s.start, width), min(s.end, width)
+		}
+	}
 	return mutedStyle.Render(strings.Repeat("─", start)) +
 		accentStyle.Render(strings.Repeat("━", end-start)) +
 		mutedStyle.Render(strings.Repeat("─", width-end))
 }
 
-// tabAt returns the tab drawn at column x of the content.
+// tabAt returns the tab a click at column x of the content selects.
 func (d details) tabAt(x int) (string, bool) {
 	for _, s := range d.spans() {
 		if x >= s.start && x < s.end {
@@ -317,7 +364,7 @@ func (d details) tabAt(x int) (string, bool) {
 	return "", false
 }
 
-// Click selects the tab under x on the tab bar or its rule.
+// Click selects the tab under x on the tab bar or its rule; a marker selects the nearest hidden tab.
 func (d details) Click(x, y int) (View, tea.Cmd, bool) {
 	if y != 0 && y != 1 {
 		return d, nil, false

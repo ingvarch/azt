@@ -29,7 +29,7 @@ func TestTabBarText(t *testing.T) {
 	if got := line("aks", "Networking", 100); got != want {
 		t.Errorf("tab bar on another tab = %q, want %q", got, want)
 	}
-	if got, want := line("aks", "", 15), "  Overview   N"; got != want {
+	if got, want := line("aks", "", 15), "  Overview  ›"; got != want {
 		t.Errorf("narrow tab bar = %q, want %q", got, want)
 	}
 	if got, want := line("webapp", "", 100), "  Overview   JSON"; got != want {
@@ -91,8 +91,8 @@ func TestTabRuleIsAsWideAsTheBody(t *testing.T) {
 			t.Errorf("tab %q width %d: rule is %d wide, want %d", c.tab, c.width, got, c.want)
 		}
 	}
-	if got := plain(strings.Split(openedAt(t, "aks", "Networking", 15, 10).Render(), "\n")[1]); strings.Contains(got, "━") {
-		t.Errorf("rule under a hidden tab has a heavy part: %q", got)
+	if got, want := plain(strings.Split(openedAt(t, "aks", "Networking", 15, 10).Render(), "\n")[1]), " "+strings.Repeat("━", 12)+"─"; got != want {
+		t.Errorf("rule under a current tab that fills the bar = %q, want %q", got, want)
 	}
 }
 
