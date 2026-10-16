@@ -3,13 +3,13 @@ package views
 import "strconv"
 
 var dnsTabs = []tabDef{
-	{overviewTab, boxesTab(dnsEssentials, dnsNameServers)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(dnsEssentials, dnsNameServers)},
+	{name: "JSON", render: jsonTab},
 }
 
 var pdnsTabs = []tabDef{
-	{overviewTab, boxesTab(pdnsEssentials)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(pdnsEssentials)},
+	{name: "JSON", render: jsonTab},
 }
 
 var recordSetsField = fieldDef{label: "Record sets", value: countOfMax("numberOfRecordSets", "maxNumberOfRecordSets")}

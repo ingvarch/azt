@@ -3,8 +3,8 @@ package views
 import "strings"
 
 var acrTabs = []tabDef{
-	{overviewTab, boxesTab(acrEssentials, acrAccess, acrNetwork, acrPolicies)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(acrEssentials, acrAccess, acrNetwork, acrPolicies)},
+	{name: "JSON", render: jsonTab},
 }
 
 var acrEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{

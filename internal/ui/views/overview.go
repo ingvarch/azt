@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+
+	"github.com/ingvarch/azt/internal/ui/data"
 )
 
 const overviewTab = "Overview"
@@ -14,9 +16,21 @@ type tabDef struct {
 	name string
 	// render draws the tab for a body width cells wide; details cuts longer lines.
 	render func(row map[string]any, width int) []string
+	// key is the data the tab loads when it opens; nil for a tab that draws the row only.
+	key func(row map[string]any, period string) data.Key
+	// draw draws a tab with a key, in place of render, from what key loaded.
+	draw func(row map[string]any, res tabData, width int) []string
 }
 
-var genericTabs = []tabDef{{overviewTab, boxesTab(genericEssentials)}, {"JSON", jsonTab}}
+// tabData is what a tab's key loaded, as the tab shows it.
+type tabData struct {
+	data    any
+	err     error
+	loading bool
+	period  string
+}
+
+var genericTabs = []tabDef{{name: overviewTab, render: boxesTab(genericEssentials)}, {name: "JSON", render: jsonTab}}
 
 // Tabs lists the tabs the details of a resource of this type have.
 func Tabs(resourceType string) []string {
@@ -32,6 +46,9 @@ var boldStyle = lipgloss.NewStyle().Bold(true)
 
 type pair struct{ key, value string }
 
+// keyGap is the cells between the keys of a block and its values.
+const keyGap = 2
+
 // block lists pairs with the muted keys padded to the longest one; a value
 // may carry its own styling.
 func block(pairs []pair) []string {
@@ -41,7 +58,7 @@ func block(pairs []pair) []string {
 	}
 	out := make([]string, len(pairs))
 	for i, p := range pairs {
-		out[i] = mutedStyle.Render(p.key) + strings.Repeat(" ", keyWidth-lipgloss.Width(p.key)+2) + p.value
+		out[i] = mutedStyle.Render(p.key) + strings.Repeat(" ", keyWidth-lipgloss.Width(p.key)+keyGap) + p.value
 	}
 	return out
 }

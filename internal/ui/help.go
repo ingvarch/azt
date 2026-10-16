@@ -20,6 +20,7 @@ var helpSections = []struct {
 		{"tab / shift+tab", "next / previous tab of a resource"},
 		{"/", "filter the list (enter keeps, esc clears)"},
 		{"r", "refresh"},
+		{"p", "period of the Monitoring tab"},
 		{"?", "this help"},
 		{"q", "quit"},
 		{"ctrl+c", "quit; clears the field in a tab dialog"},

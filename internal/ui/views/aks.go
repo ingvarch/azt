@@ -8,12 +8,13 @@ import (
 )
 
 var aksTabs = []tabDef{
-	{overviewTab, aksOverview},
-	{"Node pools", aksPools},
-	{"Networking", boxesTab(aksNetworking)},
-	{"Identity", boxesTab(aksIdentity)},
-	{"Add-ons", boxesTab(aksAddons)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: aksOverview},
+	{name: "Node pools", render: aksPools},
+	{name: "Networking", render: boxesTab(aksNetworking)},
+	{name: "Identity", render: boxesTab(aksIdentity)},
+	{name: "Add-ons", render: boxesTab(aksAddons)},
+	{name: "Monitoring", key: aksMonitoringKey, draw: aksMonitoring},
+	{name: "JSON", render: jsonTab},
 }
 
 func aksOverview(row map[string]any, width int) []string {
@@ -321,8 +322,12 @@ func addonProfiles(row map[string]any) []pair {
 	var pairs []pair
 	addons := dig(row, "properties", "addonProfiles")
 	for _, name := range mapKeys(addons) {
-		a := dig(addons, name)
-		pairs = append(pairs, pair{name, join(" · ", switchText(onOff(a, "enabled")), lastSegment(str(a, "config", "logAnalyticsWorkspaceResourceID")))})
+		pairs = append(pairs, pair{name, addonState(dig(addons, name))})
 	}
 	return pairs
+}
+
+// addonState is the add-on as on or off, with its Log Analytics workspace when it has one.
+func addonState(addon any) string {
+	return join(stateSeparator, switchText(onOff(addon, "enabled")), lastSegment(str(addon, "config", "logAnalyticsWorkspaceResourceID")))
 }

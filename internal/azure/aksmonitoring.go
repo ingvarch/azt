@@ -2,12 +2,18 @@ package azure
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 )
 
 // Periods are the spans the monitoring tab can show, in the order p steps through them.
 var Periods = []string{"24h", "7d", "30d"}
+
+// NextPeriod is the period after p, wrapping.
+func NextPeriod(p string) string {
+	return Periods[(slices.Index(Periods, p)+1)%len(Periods)]
+}
 
 type periodSpec struct {
 	span, interval time.Duration

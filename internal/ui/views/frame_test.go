@@ -7,7 +7,7 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-var aksTabNames = []string{"Overview", "Node pools", "Networking", "Identity", "Add-ons", "JSON"}
+var aksTabNames = []string{"Overview", "Node pools", "Networking", "Identity", "Add-ons", "Monitoring", "JSON"}
 
 // paddedTabs are the tab names with a space on each side.
 func paddedTabs(names []string) []string {

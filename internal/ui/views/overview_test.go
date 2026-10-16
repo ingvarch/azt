@@ -102,7 +102,7 @@ func wantLines(t *testing.T, got, want []string) {
 }
 
 func TestTabs(t *testing.T) {
-	aks := []string{"Overview", "Node pools", "Networking", "Identity", "Add-ons", "JSON"}
+	aks := []string{"Overview", "Node pools", "Networking", "Identity", "Add-ons", "Monitoring", "JSON"}
 	other := []string{"Overview", "JSON"}
 	for _, c := range []struct {
 		in   string

@@ -1,14 +1,14 @@
 package views
 
 var foundryTabs = []tabDef{
-	{overviewTab, boxesTab(foundryEssentials, foundryAccess, foundryProjects)},
-	{"Endpoints", boxesTab(foundryEndpoints)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(foundryEssentials, foundryAccess, foundryProjects)},
+	{name: "Endpoints", render: boxesTab(foundryEndpoints)},
+	{name: "JSON", render: jsonTab},
 }
 
 var foundryProjectTabs = []tabDef{
-	{overviewTab, boxesTab(foundryProjectEssentials, foundryEndpoints)},
-	{"JSON", jsonTab},
+	{name: overviewTab, render: boxesTab(foundryProjectEssentials, foundryEndpoints)},
+	{name: "JSON", render: jsonTab},
 }
 
 var foundryEssentials = boxDef{title: "Essentials", split: true, fields: []fieldDef{

@@ -21,6 +21,9 @@ Tabs, split panes and one session for every subscription you can see.
   app, virtual network, managed identity, container registry, network
   security group, DNS zone or private DNS zone across all your subscriptions
   in one table: `:vm`, `:aks`, `:kv` and the other commands.
+- Shows how an AKS cluster's monitoring is set up and how its nodes, pods and
+  control plane did over the last 24 hours, 7 or 30 days on the Monitoring
+  tab; `p` switches the period.
 - Splits the screen into panes and keeps several tabs, the way vim does with
   `ctrl+w`. Each pane has its own path; a split copies it.
 - Shows an explorer tree of subscriptions, resource groups and resource types
@@ -31,8 +34,11 @@ Tabs, split panes and one session for every subscription you can see.
 - Restores the tabs, panes and their paths the next time you start it.
 
 azt reads through [Azure Resource Graph](https://learn.microsoft.com/azure/governance/resource-graph/overview),
-so a list of thousands of resources across subscriptions is one query. It only
-reads: it does not create, change or delete anything.
+so a list of thousands of resources across subscriptions is one query. The
+Monitoring tab also reads Azure Monitor metrics and diagnostic settings
+through Azure Resource Manager, with GET requests only, so azt still only
+reads: it does not create, change or delete anything. Reader on a cluster is
+enough to see its metrics.
 
 ## Install
 

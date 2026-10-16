@@ -44,8 +44,9 @@ func TestDetailsTabKeysWrap(t *testing.T) {
 		{"tab", []tea.KeyPressMsg{keyTab}, "Node pools"},
 		{"]", []tea.KeyPressMsg{key("]")}, "Node pools"},
 		{"tab twice", []tea.KeyPressMsg{keyTab, keyTab}, "Networking"},
-		{"tab around", []tea.KeyPressMsg{keyTab, keyTab, keyTab, keyTab, keyTab, keyTab}, ""},
-		{"tab to the last", []tea.KeyPressMsg{keyTab, keyTab, keyTab, keyTab, keyTab}, "JSON"},
+		{"tab around", []tea.KeyPressMsg{keyTab, keyTab, keyTab, keyTab, keyTab, keyTab, keyTab}, ""},
+		{"tab to the last", []tea.KeyPressMsg{keyTab, keyTab, keyTab, keyTab, keyTab, keyTab}, "JSON"},
+		{"tab to monitoring", []tea.KeyPressMsg{keyTab, keyTab, keyTab, keyTab, keyTab}, "Monitoring"},
 		{"shift+tab wraps", []tea.KeyPressMsg{keyShiftTab}, "JSON"},
 		{"[ wraps", []tea.KeyPressMsg{key("[")}, "JSON"},
 		{"shift+tab back", []tea.KeyPressMsg{keyTab, keyTab, keyShiftTab}, "Node pools"},
@@ -55,7 +56,7 @@ func TestDetailsTabKeysWrap(t *testing.T) {
 			v := openedAt(t, "aks", "", 80, 20)
 			for _, k := range c.keys {
 				var cmd tea.Cmd
-				if v, cmd = press(v, k); cmd != nil {
+				if v, cmd = press(v, k); cmd != nil && tabOf(v) != "Monitoring" {
 					t.Errorf("%v returned a command", k)
 				}
 			}
@@ -192,7 +193,7 @@ func TestDetailsKeepsTabOnRefreshResult(t *testing.T) {
 
 func TestDetailsClickSelectsTab(t *testing.T) {
 	// Padded names, after a one-cell margin: Overview 1-10, Node pools 12-23,
-	// Networking 25-36, Identity 38-47, Add-ons 49-57, JSON 59-64.
+	// Networking 25-36, Identity 38-47, Add-ons 49-57, Monitoring 59-70, JSON 72-77.
 	for _, c := range []struct {
 		name string
 		x, y int
@@ -214,16 +215,20 @@ func TestDetailsClickSelectsTab(t *testing.T) {
 		{"gap before add-ons", 48, 0, "Networking", false},
 		{"add-ons", 49, 0, "Add-ons", true},
 		{"end of add-ons", 57, 0, "Add-ons", true},
-		{"gap before json", 58, 0, "Networking", false},
-		{"json", 59, 0, "JSON", true},
-		{"end of json", 64, 0, "JSON", true},
-		{"after the last tab", 65, 0, "Networking", false},
+		{"gap before monitoring", 58, 0, "Networking", false},
+		{"monitoring", 59, 0, "Monitoring", true},
+		{"end of monitoring", 70, 0, "Monitoring", true},
+		{"gap before json", 71, 0, "Networking", false},
+		{"json", 72, 0, "JSON", true},
+		{"end of json", 77, 0, "JSON", true},
+		{"after the last tab", 78, 0, "Networking", false},
 		{"far right", 79, 0, "Networking", false},
 		{"rule under the first tab", 1, 1, "", true},
 		{"rule under the end of the first tab", 10, 1, "", true},
 		{"rule in a gap", 11, 1, "Networking", false},
-		{"rule under json", 64, 1, "JSON", true},
-		{"rule after the last tab", 65, 1, "Networking", false},
+		{"rule under monitoring", 65, 1, "Monitoring", true},
+		{"rule under json", 77, 1, "JSON", true},
+		{"rule after the last tab", 78, 1, "Networking", false},
 		{"rule in the margin", 0, 1, "Networking", false},
 		{"blank line", 12, 2, "Networking", false},
 		{"first body line", 12, 3, "Networking", false},
@@ -234,8 +239,8 @@ func TestDetailsClickSelectsTab(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			v := openedAt(t, "aks", "Networking", 80, 6)
 			next, cmd, hit := v.(Clicker).Click(c.x, c.y)
-			if cmd != nil {
-				t.Error("Click returned a command")
+			if got := cmd != nil; got != (c.want == "Monitoring" && c.hit) {
+				t.Errorf("Click returned a command = %v", got)
 			}
 			if hit != c.hit {
 				t.Errorf("hit = %v, want %v", hit, c.hit)
