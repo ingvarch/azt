@@ -29,6 +29,7 @@ var kinds = []resourceKind{
 	{types: []string{"microsoft.documentdb/mongoclusters"}, command: "docdb", desc: "DocumentDB clusters in every subscription", tabs: docdbTabs, attention: docdbAttention},
 	{types: []string{"microsoft.cognitiveservices/accounts"}, command: "foundry", desc: "AI Foundry resources and projects in every subscription", tabs: foundryTabs, attention: foundryAttention},
 	{types: []string{"microsoft.cognitiveservices/accounts/projects"}, command: "foundry", tabs: foundryProjectTabs},
+	{types: []string{"microsoft.cdn/profiles"}, command: "afd", desc: "Front Door and CDN profiles in every subscription", tabs: afdTabs},
 	{types: []string{"microsoft.storage/storageaccounts"}, command: "storage", desc: "storage accounts in every subscription", tabs: storageTabs, attention: storageAttention},
 	{types: []string{"microsoft.web/sites"}, command: "app", desc: "web apps in every subscription"},
 	{types: []string{"microsoft.network/virtualnetworks"}, command: "vnet", desc: "virtual networks in every subscription", tabs: vnetTabs, attention: vnetAttention},

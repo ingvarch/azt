@@ -85,6 +85,7 @@ func TestTypeCommands(t *testing.T) {
 		{"pg", "PostgreSQL servers in every subscription", []string{"microsoft.dbforpostgresql/flexibleservers"}},
 		{"docdb", "DocumentDB clusters in every subscription", []string{"microsoft.documentdb/mongoclusters"}},
 		{"foundry", "AI Foundry resources and projects in every subscription", []string{"microsoft.cognitiveservices/accounts", "microsoft.cognitiveservices/accounts/projects"}},
+		{"afd", "Front Door and CDN profiles in every subscription", []string{"microsoft.cdn/profiles"}},
 		{"storage", "storage accounts in every subscription", []string{"microsoft.storage/storageaccounts"}},
 		{"app", "web apps in every subscription", []string{"microsoft.web/sites"}},
 		{"vnet", "virtual networks in every subscription", []string{"microsoft.network/virtualnetworks"}},

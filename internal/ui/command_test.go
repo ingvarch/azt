@@ -86,6 +86,7 @@ func TestParseCommandTypes(t *testing.T) {
 	tests := []struct{ in, want string }{
 		{"dns", "microsoft.network/dnszones,microsoft.network/privatednszones"},
 		{"foundry", "microsoft.cognitiveservices/accounts,microsoft.cognitiveservices/accounts/projects"},
+		{"afd", "microsoft.cdn/profiles"},
 		{"app", "microsoft.web/sites"},
 		{"type microsoft.web/sites", "microsoft.web/sites"},
 	}
@@ -111,6 +112,7 @@ func TestCommandTable(t *testing.T) {
 		{"pg", "PostgreSQL servers in every subscription"},
 		{"docdb", "DocumentDB clusters in every subscription"},
 		{"foundry", "AI Foundry resources and projects in every subscription"},
+		{"afd", "Front Door and CDN profiles in every subscription"},
 		{"storage", "storage accounts in every subscription"},
 		{"app", "web apps in every subscription"},
 		{"vnet", "virtual networks in every subscription"},
@@ -146,6 +148,8 @@ func TestMatchingCommands(t *testing.T) {
 		{"PG", []string{"pg"}},
 		{"doc", []string{"docdb"}},
 		{"f", []string{"foundry"}},
+		{"af", []string{"afd"}},
+		{"a", []string{"aks", "afd", "app", "acr"}},
 		{"pd", nil},
 		{"zzz", nil},
 	}

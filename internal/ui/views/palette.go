@@ -32,7 +32,7 @@ const stateSeparator = " · "
 // stateTone is the color of a state word: good, bad, or warn for any other.
 func stateTone(word string) color.Color {
 	switch strings.ToLower(word) {
-	case "running", "succeeded", "enabled", "available", "connected", "fullyinsync", "ready":
+	case "running", "succeeded", "enabled", "available", "connected", "fullyinsync", "ready", "active":
 		return good
 	case "stopped", "failed", "canceled", "disabled", "deleted", "unavailable", "disconnected", "deallocated", "dropping":
 		return bad

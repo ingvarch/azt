@@ -82,7 +82,7 @@ Press `?` for help, `:` for a command, `/` to filter and `q` to quit.
 | `enter` / `esc` | open the selected item / go back |
 | `j` `k`, `↑` `↓` | move |
 | `/` | filter the list |
-| `:` | command: `subs`, `rg`, `vm`, `aks`, `kv`, `sql`, `pg`, `docdb`, `foundry`, `storage`, `app`, `vnet`, `mi`, `acr`, `nsg`, `dns`, `type <type>`, `help`, `q` |
+| `:` | command: `subs`, `rg`, `vm`, `aks`, `kv`, `sql`, `pg`, `docdb`, `foundry`, `afd`, `storage`, `app`, `vnet`, `mi`, `acr`, `nsg`, `dns`, `type <type>`, `help`, `q` |
 | `r` | refresh |
 | `ctrl+w v` / `ctrl+w s` | split into left and right / top and bottom |
 | `ctrl+w h j k l`, `ctrl+w` arrows | move to the neighbor pane or the explorer |
