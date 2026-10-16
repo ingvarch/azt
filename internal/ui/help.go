@@ -21,6 +21,7 @@ var helpSections = []struct {
 		{"/", "filter the list (enter keeps, esc clears)"},
 		{"r", "refresh"},
 		{"p", "period of the Monitoring tab"},
+		{"0-9", "tab's subscription: 0 all, 1-9 as numbered in :subs"},
 		{"?", "this help"},
 		{"q", "quit"},
 		{"ctrl-c", "quit; clears the field in a tab dialog"},

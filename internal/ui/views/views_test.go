@@ -651,8 +651,11 @@ func TestListsColorTheState(t *testing.T) {
 func TestListStateColumnKeepsItsPlace(t *testing.T) {
 	v := deliver(t, NewSubscriptions().Resize(120, 10), subs, nil)
 	header := plain(strings.Split(v.Render(), "\n")[0])
-	// natural widths 4, 15 and 10 with the gaps: 87 spare cells, 29 for each column.
-	if i := strings.Index(header, "State"); i != 33+2+44+2 {
+	// natural widths 1 (the number, which takes no spare room), 4, 15 and 10 with the gaps: 84 spare cells, 28 for each other column.
+	if i := strings.Index(header, "Name"); i != 1+2 {
+		t.Errorf("Name starts at %d in %q", i, header)
+	}
+	if i := strings.Index(header, "State"); i != 3+32+2+43+2 {
 		t.Errorf("State starts at %d in %q", i, header)
 	}
 }

@@ -31,6 +31,7 @@ type fake struct {
 	results []data.ResultMsg
 	fetches int
 	clicks  [][2]int
+	scopes  []views.ScopeMsg
 }
 
 type record struct {
@@ -60,6 +61,8 @@ func (f fake) Update(msg tea.Msg) (views.View, tea.Cmd) {
 		f.results = append(f.results[:len(f.results):len(f.results)], msg)
 	case data.FetchMsg:
 		f.fetches++
+	case views.ScopeMsg:
+		f.scopes = append(f.scopes[:len(f.scopes):len(f.scopes)], msg)
 	}
 	return f, nil
 }

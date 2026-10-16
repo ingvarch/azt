@@ -38,3 +38,25 @@ func TestReadmeWritesCtrlDash(t *testing.T) {
 		t.Error("README writes ctrl+ instead of ctrl-")
 	}
 }
+
+func TestReadmeNamesTheSubscriptionKeys(t *testing.T) {
+	raw, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	readme := string(raw)
+	var row string
+	for _, l := range strings.Split(readme, "\n") {
+		if strings.HasPrefix(l, "| `0-9` |") {
+			row = l
+		}
+	}
+	if row == "" || !strings.Contains(row, "`:subs`") {
+		t.Errorf("README has no Keys row for 0-9 that names :subs: %q", row)
+	}
+	for _, want := range []string{"Each tab can show one subscription", "number of rows"} {
+		if !strings.Contains(readme, want) {
+			t.Errorf("README lacks %q", want)
+		}
+	}
+}

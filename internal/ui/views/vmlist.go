@@ -24,8 +24,9 @@ func NewVirtualMachines() View {
 			{title: "Subscription"},
 			{title: "Location"},
 		},
-		row:  vmRow,
-		open: func(vm azure.VM) View { return NewDetails(vm.SubscriptionID, vm.Resource) },
+		row:          vmRow,
+		open:         func(vm azure.VM) View { return NewDetails(vm.SubscriptionID, vm.Resource) },
+		subscription: func(r azure.VM) string { return r.SubscriptionID },
 	})
 }
 

@@ -354,3 +354,53 @@ func TestKeysOverDifferentTypeListsDiffer(t *testing.T) {
 		t.Error("keys over different type lists are equal")
 	}
 }
+
+func TestCacheFailed(t *testing.T) {
+	c := NewCache((&countingFetcher{data: "d"}).fetch)
+	k := Key{Kind: Subscriptions}
+	if c.Failed(k) {
+		t.Error("Failed before any fetch")
+	}
+	c.Request(FetchMsg{Key: k})
+	c.Store(ResultMsg{Key: k, Err: errors.New("boom")})
+	if !c.Failed(k) {
+		t.Error("not Failed after a failed fetch")
+	}
+	c.Request(FetchMsg{Key: k})
+	c.Store(ResultMsg{Key: k, Data: "d"})
+	if c.Failed(k) {
+		t.Error("Failed after a fetch that worked")
+	}
+}
+
+func TestCacheGet(t *testing.T) {
+	c := NewCache((&countingFetcher{data: "d"}).fetch)
+	k := Key{Kind: Subscriptions}
+	if _, ok := c.Get(k); ok {
+		t.Error("Get found a key nothing stored")
+	}
+	c.Store(ResultMsg{Key: k, Data: "d"})
+	if got, ok := c.Get(k); !ok || got != "d" {
+		t.Errorf("Get = %v, %v, want d, true", got, ok)
+	}
+	c.Store(ResultMsg{Key: k, Err: errors.New("boom")})
+	if _, ok := c.Get(k); ok {
+		t.Error("Get found data after a failed fetch")
+	}
+}
+
+func TestLoadingIsTrueOnlyWhileAFetchRuns(t *testing.T) {
+	f := &countingFetcher{data: "rows"}
+	c := NewCache(f.fetch)
+	if c.Loading(key) {
+		t.Error("Loading before a request")
+	}
+	c.Request(FetchMsg{Key: key})
+	if !c.Loading(key) {
+		t.Error("not Loading while the fetch runs")
+	}
+	c.Store(ResultMsg{Key: key, Err: errors.New("boom")})
+	if c.Loading(key) {
+		t.Error("Loading after the fetch failed")
+	}
+}

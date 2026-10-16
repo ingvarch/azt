@@ -27,7 +27,10 @@ Tabs, split panes and one session for every subscription you can see.
   control plane did over the last 24 hours, 7 or 30 days on the Monitoring
   tab; `p` switches the period.
 - Splits the screen into panes and keeps several tabs, the way vim does with
-  `ctrl-w`. Each pane has its own path; a split copies it.
+  `ctrl-w`. Each pane has its own path, a split copies it, and a pane shows
+  the number of rows of a list.
+- Each tab can show one subscription, chosen with `0-9` (0 is all); the
+  numbers are shown in `:subs`.
 - Shows an explorer tree of subscriptions, resource groups and resource types
   with counts.
 - Filters any list as you type with `/`.
@@ -91,6 +94,7 @@ Press `?` for help, `:` for a command, `/` to filter and `q` to quit.
 | `j` `k`, `↑` `↓` | move |
 | `/` | filter the list |
 | `:` | command: `subs`, `rg`, `vm`, `aks`, `kv`, `sql`, `pg`, `docdb`, `foundry`, `afd`, `storage`, `app`, `vnet`, `mi`, `acr`, `nsg`, `dns`, `type <type>`, `help`, `q` |
+| `0-9` | subscription of the tab: `0` all, `1`-`9` as numbered in `:subs` |
 | `r` | refresh |
 | `ctrl-w v` / `ctrl-w s` | split into left and right / top and bottom |
 | `ctrl-w h j k l`, `ctrl-w` arrows | move to the neighbor pane or the explorer |
