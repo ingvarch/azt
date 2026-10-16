@@ -2,8 +2,10 @@ package views
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -253,11 +255,15 @@ func TestDetailsClickSelectsTab(t *testing.T) {
 }
 
 func TestDetailsClickIgnoresCutOffTabs(t *testing.T) {
-	for _, c := range []struct{ width, x int }{{13, 12}, {26, 25}} {
+	for _, c := range []struct {
+		tab      string
+		width, x int
+		want     string
+	}{{"Overview", 13, 12, ""}, {"Overview", 26, 25, ""}, {"Monitoring", 10, 9, "Monitoring"}} {
 		for y := range 2 {
-			v := openedAt(t, "aks", "Overview", c.width, 6)
+			v := openedAt(t, "aks", c.tab, c.width, 6)
 			next, _, hit := v.(Clicker).Click(c.x, y)
-			if hit || tabOf(next) != "" {
+			if hit || tabOf(next) != c.want {
 				t.Errorf("width %d click (%d,%d): hit %v, tab %q", c.width, c.x, y, hit, tabOf(next))
 			}
 		}
@@ -391,5 +397,184 @@ func TestDetailsRefreshToShorterRowClampsScroll(t *testing.T) {
 	got := plainLines(v.Render())
 	if !strings.Contains(got[0], "Overview   Node pools") || got[3] != " {" || got[4] != `   "type": "`+aksType+`"` {
 		t.Errorf("render:\n%s", strings.Join(got, "\n"))
+	}
+}
+
+// barAndRule are the tab bar and its rule of a view, without the margin.
+func barAndRule(v View) (string, string) {
+	lines := plainLines(v.Render())
+	return strings.TrimPrefix(lines[0], " "), strings.TrimPrefix(lines[1], " ")
+}
+
+// shownTabs are the indexes of the AKS tabs whole on the bar. The helper trims
+// the padding of a last tab, so the bar is padded again before the search.
+func shownTabs(bar string) []int {
+	var shown []int
+	for i, name := range aksTabNames {
+		if strings.Contains(bar+" ", " "+name+" ") {
+			shown = append(shown, i)
+		}
+	}
+	return shown
+}
+
+// heavyCells are the columns of the rule drawn heavy.
+func heavyCells(rule string) (start, n int) {
+	start = -1
+	for i, r := range []rune(rule) {
+		if r == '━' {
+			if start < 0 {
+				start = i
+			}
+			n++
+		}
+	}
+	return start, n
+}
+
+func TestDetailsNarrowTabBarKeepsCurrentTabVisible(t *testing.T) {
+	for _, cur := range []string{"Overview", "Networking", "Monitoring", "JSON"} {
+		for width := 16; width <= 76; width++ {
+			bar, rule := barAndRule(openedAt(t, "aks", cur, width+2*margin, 6))
+			shown := shownTabs(bar)
+			at := slices.Index(aksTabNames, cur)
+			if !slices.Contains(shown, at) {
+				t.Errorf("%s at %d: current tab is not whole in %q", cur, width, bar)
+				continue
+			}
+			if first, last := shown[0], shown[len(shown)-1]; last-first+1 != len(shown) ||
+				strings.Contains(bar, "‹") != (first > 0) || strings.Contains(bar, "›") != (last < len(aksTabNames)-1) {
+				t.Errorf("%s at %d: tabs %v and markers do not match %q", cur, width, shown, bar)
+			}
+			if utf8.RuneCountInString(bar) > width || utf8.RuneCountInString(rule) > width {
+				t.Errorf("%s at %d: bar %q or rule %q is wider", cur, width, bar, rule)
+			}
+			wantStart := utf8.RuneCountInString(bar[:strings.Index(bar+" ", " "+cur+" ")])
+			if start, n := heavyCells(rule); start != wantStart || n != len(cur)+2 {
+				t.Errorf("%s at %d: heavy rule at %d for %d cells, want %d for %d: %q", cur, width, start, n, wantStart, len(cur)+2, rule)
+			}
+		}
+	}
+}
+
+func TestDetailsNarrowTabBarCells(t *testing.T) {
+	for _, c := range []struct {
+		cur  string
+		want string
+	}{
+		{"Overview", strings.Join(paddedTabs([]string{"Overview", "Node pools", "Networking", "Identity", "Add-ons"}), " ") + " ›"},
+		{"Monitoring", "‹ " + strings.Join(paddedTabs([]string{"Node pools", "Networking", "Identity", "Add-ons", "Monitoring"}), " ") + " ›"},
+		{"JSON", "‹ " + strings.Join(paddedTabs([]string{"Networking", "Identity", "Add-ons", "Monitoring", "JSON"}), " ")},
+	} {
+		bar, _ := barAndRule(openedAt(t, "aks", c.cur, 68, 6))
+		if want := strings.TrimRight(c.want, " "); bar != want {
+			t.Errorf("%s: bar = %q, want %q", c.cur, bar, want)
+		}
+	}
+}
+
+func TestDetailsFittingTabBarHasNoMarkers(t *testing.T) {
+	bar, rule := barAndRule(openedAt(t, "aks", "JSON", 80, 6))
+	if want := strings.TrimRight(strings.Join(paddedTabs(aksTabNames), " "), " "); bar != want {
+		t.Errorf("bar = %q, want %q", bar, want)
+	}
+	if strings.Count(rule, "━") != len("JSON")+2 || !strings.HasSuffix(rule, "━━━━━━─") {
+		t.Errorf("rule = %q", rule)
+	}
+}
+
+func TestDetailsClickOnScrolledTabBar(t *testing.T) {
+	// Monitoring at content width 66: ‹ 1, Node pools 3-14, Networking 16-27,
+	// Identity 29-38, Add-ons 40-48, Monitoring 50-61, › 63; the margin is cell 0.
+	for _, c := range []struct {
+		name string
+		x, y int
+		want string
+		hit  bool
+	}{
+		{"left marker", 1, 0, "", true},
+		{"gap after the left marker", 2, 0, "Monitoring", false},
+		{"first visible tab", 3, 0, "Node pools", true},
+		{"rule under the first visible tab", 14, 1, "Node pools", true},
+		{"end of the second visible tab", 27, 0, "Networking", true},
+		{"gap between tabs", 28, 0, "Monitoring", false},
+		{"rule in a gap", 28, 1, "Monitoring", false},
+		{"current tab", 50, 0, "Monitoring", true},
+		{"gap before the right marker", 62, 0, "Monitoring", false},
+		{"right marker", 63, 0, "JSON", true},
+		{"rule under the right marker", 63, 1, "JSON", true},
+		{"past the last cell", 64, 0, "Monitoring", false},
+		{"past the last cell on the rule", 66, 1, "Monitoring", false},
+		{"content edge", 67, 0, "Monitoring", false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			v := openedAt(t, "aks", "Monitoring", 68, 6)
+			next, _, hit := v.(Clicker).Click(c.x, c.y)
+			if hit != c.hit {
+				t.Errorf("hit = %v, want %v", hit, c.hit)
+			}
+			if got := tabOf(next); got != c.want {
+				t.Errorf("tab = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
+func TestDetailsClickRightMarkerSelectsFirstHiddenTab(t *testing.T) {
+	v := openedAt(t, "aks", "Overview", 68, 6)
+	next, _, hit := v.(Clicker).Click(59, 0)
+	if !hit || tabOf(next) != "Monitoring" {
+		t.Errorf("hit = %v, tab = %q", hit, tabOf(next))
+	}
+}
+
+func TestDetailsClickLeftMarkerSelectsLastHiddenTabOnTheLeft(t *testing.T) {
+	v := openedAt(t, "aks", "JSON", 68, 6)
+	next, _, hit := v.(Clicker).Click(1, 0)
+	if !hit || tabOf(next) != "Node pools" {
+		t.Errorf("hit = %v, tab = %q", hit, tabOf(next))
+	}
+}
+
+func TestDetailsTabBarMarkersAreMuted(t *testing.T) {
+	line := strings.SplitN(openedAt(t, "aks", "Monitoring", 68, 6).Render(), "\n", 2)[0]
+	for _, m := range []string{"‹", "›"} {
+		if a := attrsOf(t, line, m); a.fg != fgMuted || a.bold {
+			t.Errorf("%s: fg %q bold %v", m, a.fg, a.bold)
+		}
+	}
+}
+
+func TestDetailsTabBarTooNarrowForTheCurrentTab(t *testing.T) {
+	for _, width := range []int{0, 1, 2, 5, 8, 11} {
+		v := openedAt(t, "aks", "Monitoring", width+2*margin, 6)
+		bar, rule := barAndRule(v)
+		if got := utf8.RuneCountInString(bar); got > width {
+			t.Errorf("width %d: bar %q is %d cells", width, bar, got)
+		}
+		if got := utf8.RuneCountInString(rule); got != width {
+			t.Errorf("width %d: rule %q is %d cells", width, rule, got)
+		}
+		v.(Clicker).Click(1, 0)
+	}
+	bar, _ := barAndRule(openedAt(t, "aks", "Monitoring", 16, 6))
+	if bar != " Monitoring  ›" {
+		t.Errorf("bar = %q", bar)
+	}
+	next, _, hit := openedAt(t, "aks", "Monitoring", 16, 6).(Clicker).Click(14, 0)
+	if !hit || tabOf(next) != "JSON" {
+		t.Errorf("marker click: hit %v, tab %q", hit, tabOf(next))
+	}
+	bar, _ = barAndRule(openedAt(t, "aks", "Networking", 16, 6))
+	if bar != " Networking  ›" {
+		t.Errorf("bar = %q", bar)
+	}
+	next, _, hit = openedAt(t, "aks", "Networking", 16, 6).(Clicker).Click(14, 0)
+	if !hit || tabOf(next) != "Identity" {
+		t.Errorf("marker click from a middle tab: hit %v, tab %q", hit, tabOf(next))
+	}
+	bar, rule := barAndRule(openedAt(t, "aks", "Monitoring", 10, 6))
+	if bar != " Monitor" || rule != strings.Repeat("━", 8) {
+		t.Errorf("bar = %q, rule = %q", bar, rule)
 	}
 }
