@@ -96,16 +96,113 @@ func chartCeiling(series [][]azure.Point) float64 {
 	return math.Ceil(top/10) * 10
 }
 
-// axisLabel labels the column age steps from the newest with its time, or "now".
-func axisLabel(m azure.Monitoring, period string, w int) func(age int) string {
-	layout := choose(period == "24h", "15:04", "Jan 2")
-	span := m.End.Sub(m.Start)
-	return func(age int) string {
-		if age == 0 {
-			return "now"
-		}
-		return m.Start.Add(span * time.Duration(w-1-age) / time.Duration(w)).Local().Format(layout)
+// tickStep is the spacing of the time labels: ticks at the local hours
+// divisible by hours, or, when hours is 0, at the local midnights keep accepts.
+type tickStep struct {
+	span  time.Duration
+	hours int
+	keep  func(midnight time.Time) bool
+}
+
+const (
+	chartDay = 24 * time.Hour
+	// chartHourGap and chartDayGap are the fewest columns between two time
+	// labels of the hour and the day steps.
+	chartHourGap, chartDayGap = 12, 10
+)
+
+var (
+	hourSteps = []tickStep{
+		{span: time.Hour, hours: 1},
+		{span: 2 * time.Hour, hours: 2},
+		{span: 3 * time.Hour, hours: 3},
+		{span: 6 * time.Hour, hours: 6},
+		{span: 12 * time.Hour, hours: 12},
 	}
+	daySteps = []tickStep{
+		{span: chartDay, keep: func(time.Time) bool { return true }},
+		{span: 2 * chartDay, keep: func(d time.Time) bool { return epochDay(d)%2 == 0 }},
+		{span: 7 * chartDay, keep: isMonday},
+		{span: 14 * chartDay, keep: isEvenWeekMonday},
+	}
+)
+
+func isMonday(d time.Time) bool { return d.Weekday() == time.Monday }
+
+// isEvenWeekMonday is every other Monday, counted from Monday 1970-01-05, so
+// the ticks stay 14 days apart across years with 53 ISO weeks.
+func isEvenWeekMonday(d time.Time) bool { return isMonday(d) && (epochDay(d)-4)/7%2 == 0 }
+
+// epochDay is the local calendar day of d counted from 1970-01-01.
+func epochDay(d time.Time) int {
+	return int(time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC).Unix() / int64(chartDay/time.Second))
+}
+
+// chartStep is the smallest step of the period whose ticks are at least
+// chartHourGap or chartDayGap columns apart in w columns over span, else the largest.
+func chartStep(period string, span time.Duration, w int) tickStep {
+	steps, gap := daySteps, time.Duration(chartDayGap)
+	if period == "24h" {
+		steps, gap = hourSteps, chartHourGap
+	}
+	for _, s := range steps {
+		if s.span*time.Duration(w) >= gap*span {
+			return s
+		}
+	}
+	return steps[len(steps)-1]
+}
+
+// wallHour is hour h on the local day, false when the clocks skip it.
+func wallHour(y int, mo time.Month, d, h int) (time.Time, bool) {
+	t := time.Date(y, mo, d, h, 0, 0, 0, time.Local)
+	return t, t.Hour() == h && t.Minute() == 0
+}
+
+// tickTimes is the local tick times of the step in [start, end), built from
+// wall-clock fields so a daylight saving change does not shift them; a time
+// the clocks skip is left out.
+func tickTimes(step tickStep, start, end time.Time) []time.Time {
+	var ticks []time.Time
+	add := func(t time.Time) {
+		if !t.Before(start) && t.Before(end) {
+			ticks = append(ticks, t)
+		}
+	}
+	y, mo, d := start.In(time.Local).Date()
+	for i := 0; ; i++ {
+		midnight, ok := wallHour(y, mo, d+i, 0)
+		if !midnight.Before(end) {
+			break
+		}
+		if step.hours == 0 {
+			if ok && step.keep(midnight) {
+				add(midnight)
+			}
+			continue
+		}
+		for h := 0; h < 24; h += step.hours {
+			if t, ok := wallHour(y, mo, d+i, h); ok {
+				add(t)
+			}
+		}
+	}
+	return ticks
+}
+
+// tickLabel labels the column holding a round time with it, and the newest
+// column "now"; the columns map to times as in resample.
+func tickLabel(m azure.Monitoring, period string, w int) func(age int) string {
+	labels := map[int]string{}
+	if span := m.End.Sub(m.Start); span > 0 && w > 0 {
+		step := chartStep(period, span, w)
+		layout := choose(step.hours > 0, "15:04", "Jan 2")
+		for _, t := range tickTimes(step, m.Start, m.End) {
+			labels[w-1-int(t.Sub(m.Start)*time.Duration(w)/span)] = t.Format(layout)
+		}
+	}
+	labels[0] = "now"
+	return func(age int) string { return labels[age] }
 }
 
 // newChart is an empty chart of w columns with a series for each name.
@@ -118,7 +215,7 @@ func newChart(w int, names []string, ceiling float64, label func(age int) string
 		pulse.WithFill(false),
 		pulse.WithLabelWidth(chartLabelWidth),
 		pulse.WithLabelFormatter(func(v float64) string { return fmt.Sprintf("%.0f%%", v) }),
-		pulse.WithXAxis(label),
+		pulse.WithXAxisAt(label),
 	}
 	for i, name := range names {
 		opts = append(opts, pulse.WithSeriesStyle(name, lipgloss.NewStyle().Foreground(chartColors[i%len(chartColors)])))
@@ -128,7 +225,7 @@ func newChart(w int, names []string, ceiling float64, label func(age int) string
 
 // chartLines draws the series, one per name, as a chart with its legend line.
 func chartLines(m azure.Monitoring, period string, names []string, series [][]azure.Point, w int) []string {
-	chart := newChart(w, names, chartCeiling(series), axisLabel(m, period, w))
+	chart := newChart(w, names, chartCeiling(series), tickLabel(m, period, w))
 	for i, name := range names {
 		for _, v := range resample(series[i], m.Start, m.End, m.Interval, w) {
 			chart.PushSeries(name, v)

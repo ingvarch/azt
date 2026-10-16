@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph v0.10.0
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/google/licenseclassifier/v2 v2.0.0
-	github.com/ingvarch/pulse v0.6.1
+	github.com/ingvarch/pulse v0.7.0
 	golang.org/x/mod v0.42.0
 	sigs.k8s.io/yaml v1.6.0
 )
