@@ -36,7 +36,8 @@ func aksMonitoring(row map[string]any, res tabData, width int) []string {
 		return []string{failedLine(res.err)}
 	}
 	m, _ := res.data.(azure.Monitoring)
-	secs := []section{setupSection(row, m, innerWidth(width)), poolsSection(row, m, innerWidth(width)), nodesSection(m), podsSection(m), controlPlaneSection(m)}
+	secs := append([]section{setupSection(row, m, innerWidth(width))}, poolChartSections(row, m, res.period, innerWidth(width))...)
+	secs = append(secs, poolsSection(row, m, innerWidth(width)), nodesSection(m), podsSection(m), controlPlaneSection(m))
 	if autoscaling(row) {
 		secs = append(secs, autoscalerSection(m))
 	}
@@ -148,28 +149,56 @@ func wrapItems(prefix string, items []string, width int) []string {
 	return lines
 }
 
+// poolMetrics are the node CPU and memory series by pool and the pool names, sorted.
+func poolMetrics(m azure.Monitoring) (cpu, mem []azure.Series, names []string) {
+	cpu = seriesOf(m.Pools.Data, "node_cpu_usage_percentage")
+	mem = seriesOf(m.Pools.Data, "node_memory_working_set_percentage")
+	return cpu, mem, dimValues(slices.Concat(cpu, mem), "nodepool")
+}
+
+// poolLabels are the pool names as the table and the charts show them: a pool the cluster does not list is a Karpenter pool.
+func poolLabels(row map[string]any, names []string) []string {
+	own := make([]string, 0, len(names))
+	for _, p := range pools(dig(row, "properties")) {
+		own = append(own, str(p, "name"))
+	}
+	labels := make([]string, len(names))
+	for i, name := range names {
+		labels[i] = name + choose(containsFold(own, name), "", " (auto)")
+	}
+	return labels
+}
+
+// poolChartSections are the CPU and memory charts of the pools; with no pool data or room for a plot there are none.
+func poolChartSections(row map[string]any, m azure.Monitoring, period string, width int) []section {
+	cpu, mem, names := poolMetrics(m)
+	if m.Pools.Err != nil || plotWidth(width) < chartMinPlot || len(names) == 0 || !hasData(slices.Concat(cpu, mem)...) {
+		return nil
+	}
+	labels := poolLabels(row, names)
+	chart := func(title string, metric []azure.Series) section {
+		points := make([][]azure.Point, len(names))
+		for i, name := range names {
+			points[i] = byDim(metric, "nodepool", name).Points
+		}
+		return section{title: title, lines: chartLines(m, period, labels, points, plotWidth(width))}
+	}
+	return []section{chart("Node CPU", cpu), chart("Node memory", mem)}
+}
+
 func poolsSection(row map[string]any, m azure.Monitoring, width int) section {
 	return partSection(overviewPools, m.Pools.Err, func() []string {
-		cpu := seriesOf(m.Pools.Data, "node_cpu_usage_percentage")
-		mem := seriesOf(m.Pools.Data, "node_memory_working_set_percentage")
-		names := dimValues(slices.Concat(cpu, mem), "nodepool")
+		cpu, mem, names := poolMetrics(m)
 		switch {
 		case len(names) == 0:
 			return []string{"none"}
 		case !hasData(slices.Concat(cpu, mem)...):
 			return []string{"no data"}
 		}
-		own := make([]string, 0, len(names))
-		for _, p := range pools(dig(row, "properties")) {
-			own = append(own, str(p, "name"))
-		}
 		rows := make([][]string, len(names))
-		for i, name := range names {
-			c, mm := byDim(cpu, "nodepool", name), byDim(mem, "nodepool", name)
-			if !containsFold(own, name) {
-				name += " (auto)"
-			}
-			rows[i] = []string{name, percent(meanOf(c)), percent(peak(c)), percent(meanOf(mm)), percent(peak(mm))}
+		for i, label := range poolLabels(row, names) {
+			c, mm := byDim(cpu, "nodepool", names[i]), byDim(mem, "nodepool", names[i])
+			rows[i] = []string{label, percent(meanOf(c)), percent(peak(c)), percent(meanOf(mm)), percent(peak(mm))}
 		}
 		cols := []column{{title: "Pool"}, {title: "CPU avg"}, {title: "CPU max"}, {title: "Memory avg"}, {title: "Memory max"}}
 		return summaryTable(cols, rows, width)

@@ -674,7 +674,7 @@ func TestMonitoringErrorTextHasNoRequestURL(t *testing.T) {
 }
 
 func TestMonitoringTabInDetailsView(t *testing.T) {
-	v := openedAt(t, "aks", "Monitoring", 100, 60)
+	v := openedAt(t, "aks", "Monitoring", 100, 90)
 	row := fixture(t, "aks")
 	mk := aksMonitoringKey(row, "24h")
 	if got := bodyText(v); !strings.Contains(got, "Loading monitoring…") {
