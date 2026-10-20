@@ -41,6 +41,16 @@ type Clicker interface {
 	Click(x, y int) (v View, cmd tea.Cmd, hit bool)
 }
 
+// Item is a thing a view shows, by ID and name.
+type Item struct{ ID, Name string }
+
+// Selector is a View with a selected item.
+type Selector interface {
+	View
+	// Selected is the item under the cursor; false when there is none.
+	Selected() (Item, bool)
+}
+
 // ScopeMsg tells the views of a tab which subscription the tab shows; an empty ID means all.
 // Lists over rows of every subscription keep the rows of that subscription; other views ignore it.
 type ScopeMsg struct{ ID, Name string }

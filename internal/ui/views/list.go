@@ -24,6 +24,7 @@ type listConfig[T any] struct {
 	columns []column
 	row     func(T) []string
 	open    func(T) View
+	item    func(T) Item
 	// keep, when set, drops the items it rejects.
 	keep func(T) bool
 	// subscription, when set, gives the subscription ID of an item; the list then
@@ -232,11 +233,29 @@ func (l list[T]) Render() string {
 // hasRows reports whether the table is drawn.
 func (l list[T]) hasRows() bool { return l.ready() && len(l.shown) > 0 }
 
-func (l list[T]) Open() (View, bool) {
+// current is the item of the row under the cursor; false when no row is drawn.
+func (l list[T]) current() (T, bool) {
 	if !l.hasRows() {
+		var zero T
+		return zero, false
+	}
+	return l.shown[l.table.cursor], true
+}
+
+func (l list[T]) Open() (View, bool) {
+	it, ok := l.current()
+	if !ok {
 		return nil, false
 	}
-	return l.cfg.open(l.shown[l.table.cursor]), true
+	return l.cfg.open(it), true
+}
+
+func (l list[T]) Selected() (Item, bool) {
+	it, ok := l.current()
+	if !ok {
+		return Item{}, false
+	}
+	return l.cfg.item(it), true
 }
 
 // Click selects the row drawn on line y; the info line is line 0 when shown.
@@ -263,6 +282,7 @@ func NewSubscriptions() View {
 		},
 		row:      func(s azure.Subscription) []string { return []string{s.Name, s.ID, s.State} },
 		open:     NewResourceGroups,
+		item:     SubscriptionItem,
 		numbered: true,
 	})
 }
@@ -282,6 +302,7 @@ func NewResourceGroups(sub azure.Subscription) View {
 		},
 		row:  func(g azure.ResourceGroup) []string { return []string{g.Name, g.Location, g.State} },
 		open: func(g azure.ResourceGroup) View { return NewResources(sub.ID, g) },
+		item: GroupItem,
 	})
 }
 
@@ -310,6 +331,15 @@ func ShortType(t string) string {
 	return t
 }
 
+// SubscriptionItem is s by its subscription ID and name.
+func SubscriptionItem(s azure.Subscription) Item { return Item{ID: s.ID, Name: s.Name} }
+
+// GroupItem is g by its resource ID and name.
+func GroupItem(g azure.ResourceGroup) Item { return Item{ID: g.ID(), Name: g.Name} }
+
+// ResourceItem is r by its resource ID and name.
+func ResourceItem(r azure.Resource) Item { return Item{ID: r.ID, Name: r.Name} }
+
 func resourcesConfig(subscriptionID string, group azure.ResourceGroup) listConfig[azure.Resource] {
 	return listConfig[azure.Resource]{
 		key:   data.Key{Kind: data.Resources, Subscription: subscriptionID, Group: group.Name},
@@ -324,6 +354,7 @@ func resourcesConfig(subscriptionID string, group azure.ResourceGroup) listConfi
 		},
 		row:  func(r azure.Resource) []string { return []string{r.Name, r.Type, r.Location} },
 		open: func(r azure.Resource) View { return NewDetails(subscriptionID, r) },
+		item: ResourceItem,
 	}
 }
 
@@ -343,6 +374,7 @@ func NewAllResourceGroups() View {
 		},
 		row:          func(g azure.ResourceGroup) []string { return []string{g.Name, g.Subscription, g.Location, g.State} },
 		open:         func(g azure.ResourceGroup) View { return NewResources(g.SubscriptionID, g) },
+		item:         GroupItem,
 		subscription: func(g azure.ResourceGroup) string { return g.SubscriptionID },
 	})
 }
@@ -378,8 +410,25 @@ func NewResourcesByType(resourceTypes ...string) View {
 			return cells
 		},
 		open:         func(r azure.Resource) View { return NewDetails(r.SubscriptionID, r) },
+		item:         ResourceItem,
 		subscription: func(r azure.Resource) string { return r.SubscriptionID },
 	})
+}
+
+// ofType makes cfg a list of the resources of type typ in every subscription;
+// resource is the resource an item holds.
+func ofType[T any](cfg listConfig[T], typ string, resource func(T) azure.Resource) listConfig[T] {
+	cfg.spec = Spec{Kind: "resourcesByType", Type: typ}
+	cfg.title = KindName(typ)
+	cfg.noun = "resources"
+	cfg.empty = "No resources of this type."
+	cfg.open = func(it T) View {
+		r := resource(it)
+		return NewDetails(r.SubscriptionID, r)
+	}
+	cfg.item = func(it T) Item { return ResourceItem(resource(it)) }
+	cfg.subscription = func(it T) string { return resource(it).SubscriptionID }
+	return cfg
 }
 
 // listColumnMax is the widest a list column is by its own content.

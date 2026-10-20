@@ -19,6 +19,11 @@ type ResourceGroup struct {
 	Subscription   string `json:"subscription"` // name; only tenant-wide queries fill it
 }
 
+// ID is the resource ID of g.
+func (g ResourceGroup) ID() string {
+	return "/subscriptions/" + g.SubscriptionID + "/resourceGroups/" + g.Name
+}
+
 // Resource is an Azure resource as Resource Graph returns it.
 type Resource struct {
 	ID             string `json:"id"`

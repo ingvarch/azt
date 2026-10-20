@@ -203,6 +203,26 @@ func (m Model) Stack() ([]views.View, bool) {
 	return stack, true
 }
 
+// Selected is the selected subscription, group or resource; a tab gives its
+// resource, a type nothing.
+func (m Model) Selected() (views.Item, bool) {
+	r, ok := m.selected()
+	if !ok || r.n == nil {
+		return views.Item{}, false
+	}
+	switch r.n.kind {
+	case subscription:
+		return views.SubscriptionItem(r.n.sub), true
+	case group:
+		return views.GroupItem(r.n.group), true
+	case resource:
+		return views.ResourceItem(r.n.resource), true
+	case tab:
+		return views.ResourceItem(r.path[3].resource), true
+	}
+	return views.Item{}, false
+}
+
 func (m Model) selected() (row, bool) {
 	rows := m.rows()
 	if m.idx < 0 || m.idx >= len(rows) {

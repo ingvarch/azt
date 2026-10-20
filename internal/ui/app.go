@@ -11,6 +11,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/atotto/clipboard"
 
 	"github.com/ingvarch/azt/internal/azure"
 	"github.com/ingvarch/azt/internal/layout"
@@ -102,7 +103,9 @@ type Model struct {
 	newTabDialog  bool            // the tab dialog opens a tab; otherwise it renames the active one
 	palette       paletteModel    // the command dialog, while the mode is palette
 	notice        string          // command error shown until the next key
+	info          string          // a message that is not an error, shown until the next key
 	now           func() time.Time
+	clipboard     func(string) error // writes the system clipboard
 	drag          *drag
 	last          *lastPress
 	barShade      color.Color // tab bar background; nil until the terminal reports its own
@@ -134,11 +137,12 @@ func newModel(newView func() views.View, fetch data.Fetcher) Model {
 	// into a message that never reaches the input.
 	input.KeyMap.Paste.SetEnabled(false)
 	return Model{
-		input:   input,
-		now:     time.Now,
-		newView: newView,
-		cache:   data.NewCache(fetch),
-		stacks:  map[layout.PaneID][]views.View{},
+		input:     input,
+		now:       time.Now,
+		clipboard: clipboard.WriteAll,
+		newView:   newView,
+		cache:     data.NewCache(fetch),
+		stacks:    map[layout.PaneID][]views.View{},
 
 		sidebar:        sidebar.New(),
 		sidebarVisible: true,
@@ -211,7 +215,7 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if k == "ctrl+c" && m.mode != modeTabDialog {
 		return m, tea.Quit
 	}
-	m.notice = ""
+	m.notice, m.info = "", ""
 	m.drag, m.last = nil, nil
 	switch m.mode {
 	case modePrefix:
@@ -229,6 +233,10 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.openOverlay(k) || m.chooseSubscription(k) {
 		return m, nil
+	}
+	if k == "y" || k == "Y" {
+		cmd := m.copySelected(k == "Y")
+		return m, cmd
 	}
 	if m.sidebarFocused && k != "q" && k != "ctrl+w" {
 		return m.sidebarKey(msg)
@@ -291,6 +299,37 @@ func (m *Model) chooseSubscription(k string) bool {
 		m.setScope(views.ScopeMsg{ID: subs[n-1].ID, Name: subs[n-1].Name})
 	}
 	return true
+}
+
+// copySelected copies the ID, or the name, of the item selected in the explorer
+// or the focused pane.
+func (m *Model) copySelected(name bool) tea.Cmd {
+	v := m.top(m.tabs[m.active].focus)
+	if m.sidebarFocused {
+		v = m.sidebar
+	}
+	var it views.Item
+	s, ok := v.(views.Selector)
+	if ok {
+		it, ok = s.Selected()
+	}
+	text := it.ID
+	if name {
+		text = it.Name
+	}
+	if !ok || text == "" {
+		m.notice = "nothing to copy"
+		return nil
+	}
+	m.info = "copied " + text
+	write := m.clipboard
+	return tea.Batch(tea.SetClipboard(text), func() tea.Msg {
+		// OSC 52 reaches the terminal over ssh too; the system clipboard is for
+		// terminals without it. OSC 52 gets no reply, so a failed write here
+		// does not mean the copy failed.
+		_ = write(text)
+		return nil
+	})
 }
 
 // setScope sets the subscription of the active tab and tells its views.
@@ -879,6 +918,9 @@ func (m Model) modeBar() string {
 	}
 	if m.notice != "" {
 		lead += errorStyle.Render(m.notice) + "  "
+	}
+	if m.info != "" {
+		lead += m.info + "  "
 	}
 	return lead + hintStyle.Render(hints)
 }

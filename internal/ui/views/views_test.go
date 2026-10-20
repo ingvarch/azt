@@ -62,8 +62,8 @@ var (
 		{ID: "id-2", Name: "Prod", State: "Disabled"},
 	}
 	groups = []azure.ResourceGroup{
-		{Name: "rg-a", Location: "westeurope", State: "Succeeded"},
-		{Name: "rg-b", Location: "northeurope", State: "Deleting"},
+		{Name: "rg-a", Location: "westeurope", State: "Succeeded", SubscriptionID: "id-1"},
+		{Name: "rg-b", Location: "northeurope", State: "Deleting", SubscriptionID: "id-1"},
 	}
 	resources = []azure.Resource{
 		{ID: "/r/web", Name: "web-app", Type: "microsoft.web/sites", Location: "westeurope"},
@@ -96,48 +96,57 @@ var lists = []struct {
 	empty string
 	data  any
 	cells []string
+	// second is the item of the second row.
+	second Item
 }{
 	{
 		"subscriptions", NewSubscriptions,
 		data.Key{Kind: data.Subscriptions}, "Subscriptions", "subscriptions",
 		"No subscriptions found. Check the account you signed in with az login.",
 		subs, []string{"Subscription ID", "Dev", "id-1", "Prod", "id-2", "Disabled"},
+		Item{ID: "id-2", Name: "Prod"},
 	},
 	{
 		"resource groups", func() View { return NewResourceGroups(subs[0]) },
 		data.Key{Kind: data.ResourceGroups, Subscription: "id-1"}, "Dev", "resource groups",
 		"No resource groups in this subscription.",
 		groups, []string{"Location", "rg-a", "westeurope", "rg-b", "Deleting"},
+		Item{ID: "/subscriptions/id-1/resourceGroups/rg-b", Name: "rg-b"},
 	},
 	{
 		"resources", func() View { return NewResources("id-1", groups[1]) },
 		data.Key{Kind: data.Resources, Subscription: "id-1", Group: "rg-b"}, "rg-b", "resources",
 		"No resources in this resource group.",
 		resources, []string{"Type", "web-app", "microsoft.web/sites", "kv-prod", "northeurope"},
+		Item{ID: "/r/kv", Name: "kv-prod"},
 	},
 	{
 		"all resource groups", NewAllResourceGroups,
 		data.Key{Kind: data.AllResourceGroups}, "Resource groups", "resource groups",
 		"No resource groups found.",
 		allGroups, []string{"Subscription", "rg-a", "Dev", "westeurope", "rg-b", "Prod", "Deleting"},
+		Item{ID: "/subscriptions/id-2/resourceGroups/rg-b", Name: "rg-b"},
 	},
 	{
 		"resources by type", func() View { return NewResourcesByType("microsoft.web/sites") },
 		data.Key{Kind: data.ResourcesOfType, Type: "microsoft.web/sites"}, "Web apps", "resources",
 		"No resources of this type.",
 		tenantResources, []string{"Resource group", "Subscription", "web-app", "rg-a", "Dev", "api-app", "Prod"},
+		Item{ID: "/r/api", Name: "api-app"},
 	},
 	{
 		"virtual machines", NewVirtualMachines,
 		data.Key{Kind: data.VirtualMachines}, "Virtual machines", "resources",
 		"No resources of this type.",
 		vmRows[:2], []string{"Private IP", "vm-web", "10.0.0.4", "Deallocated"},
+		Item{ID: "/r/batch", Name: "vm-batch"},
 	},
 	{
 		"AKS clusters", NewAKSClusters,
 		data.Key{Kind: data.AKSClusters}, "AKS clusters", "resources",
 		"No resources of this type.",
 		clusterRows[:2], []string{"Auto-upgrade", "aks-prod", "1.30.4", "none"},
+		Item{ID: "/r/idle", Name: "aks-idle"},
 	},
 }
 

@@ -7,12 +7,8 @@ import (
 
 // NewVirtualMachines lists the virtual machines of every subscription.
 func NewVirtualMachines() View {
-	return newList(listConfig[azure.VM]{
-		key:   data.Key{Kind: data.VirtualMachines},
-		spec:  Spec{Kind: "resourcesByType", Type: vmType},
-		title: KindName(vmType),
-		noun:  "resources",
-		empty: "No resources of this type.",
+	return newList(ofType(listConfig[azure.VM]{
+		key: data.Key{Kind: data.VirtualMachines},
 		columns: []column{
 			{title: "Name"},
 			{title: "Status", state: true},
@@ -24,10 +20,8 @@ func NewVirtualMachines() View {
 			{title: "Subscription"},
 			{title: "Location"},
 		},
-		row:          vmRow,
-		open:         func(vm azure.VM) View { return NewDetails(vm.SubscriptionID, vm.Resource) },
-		subscription: func(r azure.VM) string { return r.SubscriptionID },
-	})
+		row: vmRow,
+	}, vmType, func(vm azure.VM) azure.Resource { return vm.Resource }))
 }
 
 func vmRow(vm azure.VM) []string {

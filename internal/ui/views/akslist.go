@@ -9,12 +9,8 @@ import (
 
 // NewAKSClusters lists the AKS clusters of every subscription.
 func NewAKSClusters() View {
-	return newList(listConfig[azure.Cluster]{
-		key:   data.Key{Kind: data.AKSClusters},
-		spec:  Spec{Kind: "resourcesByType", Type: aksType},
-		title: KindName(aksType),
-		noun:  "resources",
-		empty: "No resources of this type.",
+	return newList(ofType(listConfig[azure.Cluster]{
+		key: data.Key{Kind: data.AKSClusters},
 		columns: []column{
 			{title: "Name"},
 			{title: "Status", state: true},
@@ -26,10 +22,8 @@ func NewAKSClusters() View {
 			{title: "Subscription"},
 			{title: "Location"},
 		},
-		row:          clusterRow,
-		open:         func(c azure.Cluster) View { return NewDetails(c.SubscriptionID, c.Resource) },
-		subscription: func(r azure.Cluster) string { return r.SubscriptionID },
-	})
+		row: clusterRow,
+	}, aksType, func(c azure.Cluster) azure.Resource { return c.Resource }))
 }
 
 func clusterRow(c azure.Cluster) []string {

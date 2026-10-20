@@ -388,3 +388,7 @@ func (d details) Spec() Spec {
 }
 
 func (details) Open() (View, bool) { return nil, false }
+
+func (d details) Selected() (Item, bool) {
+	return Item{ID: d.spec.ResourceID, Name: d.spec.ResourceName}, true
+}
