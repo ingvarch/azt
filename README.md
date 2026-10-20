@@ -96,6 +96,7 @@ Press `?` for help, `:` for a command, `/` to filter and `q` to quit.
 | `:` | command: `subs`, `rg`, `vm`, `aks`, `kv`, `sql`, `pg`, `docdb`, `foundry`, `afd`, `storage`, `app`, `vnet`, `mi`, `acr`, `nsg`, `dns`, `type <type>`, `help`, `q` |
 | `0-9` | subscription of the tab: `0` all, `1`-`9` as numbered in `:subs` |
 | `r` | refresh |
+| `y` / `Y` | copy the ID / name of the selected item |
 | `ctrl-w v` / `ctrl-w s` | split into left and right / top and bottom |
 | `ctrl-w h j k l`, `ctrl-w` arrows | move to the neighbor pane or the explorer |
 | `ctrl-w q`, `ctrl-w z`, `ctrl-w =` | close, zoom, equalize panes |

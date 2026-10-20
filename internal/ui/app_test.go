@@ -125,6 +125,7 @@ func newSidebarHarness(w, h int) *harness {
 	hs := &harness{}
 	hs.m = New(hs.newFake, hs.fetch)
 	hs.m.now = func() time.Time { return hs.clock }
+	hs.m.clipboard = func(string) error { return nil } // keeps the real clipboard out of the tests
 	hs.send(tea.WindowSizeMsg{Width: w, Height: h})
 	return hs
 }
@@ -511,7 +512,7 @@ func TestTabs(t *testing.T) {
 	}
 
 	h.prefix("n") // wraps to 1
-	h.send(key("y"))
+	h.send(key("u"))
 	if len(h.pane(0).keys) != 1 {
 		t.Error("n did not wrap to tab 1")
 	}

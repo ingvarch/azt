@@ -21,7 +21,7 @@ var (
 	keyRes    = data.Key{Kind: data.Resources, Subscription: "id-1", Group: "rg-a"}
 
 	subs   = []azure.Subscription{{ID: "id-1", Name: "Dev"}, {ID: "id-2", Name: "Prod"}}
-	groups = []azure.ResourceGroup{{Name: "rg-a"}, {Name: "rg-b"}}
+	groups = []azure.ResourceGroup{{Name: "rg-a", SubscriptionID: "id-1"}, {Name: "rg-b", SubscriptionID: "id-1"}}
 	res    = []azure.Resource{
 		{ID: "/1", Name: "site-b", Type: "microsoft.web/sites"},
 		{ID: "/2", Name: "sql-b", Type: "microsoft.sql/servers"},

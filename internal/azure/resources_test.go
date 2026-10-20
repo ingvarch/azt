@@ -246,3 +246,10 @@ func TestResourcesOfType(t *testing.T) {
 		t.Errorf("query = %q, want %q", *req.Query, wantQuery)
 	}
 }
+
+func TestResourceGroupID(t *testing.T) {
+	g := ResourceGroup{Name: "rg-app", SubscriptionID: "0000-1111"}
+	if got, want := g.ID(), "/subscriptions/0000-1111/resourceGroups/rg-app"; got != want {
+		t.Errorf("ID() = %q, want %q", got, want)
+	}
+}

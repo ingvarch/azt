@@ -66,3 +66,15 @@ func TestHelpListsTheSubscriptionKeys(t *testing.T) {
 	}
 	t.Errorf("help lacks the subscription keys:\n%s", strings.Join(helpLines(), "\n"))
 }
+
+func TestHelpListsTheCopyKeysForPanesAndExplorer(t *testing.T) {
+	n := 0
+	for _, line := range helpLines() {
+		if strings.HasPrefix(strings.TrimSpace(line), "y / Y ") && strings.Contains(line, "copy the ID / name of the selected item") {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Errorf("help lists the copy keys %d times, want 2 (panes, explorer):\n%s", n, strings.Join(helpLines(), "\n"))
+	}
+}
