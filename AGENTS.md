@@ -46,3 +46,7 @@ go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 run ./...
 - UI changes follow k9s and [taws](https://github.com/huseyinbabal/taws):
   fewer, clearer elements, scope on the number keys.
 - Issues and pull requests go on the GitHub milestone of the next version.
+- The `default-branch` ruleset requires the CI jobs by name: `lint`,
+  `test <os> go <go>`, `govulncheck`, `release snapshot`. Renaming a job or
+  changing a runner or the Go matrix changes a name; update the ruleset with
+  the change, or every pull request waits for a check that never runs.
