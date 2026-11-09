@@ -11,28 +11,8 @@ change is agreed before the work is done.
 
 ## Build and run
 
-You need Go, at least the version named in `go.mod`, and the Azure CLI signed
-in with `az login`. azt reads with that account:
-
-```sh
-az login
-make run
-```
-
-```sh
-make check   # fmt, vet, lint, licenses, test, test on the oldest Go, build
-make dist    # the whole release, published nowhere
-```
-
-- `make lint` needs golangci-lint, the version named in the Makefile; CI runs
-  the same one.
-- `make test-min-go` runs the tests on the go line of `go.mod`, the oldest Go
-  azt supports. Go downloads that toolchain the first time.
-- `make licenses` fails when a module azt links has a license outside the list
-  in `internal/licenses`; `make notices` also writes `THIRD_PARTY_NOTICES`,
-  which the release ships.
-- `make dist` needs goreleaser, the version named in `.tool-versions`, and
-  [syft](https://github.com/anchore/syft) for the SBOMs.
+What you need, how to run azt and the checks, and where the code lives are in
+[docs/development.md](docs/development.md).
 
 ## How a change is made
 
@@ -62,3 +42,4 @@ needs all of them green.
 
 A maintainer pushes a `vX.Y.Z` tag. The tag publishes the release, the deb and
 rpm packages and the Homebrew cask; a pull request changes nothing for that.
+The steps are in [docs/releasing.md](docs/releasing.md).

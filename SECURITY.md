@@ -17,9 +17,10 @@ that fixes it.
 
 ## What azt can reach
 
-azt reads Azure through Azure Resource Graph with the account you signed in to
-with `az login`. It does not create, change or delete resources, and it stores
-no credentials. It writes one file, the layout of the last session, to
+azt reads Azure with the account you signed in to with `az login`: through
+Azure Resource Graph, and through Azure Resource Manager with GET requests
+only, for the metrics and diagnostic settings of the Monitoring tab. It does
+not create, change or delete resources, and it stores no credentials. It writes one file, the layout of the last session, to
 `$XDG_STATE_HOME/azt/session.json` (by default
 `~/.local/state/azt/session.json`) with mode 0600. The file holds subscription
 IDs, resource group names and resource IDs, and no data from the resources.

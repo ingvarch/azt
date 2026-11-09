@@ -1,122 +1,66 @@
-<div align="center">
-
 # azt
-
-**A terminal UI for Azure.**
-Tabs, split panes and one session for every subscription you can see.
 
 [![ci](https://github.com/ingvarch/azt/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ingvarch/azt/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/ingvarch/azt)](https://github.com/ingvarch/azt/releases/latest)
-[![Go](https://img.shields.io/github/go-mod/go-version/ingvarch/azt)](go.mod)
+[![Go](https://img.shields.io/github/go-mod/go-version/ingvarch/azt?logo=go&logoColor=white)](go.mod)
 [![license](https://img.shields.io/github/license/ingvarch/azt)](LICENSE)
 
-</div>
+azt is a terminal UI for Azure, for people who work across many
+subscriptions. It shows the resources of every subscription you can see in
+one table, opens any resource down to its JSON and shows how an AKS cluster
+did over the last 30 days, in tabs and split panes you drive from the keyboard.
+azt only reads: it does not create, change or delete anything. Igor Churmeev
+makes it.
 
-## What it does
+## Features
 
-- Walks from subscriptions to resource groups, resources and the full JSON of
-  a resource: `enter` goes in, `esc` comes back.
-- Lists every VM, AKS cluster, key vault, SQL server, PostgreSQL server,
-  DocumentDB cluster, AI Foundry resource and project, storage account, web
-  app, virtual network, managed identity, container registry, network
-  security group, DNS zone or private DNS zone across all your subscriptions
-  in one table: `:vm`, `:aks`, `:kv` and the other commands. `:vm` shows each
-  VM's status, size, OS and IPs; `:aks` shows each cluster's status,
-  Kubernetes version, nodes, tier and auto-upgrade channel.
-- Shows how an AKS cluster's monitoring is set up and how its nodes, pods and
-  control plane did over the last 24 hours, 7 or 30 days on the Monitoring
-  tab; `p` switches the period.
-- Splits the screen into panes and keeps several tabs, the way vim does with
-  `ctrl-w`. Each pane has its own path, a split copies it, and a pane shows
-  the number of rows of a list.
-- Each tab can show one subscription, chosen with `0-9` (0 is all); the
-  numbers are shown in `:subs`.
-- Shows an explorer tree of subscriptions, resource groups and resource types
-  with counts.
-- Filters any list as you type with `/`.
-- Works with the mouse too: click to focus or select, double click to open,
-  drag a border to resize panes or the explorer, scroll with the wheel.
-- Restores the tabs, panes and their paths the next time you start it.
+- One table of every VM, AKS cluster, key vault, database, storage account,
+  network and more across all your subscriptions: `:vm`, `:aks`, `:kv`.
+- Walk from subscriptions to resource groups, resources and a resource's full
+  JSON.
+- AKS monitoring: how it is set up and how the nodes, pods and control plane
+  did over 24 hours, 7 or 30 days.
+- Tabs and split panes with vim's `ctrl-w` keys; each tab can show one
+  subscription, chosen with `0-9`.
+- An explorer tree of subscriptions, resource groups and resource types with
+  counts.
+- Filter any list as you type, copy an ID or a name with `y` and `Y`, or use
+  the mouse.
+- The tabs, panes and their paths come back the next time you start it.
 
-azt reads through [Azure Resource Graph](https://learn.microsoft.com/azure/governance/resource-graph/overview),
-so a list of thousands of resources across subscriptions is one query. The
-Monitoring tab also reads Azure Monitor metrics and diagnostic settings
-through Azure Resource Manager, with GET requests only, so azt still only
-reads: it does not create, change or delete anything. Reader on a cluster is
-enough to see its metrics.
-
-## Install
-
-On macOS or Linux, with Homebrew:
+## Usage
 
 ```sh
 brew install ingvarch/tap/azt
-```
-
-On Debian, Ubuntu, Fedora or RHEL, download the `.deb` or `.rpm` package from
-the [releases](https://github.com/ingvarch/azt/releases) page and install it:
-
-```sh
-sudo apt install ./azt_*_amd64.deb
-sudo dnf install ./azt-*.x86_64.rpm
-```
-
-For other systems (Linux, macOS, Windows and FreeBSD, on amd64 and ARM),
-download an archive from the same page, or install with Go:
-
-```sh
-go install github.com/ingvarch/azt/cmd/azt@latest
-```
-
-To build from source:
-
-```sh
-make build && ./bin/azt
-```
-
-## Quick start
-
-azt uses the account of the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli).
-No configuration file is needed.
-
-```sh
 az login
 azt
 ```
 
-Press `?` for help, `:` for a command, `/` to filter and `q` to quit.
+Press `?` for every key. Packages for Debian and Fedora, archives for other
+systems and `go install` are in [docs/install.md](docs/install.md).
 
-## Keys
+## Quick start
 
-| Key | What it does |
-| --- | --- |
-| `enter` / `esc` | open the selected item / go back |
-| `j` `k`, `↑` `↓` | move |
-| `/` | filter the list |
-| `:` | command: `subs`, `rg`, `vm`, `aks`, `kv`, `sql`, `pg`, `docdb`, `foundry`, `afd`, `storage`, `app`, `vnet`, `mi`, `acr`, `nsg`, `dns`, `type <type>`, `help`, `q` |
-| `0-9` | subscription of the tab: `0` all, `1`-`9` as numbered in `:subs` |
-| `r` | refresh |
-| `y` / `Y` | copy the ID / name of the selected item |
-| `ctrl-w v` / `ctrl-w s` | split into left and right / top and bottom |
-| `ctrl-w h j k l`, `ctrl-w` arrows | move to the neighbor pane or the explorer |
-| `ctrl-w q`, `ctrl-w z`, `ctrl-w =` | close, zoom, equalize panes |
-| `ctrl-w t`, `ctrl-w n p 1-9`, `ctrl-w ,` | new tab, switch tabs, rename the tab |
-| `ctrl-w e` | show or hide the explorer |
-| `ctrl-w < >`, `ctrl-w =` | with the explorer focused: make it narrower or wider, or reset it to the default width |
-| `?` | every key |
+You need Go and the Azure CLI, see [docs/development.md](docs/development.md).
 
-While azt runs, the terminal's own text selection needs Shift (Option in
-iTerm2), because azt takes the mouse.
+```sh
+git clone https://github.com/ingvarch/azt.git
+cd azt
+make test
+az login
+make run
+```
 
-The session is saved to `$XDG_STATE_HOME/azt/session.json`, by default
-`~/.local/state/azt/session.json`. Delete the file to start with one empty
-tab.
+## Documentation
 
-## Contributing
-
-How to build azt, run the checks and send a change is in
-[CONTRIBUTING.md](CONTRIBUTING.md). Security problems are reported privately,
-see [SECURITY.md](SECURITY.md).
+- [Install](docs/install.md): Homebrew, deb and rpm packages, archives,
+  `go install`, from source.
+- [Usage](docs/usage.md): views, keys, mouse, the session file, what azt
+  reads.
+- [Development](docs/development.md): prerequisites, run, checks, project
+  structure.
+- [Releasing](docs/releasing.md): what a release publishes, how to make one,
+  secrets, failures.
 
 ## License
 
@@ -125,3 +69,8 @@ MIT, see [LICENSE](LICENSE). The release archives and packages also carry
 
 Microsoft and Azure are trademarks of the Microsoft group of companies. azt is
 an independent project and is not affiliated with or endorsed by Microsoft.
+
+## Contributing
+
+How to propose a change is in [CONTRIBUTING.md](CONTRIBUTING.md). Security
+problems are reported privately, see [SECURITY.md](SECURITY.md).
