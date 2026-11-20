@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v7.1.0
         with:
           go-version: stable
           cache: false
@@ -50,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # One input per job: setup-go warns when it gets both.
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v7.1.0
         with:
           go-version-file: ${{ matrix.go == 'go.mod' && 'go.mod' || '' }}
           go-version: ${{ matrix.go != 'go.mod' && matrix.go || '' }}
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v7.1.0
         with:
           go-version: stable
       - uses: anchore/sbom-action/download-syft@v0.24.3
